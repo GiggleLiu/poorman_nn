@@ -14,8 +14,6 @@ import sys,pdb,time
 from os import path
 from spconv import SPConv
 
-from conv import *
-
 def test_pbc_conv1d():
     N=100
     m=random.random([N,N])
@@ -52,8 +50,8 @@ def test_conv2d():
     assert_allclose(res.data.numpy(),[[[[40,48],[72,80]],[[21,25],[37,41]]],[[[48,56],[80,88]],[[25,29],[41,45]]]])
 
     #new
-    fltr=complex128(swapaxes([[[[1.,1,1],[1,0,1],[1,1,1.]]],[[[0,1,0],[1,0,1],[0,1,0]]]],0,1))
-    sv=SPConv((1,2,(4,4),(2,2)),fltr,bias=cv.bias.data.numpy(),strides=(1,1),boundary='O')
+    fltr=complex128([[[[1.,1,1],[1,0,1],[1,1,1.]]],[[[0,1,0],[1,0,1],[0,1,0]]]])
+    sv=SPConv(fltr,bias=cv.bias.data.numpy(),img_in_shape=(4,4),dtype='float32',strides=(1,1),boundary='O')
     x=transpose(ts.data.numpy(),axes=(2,3,0,1))
     res2=sv.forward(complex128(ascontiguousarray(x)))
     res2=transpose(res2,axes=(2,3,0,1))
@@ -62,8 +60,8 @@ def test_conv2d():
 
 def test_conv2d_per():
     num_batch=1
-    dim_x=10
-    dim_y=10
+    dim_x=20
+    dim_y=20
     K=3
     nfin=10
     nfout=16
@@ -72,11 +70,12 @@ def test_conv2d_per():
     ts=autograd.Variable(torch.Tensor(ts),requires_grad=True)
     #2 features, kernel size 3x3
     cv=Conv2d(nfin,nfout,kernel_size=(K,K),stride=(1,1),padding=(0,0))
-    fltr=swapaxes(cv.weight.data.numpy(),0,1)
-    sv=SPConv((nfin,nfout,(dim_x,dim_y),(dim_x-K+1,dim_y-K+1)),float32(fltr),bias=float32(cv.bias.data.numpy()),strides=(1,1),boundary='O')
+    fltr=cv.weight.data.numpy()
+    sv=SPConv(float32(fltr),float32(cv.bias.data.numpy()),(dim_x,dim_y),strides=(1,1),boundary='O', w_contiguous=True)
     #xin_np=ascontiguousarray(transpose(ts.data.numpy(),(0,2,3,1)))
     #xin_np=ascontiguousarray(transpose(ts.data.numpy(),(2,3,0,1)))
     xin_np=ascontiguousarray(transpose(ts.data.numpy(),(2,3,1,0)))
+    xin_np1=xin_np[...,0]
     ntest=5
     t0=time.time()
     for i in xrange(ntest):
@@ -85,38 +84,61 @@ def test_conv2d_per():
     for i in xrange(ntest):
         y2=sv.forward(xin_np)
     t2=time.time()
-    print "Elapse old = %s, new = %s"%(t1-t0,t2-t1)
+    for i in xrange(ntest):
+        y3=sv.forward(xin_np1)
+    t3=time.time()
+    print "Elapse old = %s, new = %s, new_1 = %s"%(t1-t0,t2-t1,t3-t2)
     res1=y1.data.numpy()
     #res2=transpose(y2,(2,3,0,1))
     #res2=transpose(y2,(0,3,1,2))
     res2=transpose(y2,(3,2,0,1))
+    res3=transpose(y3[...,newaxis],(3,2,0,1))
     assert_allclose(res1,res2,atol=1e-4)
+    assert_allclose(res1,res3,atol=1e-4)
 
     print "Testing backward"
     dy=torch.randn(*y1.size())
     dy_np=ascontiguousarray(transpose(dy.numpy(),(2,3,1,0)))
-    dweight=zeros_like(sv.fltr_data)
+    dy_np1=dy_np[...,0]
+    dweight=zeros_like(sv._fltr_flatten)
     dbias=zeros_like(sv.bias)
+    dweight1=zeros_like(sv._fltr_flatten)
+    dbias1=zeros_like(sv.bias)
     dx=zeros_like(xin_np)
+    dx1=zeros_like(xin_np1)
 
     t0=time.time()
     y1.backward(dy)
     t1=time.time()
     for i in xrange(ntest):
         sv.backward(xin_np, y2, dy_np, dx, dweight, dbias, mask=(1,1,1))
+    t2=time.time()
+    for i in xrange(ntest):
+        sv.backward(xin_np1, y3, dy_np1, dx1, dweight1, dbias1, mask=(1,1,1))
+    t3=time.time()
+    print "Elapse old = %s, new = %s, new-1 = %s"%(t1-t0,(t2-t1)/ntest,(t3-t2)/ntest)
     dweight/=ntest
     dx/=ntest
     dbias/=ntest
-    t2=time.time()
-    print "Elapse old = %s, new = %s"%(t1-t0,(t2-t1)/ntest)
+    dweight1/=ntest
+    dx1/=ntest
+    dbias1/=ntest
 
-    dx=transpose(dx,(3,2,0,1))
-    wfactor=abs(dweight).mean()
-    bfactor=abs(dbias).mean()
+    #reshape back
+    dx0=transpose(ts.grad.data.numpy(),(2,3,1,0))
+    dx1=dx1[...,newaxis]
+
+    wfactor=dweight.mean()
+    bfactor=dbias.mean()
     dweight=reshape(dweight,cv.weight.size())/wfactor
-    assert_allclose(ts.grad.data.numpy(),dx,atol=1e-4)
-    assert_allclose(cv.weight.grad.data.numpy()/wfactor,dweight,atol=1e-4)
-    assert_allclose(cv.bias.grad.data.numpy()/bfactor,dbias/bfactor,atol=1e-4)
+    dweight1=reshape(dweight1,cv.weight.size())/wfactor
+    assert_allclose(dx0,dx,atol=2e-3)
+    assert_allclose(cv.weight.grad.data.numpy()/wfactor,dweight,atol=2e-3)
+    assert_allclose(cv.bias.grad.data.numpy()/bfactor,dbias/bfactor,atol=2e-3)
+    assert_allclose(dx0,dx1,atol=2e-3)
+    assert_allclose(cv.weight.grad.data.numpy()/wfactor,dweight1,atol=2e-3)
+    assert_allclose(cv.bias.grad.data.numpy()/bfactor,dbias1/bfactor,atol=2e-3)
+    pdb.set_trace()
 
 #test_pbc_conv1d()
 #test_conv1d()
