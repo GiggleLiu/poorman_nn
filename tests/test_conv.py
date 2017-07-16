@@ -5,13 +5,13 @@ from numpy import *
 from numpy.linalg import norm,svd
 from copy import deepcopy
 from numpy.testing import dec,assert_,assert_raises,assert_almost_equal,assert_allclose
-from matplotlib.pyplot import *
 import torch.nn.functional as F
 from torch.nn import Conv1d,Conv2d
 from torch import autograd
 import torch
 import sys,pdb,time
-from os import path
+sys.path.insert(0,'../')
+
 from spconv import SPConv
 
 def test_pbc_conv1d():
@@ -93,8 +93,8 @@ def test_conv2d_per():
     #res2=transpose(y2,(0,3,1,2))
     res2=transpose(y2,(3,2,0,1))
     res3=transpose(y3[...,newaxis],(3,2,0,1))
-    assert_allclose(res1,res2,atol=1e-4)
     assert_allclose(res1,res3,atol=1e-4)
+    assert_allclose(res1,res2,atol=1e-4)
 
     print "Testing backward"
     dy=torch.randn(*y1.size())

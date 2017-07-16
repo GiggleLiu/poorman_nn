@@ -5,8 +5,9 @@ Convolution using sparse matrix.
 import numpy as np
 import pdb,time
 
-from spconvz import lib as spconvz
-from spconvd import lib as spconvd
+from lib.spconvz import lib as spconvz
+from lib.spconvd import lib as spconvd
+from utils import scan2csc
 
 class SPConv(object):
     '''
@@ -50,49 +51,11 @@ class SPConv(object):
 
         num_feature_out, num_feature_in = self.fltr.shape[:2]
         kernel_shape = self.fltr.shape[2:]
-        dim_kernel = np.prod(kernel_shape)
-        dim_in = np.prod(img_in_shape)
 
-        if len(img_in_shape)!=len(strides) or len(kernel_shape)!=len(strides):
-            raise ValueError("Dimension Error! (%d, %d, %d, %d)"%(len(strides),len(size_out),len(img_in_shape),len(kernel_shape)))
-
-        # get output image shape
-        dimension = len(strides)
-        img_out_shape=[]
-        for i in xrange(dimension):
-            dim_scan=img_in_shape[i]
-            if boundary=='P':
-                pass
-            elif boundary=='O':
-                dim_scan-=kernel_shape[i]-1
-            else:
-                raise ValueError("Type of boundary Error!")
-            if dim_scan%strides[i]!=0: raise ValueError("Stride and Shape not match!")
-            num_sweep_i=dim_scan/strides[i]
-            img_out_shape.append(num_sweep_i)
-        self.img_out_shape = tuple(img_out_shape)
-        dim_out = np.prod(img_out_shape)
-
-        # create a sparse csc_matrix(dim_in, dim_out), used in fortran and start from 1!.
-        self.csc_indptr=np.arange(1,dim_kernel*dim_out+2, dim_kernel, dtype='int32')
-        csc_indices=[]   #pointer to rows in x
-        if dimension==1:
-            for i in xrange(img_out_shape[0]):
-                csc_indices.append(np.arange(strides[0]*i+1,strides[0]*i+dim_filter+1,dtype='int32')%dim_in)
-        if dimension==2:
-            for i in xrange(img_out_shape[0]):
-                for j in xrange(img_out_shape[1]):
-                    i0, j0 = i*strides[0], j*strides[1]
-                    start_ = i*img_in_shape[1]+j
-                    indices_ij = np.concatenate(np.int32([[(i_%img_in_shape[0])*img_in_shape[1]+j_%img_in_shape[1]+1 for j_ in xrange(j0,j0+kernel_shape[1])]\
-                            for i_ in xrange(i0,i0+kernel_shape[0])]))
-                    csc_indices.append(indices_ij)
-        else:
-            raise ValueError("Dimension too high!")
-        self.csc_indices=np.concatenate(csc_indices)
-        #self.fltr_data = np.asfortranarray(np.transpose(np.tile(fltr.reshape([num_feature_in,num_feature_out,dim_kernel]), [1,1,np.prod(img_out_shape)]),axes=(2,0,1)).T)
+        self.csc_indptr, self.csc_indices, self.img_out_shape = scan2csc(kernel_shape, img_in_shape, strides, boundary)
+        #self.fltr_data = np.asfortranarray(np.transpose(np.tile(fltr.reshape([num_feature_in,num_feature_out,dim_kernel]), [1,1,np.prod(self.img_out_shape)]),axes=(2,0,1)).T)
         if not w_contiguous:
-            self.weight_indices = np.asfortranarray(np.tile(np.arange(dim_kernel,dtype='int32'),np.prod(img_out_shape)))+1  #pointer to filter data
+            self.weight_indices = np.asfortranarray(np.tile(np.arange(np.prod(kernel_shape),dtype='int32'),np.prod(self.img_out_shape)))+1  #pointer to filter data
 
     @property
     def img_nd(self):

@@ -1,8 +1,11 @@
 import numpy as np
+from numpy import ma
+import pdb
 
 from core import Layer,EMPTY_ARRAY
+from utils import scan2csc
 
-__all__=['Function','Log2cosh','Sigmoid']
+__all__=['Function','Log2cosh','Sigmoid','Sum','ReLU','PReLU','MaxPool']
 
 EXP_OVERFLOW=30
 
@@ -110,4 +113,106 @@ class Sum(Function):
         dy_=dy[(slice(None),)*self.axis+(np.newaxis,)]
         return EMPTY_ARRAY,np.repeat(dy_,self._nitem,axis=self.axis)
 
-#TODO: sum, maxpool?, onehot?
+
+class ReLU(Function):
+    '''
+    ReLU.
+    '''
+    def __init__(self, leak = 0):
+        self.leak = leak
+        if leak>1 or leak<0:
+            raise ValueError('leak parameter should be 0-1!')
+
+    def forward(self, x):
+        if self.leak==0:
+            return maximum(x,0)
+        else:
+            return maximum(x,self.leak*x)
+
+    def backward(self, x, y, dy):
+        dx=dy.copy()
+        if self.leak==0:
+            dx[x<0]=0
+        else:
+            dx[x<0]=leak*dy
+        return EMPTY_ARRAY, dx
+
+class PReLU(Function):
+    '''
+    Parametric ReLU.
+    '''
+    def __init__(self, leak = 0, dtype='float64'):
+        self.leak = leak
+        self.dtype=dtype
+        if leak>1 or leak<0:
+            raise ValueError('leak parameter should be 0-1!')
+
+    def forward(self, x):
+        if self.leak==0:
+            return maximum(x,0)
+        else:
+            return maximum(x,self.leak*x)
+
+    def backward(self, x, y, dy):
+        dx=dy.copy()
+        mask=x<0
+        if self.leak==0:
+            dx[mask]=0
+        else:
+            dx[mask]=leak*dy
+        da = np.sum(dy[mask]*x[mask].conj())
+        return np.array([da], dtype=self.dtype), dx
+
+    def get_variables(self):
+        return np.array([self.leak], dtype=self.dtype)
+
+    def set_variables(self, a):
+        self.leak=a.item()
+
+class MaxPool(Function):
+    '''
+    Max pooling.
+
+    Note:
+        for complex numbers, what does max pooling looks like?
+    '''
+    def __init__(self, kernel_shape, img_in_shape, boundary):
+        self.kernel_shape = kernel_shape
+        self.img_in_shape = img_in_shape
+        self.csc_indptr, self.csc_indices, self.img_out_shape = scan2csc(kernel_shape, img_in_shape, strides=kernel_shape, boundary=boundary)
+
+    @property
+    def img_nd(self):
+        return len(self.kernel_shape)
+
+    def forward(self, x):
+        '''
+        Parameters:
+            :x: ndarray, (dim_in(s), num_feature_in, num_batch), input in 'C' order.
+
+        Return:
+            ndarray, (dim_out(s), num_feature_out, num_batch), output in 'C' order.
+        '''
+        res=[]
+        x=x.reshape((-1,)+x.shape[-2:])
+        for start,end in zip(self.csc_indptr[:-1],self.csc_indptr[1:]):
+            indices=self.csc_indices[start-1:end-1]-1
+            res.append(np.max(x[indices],axis=0))
+        res=np.reshape(res,self.img_out_shape+x.shape[-2:])
+        return res
+
+    def backward(self, x, y, dy):
+        '''It will shed a mask on dy'''
+        x_=x.reshape((-1,)+x.shape[-2:])
+        dy=dy.reshape((-1,)+dy.shape[-2:])
+        dx=ma.zeros(x_.shape,fill_value=0,dtype=dy.dtype)
+        dx.mask=np.ones(dx.shape,dtype='bool')
+        ind1,ind2=np.indices(x.shape[-2:])
+        for dyi,start,end in zip(dy,self.csc_indptr[:-1],self.csc_indptr[1:]):
+            indices=self.csc_indices[start-1:end-1]-1
+            maxind=indices[np.argmax(x_[indices],axis=0)]
+            dx.mask[maxind,ind1,ind2]=False
+            dx.data[maxind,ind1,ind2]=dyi
+        return EMPTY_ARRAY, dx.reshape(x.shape)
+
+#TODO: onehot?

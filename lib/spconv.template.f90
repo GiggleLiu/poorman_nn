@@ -181,8 +181,10 @@ module lib
                 !calculate dweight
                 {%ifequal version "general"%}
                 w_work=0
-                call {{dtype_token}}ger{%if is_complex%}c{%endif%}(nfo, k, one, dy(:,col), 1,&
-                    x_work, 1, w_work, nfo)
+                !call {{dtype_token}}ger{%if is_complex%}c{%endif%}(nfo, k, one, dy(:,col), 1,&
+                !    x_work, 1, w_work, nfo)
+                call {{dtype_token}}gemm('N', 'N', nfo, k, 1, one, dy(:,col), nfo,&
+                    {%if is_complex%}conjg(x_work){%else%}x_work{%endif%}, 1, zero, w_work, nfo)
                 !extract rows
                 do ii=1,nnz_row
                     row=weight_indices(start_+ii-1)

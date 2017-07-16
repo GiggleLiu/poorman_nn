@@ -1,1 +1,0 @@
-template4 is more memory friendly.

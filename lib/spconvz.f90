@@ -1,3 +1,4 @@
+!This is an automatically generated .f90 file.
 !orders: conv_dim_out/in, feature_dim_out/in, batch_dim
 module lib
     contains
@@ -6,14 +7,14 @@ module lib
             nnz, dim_in, dim_out, nfi, nfo, nd, max_nnz_row)
         implicit none
         integer,intent(in) :: num_batch, nnz, dim_in, dim_out, nfi, nfo, max_nnz_row, nd
-        real*4,intent(in) :: x(num_batch, nfi, dim_in), bias(nfo)
-        real*4,intent(in) :: fltr_data(nfo, nfi, nd)
+        complex*16,intent(in) :: x(num_batch, nfi, dim_in), bias(nfo)
+        complex*16,intent(in) :: fltr_data(nfo, nfi, nd)
         integer,intent(in) :: csc_indices(nnz), csc_indptr(dim_out+1), weight_indices(nnz)
-        real*4,intent(out) :: y(num_batch, nfo, dim_out)
+        complex*16,intent(out) :: y(num_batch, nfo, dim_out)
 
-        real*4 :: x_work(num_batch, nfi, max_nnz_row), w_work(nfo, nfi, max_nnz_row)
+        complex*16 :: x_work(num_batch, nfi, max_nnz_row), w_work(nfo, nfi, max_nnz_row)
         integer :: start_, end_, col, ii, nnz_row, k
-        real*4,parameter :: one=1.0
+        complex*16,parameter :: one=dcmplx(1D0,0D0)
         !f2py intent(in) x, csc_indices, csc_indptr, fltr_data, bias, weight_indices
         !f2py intent(in) nfi, nfo, num_batch, max_nnz_row, nnz, dim_out, nd, dim_in
         !f2py intent(out) y
@@ -33,7 +34,7 @@ module lib
                 x_work(:,:,ii)=x(:,:,csc_indices(start_+ii-1))
                 w_work(:,:,ii)=fltr_data(:,:,weight_indices(start_+ii-1))
             enddo
-            call sgemm('N', 'T', num_batch, nfo, k, one, x_work, num_batch,&
+            call zgemm('N', 'T', num_batch, nfo, k, one, x_work, num_batch,&
                 w_work, nfo, one, y(:,:,col), num_batch)
         enddo
     end subroutine forward_general
@@ -43,15 +44,15 @@ module lib
         implicit none
         integer,intent(in) :: num_batch, nnz,dim_in,dim_out,nfi,nfo,nd,max_nnz_row
         logical,intent(in) :: do_xgrad, do_wgrad, do_bgrad
-        real*4,intent(in) :: x(num_batch, nfi, dim_in), dy(num_batch, nfo, dim_out),&
+        complex*16,intent(in) :: x(num_batch, nfi, dim_in), dy(num_batch, nfo, dim_out),&
             fltr_data(nfo,nfi,nd), bias(nfo)
         integer,intent(in) :: csc_indices(nnz), csc_indptr(dim_out+1), weight_indices(nnz)
-        real*4,intent(inout) :: dweight(nfo, nfi, nd), dbias(nfo), dx(num_batch, nfi, dim_in)
+        complex*16,intent(inout) :: dweight(nfo, nfi, nd), dbias(nfo), dx(num_batch, nfi, dim_in)
 
         integer :: start_, end_, k, col, ii, row, nnz_row
-        real*4 :: x_work(num_batch, nfi, max_nnz_row), w_work(nfo, nfi, max_nnz_row)
-        real*4,parameter :: one=1.0
-        real*4,parameter :: zero=0.0
+        complex*16 :: x_work(num_batch, nfi, max_nnz_row), w_work(nfo, nfi, max_nnz_row)
+        complex*16,parameter :: one=dcmplx(1D0,0D0)
+        complex*16,parameter :: zero=dcmplx(0D0,0D0)
 
         !f2py intent(in) x, dy, csc_indices, csc_indptr, weight_indices, fltr_data
         !f2py intent(in) do_xgrad, do_wgrad, do_bgrad
@@ -72,8 +73,8 @@ module lib
 
                 !calculate dweight
                 
-                call sgemm('T', 'N', nfo, k, num_batch, one, dy(:,:,col), num_batch,&
-                    x_work, num_batch, zero, w_work, nfo)
+                call zgemm('T', 'N', nfo, k, num_batch, one, dy(:,:,col), num_batch,&
+                    conjg(x_work), num_batch, zero, w_work, nfo)
 
                 !extract rows
                 do ii=1,nnz_row
@@ -89,8 +90,8 @@ module lib
                     w_work(:,:,ii)=fltr_data(:,:,weight_indices(start_+ii-1))
                 enddo
                 !calculate dx
-                call sgemm('N', 'N', num_batch, k, nfo, one, dy(:,:,col), num_batch,&
-                    w_work, nfo, zero, x_work, num_batch)
+                call zgemm('N', 'N', num_batch, k, nfo, one, dy(:,:,col), num_batch,&
+                    conjg(w_work), nfo, zero, x_work, num_batch)
                 
                 !extract rows
                 do ii=1,nnz_row
@@ -109,14 +110,14 @@ module lib
             nnz, dim_in, dim_out, nfi, nfo, nd, max_nnz_row)
         implicit none
         integer,intent(in) :: nnz, dim_in, dim_out, nfi, nfo, max_nnz_row, nd
-        real*4,intent(in) :: x(nfi, dim_in), bias(nfo)
-        real*4,intent(in) :: fltr_data(nfo, nfi, nd)
+        complex*16,intent(in) :: x(nfi, dim_in), bias(nfo)
+        complex*16,intent(in) :: fltr_data(nfo, nfi, nd)
         integer,intent(in) :: csc_indices(nnz), csc_indptr(dim_out+1), weight_indices(nnz) 
-        real*4,intent(out) :: y(nfo, dim_out)
+        complex*16,intent(out) :: y(nfo, dim_out)
 
-        real*4 :: x_work(nfi, max_nnz_row), w_work(nfo, nfi, max_nnz_row)
+        complex*16 :: x_work(nfi, max_nnz_row), w_work(nfo, nfi, max_nnz_row)
         integer :: start_, end_, col, ii, nnz_row, k
-        real*4,parameter :: one=1.0
+        complex*16,parameter :: one=dcmplx(1D0,0D0)
         !f2py intent(in) x, csc_indices, csc_indptr, fltr_data, weight_indices,  bias
         !f2py intent(in) nfi, nfo, max_nnz_row, nnz, dim_out, nd, dim_in
         !f2py intent(out) y
@@ -136,7 +137,7 @@ module lib
                 x_work(:,ii)=x(:,csc_indices(start_+ii-1))
                 w_work(:,:,ii)=fltr_data(:,:,weight_indices(start_+ii-1))
             enddo
-            call sgemv('N', nfo, k, one, fltr_data, nfo,&
+            call zgemv('N', nfo, k, one, fltr_data, nfo,&
             x_work, 1, one, y(:,col), 1)
         enddo
     end subroutine forward1_general
@@ -146,14 +147,14 @@ module lib
         implicit none
         integer,intent(in) :: nnz,dim_in,dim_out,nfi,nfo,nd,max_nnz_row
         logical,intent(in) :: do_xgrad, do_wgrad, do_bgrad
-        real*4,intent(in) :: x(nfi, dim_in), dy(nfo, dim_out), fltr_data(nfo,nfi,nd), bias(nfo)
+        complex*16,intent(in) :: x(nfi, dim_in), dy(nfo, dim_out), fltr_data(nfo,nfi,nd), bias(nfo)
         integer,intent(in) :: csc_indices(nnz), csc_indptr(dim_out+1), weight_indices(nnz) 
-        real*4,intent(inout) :: dweight(nfo, nfi, nd), dbias(nfo), dx(nfi, dim_in)
+        complex*16,intent(inout) :: dweight(nfo, nfi, nd), dbias(nfo), dx(nfi, dim_in)
 
         integer :: start_, end_, k, col, ii, row, nnz_row
-        real*4 :: x_work(nfi, max_nnz_row), w_work(nfo, nfi, max_nnz_row)
-        real*4,parameter :: one=1.0
-        real*4,parameter :: zero=0.0
+        complex*16 :: x_work(nfi, max_nnz_row), w_work(nfo, nfi, max_nnz_row)
+        complex*16,parameter :: one=dcmplx(1D0,0D0)
+        complex*16,parameter :: zero=dcmplx(0D0,0D0)
 
         !f2py intent(in) x, dy, csc_indices, csc_indptr, weight_indices, fltr_data
         !f2py intent(in) do_xgrad, do_wgrad, do_bgrad
@@ -175,8 +176,10 @@ module lib
                 !calculate dweight
                 
                 w_work=0
-                call sger(nfo, k, one, dy(:,col), 1,&
-                    x_work, 1, w_work, nfo)
+                !call zgerc(nfo, k, one, dy(:,col), 1,&
+                !    x_work, 1, w_work, nfo)
+                call zgemm('N', 'N', nfo, k, 1, one, dy(:,col), nfo,&
+                    conjg(x_work), 1, zero, w_work, nfo)
                 !extract rows
                 do ii=1,nnz_row
                     row=weight_indices(start_+ii-1)
@@ -192,7 +195,7 @@ module lib
                 enddo
                 
                 !calculate dx
-                call sgemv('T', nfo, k, one,&
+                call zgemv('C', nfo, k, one,&
                     w_work, nfo, dy(:,col), 1, zero, x_work, 1)
                 !extract rows
                 do ii=1,nnz_row
@@ -211,14 +214,14 @@ module lib
             nnz, dim_in, dim_out, nfi, nfo, nd, max_nnz_row)
         implicit none
         integer,intent(in) :: num_batch, nnz, dim_in, dim_out, nfi, nfo, max_nnz_row, nd
-        real*4,intent(in) :: x(num_batch, nfi, dim_in), bias(nfo)
-        real*4,intent(in) :: fltr_data(nfo, nfi, nd)
+        complex*16,intent(in) :: x(num_batch, nfi, dim_in), bias(nfo)
+        complex*16,intent(in) :: fltr_data(nfo, nfi, nd)
         integer,intent(in) :: csc_indices(nnz), csc_indptr(dim_out+1)
-        real*4,intent(out) :: y(num_batch, nfo, dim_out)
+        complex*16,intent(out) :: y(num_batch, nfo, dim_out)
 
-        real*4 :: x_work(num_batch, nfi, max_nnz_row)
+        complex*16 :: x_work(num_batch, nfi, max_nnz_row)
         integer :: start_, end_, col, ii, nnz_row, k
-        real*4,parameter :: one=1.0
+        complex*16,parameter :: one=dcmplx(1D0,0D0)
         !f2py intent(in) x, csc_indices, csc_indptr, fltr_data, bias
         !f2py intent(in) nfi, nfo, num_batch, max_nnz_row, nnz, dim_out, nd, dim_in
         !f2py intent(out) y
@@ -238,7 +241,7 @@ module lib
                 x_work(:,:,ii)=x(:,:,csc_indices(start_+ii-1))
                 
             enddo
-            call sgemm('N', 'T', num_batch, nfo, k, one, x_work, num_batch,&
+            call zgemm('N', 'T', num_batch, nfo, k, one, x_work, num_batch,&
                 fltr_data, nfo, one, y(:,:,col), num_batch)
         enddo
     end subroutine forward_contiguous
@@ -248,15 +251,15 @@ module lib
         implicit none
         integer,intent(in) :: num_batch, nnz,dim_in,dim_out,nfi,nfo,nd,max_nnz_row
         logical,intent(in) :: do_xgrad, do_wgrad, do_bgrad
-        real*4,intent(in) :: x(num_batch, nfi, dim_in), dy(num_batch, nfo, dim_out),&
+        complex*16,intent(in) :: x(num_batch, nfi, dim_in), dy(num_batch, nfo, dim_out),&
             fltr_data(nfo,nfi,nd), bias(nfo)
         integer,intent(in) :: csc_indices(nnz), csc_indptr(dim_out+1)
-        real*4,intent(inout) :: dweight(nfo, nfi, nd), dbias(nfo), dx(num_batch, nfi, dim_in)
+        complex*16,intent(inout) :: dweight(nfo, nfi, nd), dbias(nfo), dx(num_batch, nfi, dim_in)
 
         integer :: start_, end_, k, col, ii, row, nnz_row
-        real*4 :: x_work(num_batch, nfi, max_nnz_row)
-        real*4,parameter :: one=1.0
-        real*4,parameter :: zero=0.0
+        complex*16 :: x_work(num_batch, nfi, max_nnz_row)
+        complex*16,parameter :: one=dcmplx(1D0,0D0)
+        complex*16,parameter :: zero=dcmplx(0D0,0D0)
 
         !f2py intent(in) x, dy, csc_indices, csc_indptr, fltr_data
         !f2py intent(in) do_xgrad, do_wgrad, do_bgrad
@@ -277,14 +280,14 @@ module lib
 
                 !calculate dweight
                 
-                call sgemm('T', 'N', nfo, k, num_batch, one, dy(:,:,col), num_batch,&
-                    x_work, num_batch, one, dweight, nfo)
+                call zgemm('T', 'N', nfo, k, num_batch, one, dy(:,:,col), num_batch,&
+                    conjg(x_work), num_batch, one, dweight, nfo)
                 
             endif
             if(do_xgrad) then
                 
-                call sgemm('N', 'N', num_batch, k, nfo, one, dy(:,:,col), num_batch,&
-                    fltr_data, nfo, zero, x_work, num_batch)
+                call zgemm('N', 'N', num_batch, k, nfo, one, dy(:,:,col), num_batch,&
+                    conjg(fltr_data), nfo, zero, x_work, num_batch)
                 
                 !extract rows
                 do ii=1,nnz_row
@@ -303,14 +306,14 @@ module lib
             nnz, dim_in, dim_out, nfi, nfo, nd, max_nnz_row)
         implicit none
         integer,intent(in) :: nnz, dim_in, dim_out, nfi, nfo, max_nnz_row, nd
-        real*4,intent(in) :: x(nfi, dim_in), bias(nfo)
-        real*4,intent(in) :: fltr_data(nfo, nfi, nd)
+        complex*16,intent(in) :: x(nfi, dim_in), bias(nfo)
+        complex*16,intent(in) :: fltr_data(nfo, nfi, nd)
         integer,intent(in) :: csc_indices(nnz), csc_indptr(dim_out+1)
-        real*4,intent(out) :: y(nfo, dim_out)
+        complex*16,intent(out) :: y(nfo, dim_out)
 
-        real*4 :: x_work(nfi, max_nnz_row)
+        complex*16 :: x_work(nfi, max_nnz_row)
         integer :: start_, end_, col, ii, nnz_row, k
-        real*4,parameter :: one=1.0
+        complex*16,parameter :: one=dcmplx(1D0,0D0)
         !f2py intent(in) x, csc_indices, csc_indptr, fltr_data,bias
         !f2py intent(in) nfi, nfo, max_nnz_row, nnz, dim_out, nd, dim_in
         !f2py intent(out) y
@@ -330,7 +333,7 @@ module lib
                 x_work(:,ii)=x(:,csc_indices(start_+ii-1))
                 
             enddo
-            call sgemv('N', nfo, k, one, fltr_data, nfo,&
+            call zgemv('N', nfo, k, one, fltr_data, nfo,&
             x_work, 1, one, y(:,col), 1)
         enddo
     end subroutine forward1_contiguous
@@ -340,14 +343,14 @@ module lib
         implicit none
         integer,intent(in) :: nnz,dim_in,dim_out,nfi,nfo,nd,max_nnz_row
         logical,intent(in) :: do_xgrad, do_wgrad, do_bgrad
-        real*4,intent(in) :: x(nfi, dim_in), dy(nfo, dim_out), fltr_data(nfo,nfi,nd), bias(nfo)
+        complex*16,intent(in) :: x(nfi, dim_in), dy(nfo, dim_out), fltr_data(nfo,nfi,nd), bias(nfo)
         integer,intent(in) :: csc_indices(nnz), csc_indptr(dim_out+1)
-        real*4,intent(inout) :: dweight(nfo, nfi, nd), dbias(nfo), dx(nfi, dim_in)
+        complex*16,intent(inout) :: dweight(nfo, nfi, nd), dbias(nfo), dx(nfi, dim_in)
 
         integer :: start_, end_, k, col, ii, row, nnz_row
-        real*4 :: x_work(nfi, max_nnz_row)
-        real*4,parameter :: one=1.0
-        real*4,parameter :: zero=0.0
+        complex*16 :: x_work(nfi, max_nnz_row)
+        complex*16,parameter :: one=dcmplx(1D0,0D0)
+        complex*16,parameter :: zero=dcmplx(0D0,0D0)
 
         !f2py intent(in) x, dy, csc_indices, csc_indptr, fltr_data
         !f2py intent(in) do_xgrad, do_wgrad, do_bgrad
@@ -369,16 +372,16 @@ module lib
                 !calculate dweight
                 
                 !Q: slow!!!!
-                !call sger(nfo, k, one, dy(:,col), 1,& 
-                !    x_work, 1, dweight, nfo)
-                call sgemm('N', 'N', nfo, k, 1, one, dy(:,col), nfo,&
-                    x_work, 1, one, dweight, nfo)
+                !call zgerc(nfo, k, one, dy(:,col), 1,& 
+                !    conjg(x_work), 1, dweight, nfo)
+                call zgemm('N', 'N', nfo, k, 1, one, dy(:,col), nfo,&
+                    conjg(x_work), 1, one, dweight, nfo)
                 
             endif
             if(do_xgrad) then
                 
                 !calculate dx
-                call sgemv('T', nfo, k, one,&
+                call zgemv('C', nfo, k, one,&
                     fltr_data, nfo, dy(:,col), 1, zero, x_work, 1)
                 !extract rows
                 do ii=1,nnz_row
