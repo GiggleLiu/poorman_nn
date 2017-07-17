@@ -9,25 +9,23 @@ F90 = gfortran
 
 F90FLAGS = -O3
 
-TARGETS = spconvz.so spconvd.so
-TARGETS_F90 = spconvd.f90 spconvz.f90
-OBJS = spconvz.o spconvd.o
+TARGETS = spconv.so linear.so
+TARGETS_F90 = spconv.f90 linear.f90
+OBJS = spconv.o linear.o
 
 all: $(TARGETS)
 
 clean:
 	rm -f $(TARGETS) $(OBJS) *.mod  $(TARGETS_F90)
-spconvz: spconvz.o
-	$(F90) -o spconvz spconvz.o $(LIBS) $(INC) $(F90FLAGS)
-spconvd: spconvd.o
-	$(F90) -o spconvd spconvd.o $(LIBS) $(INC) $(F90FLAGS)
-spconvz.so: %: spconvz.f90
-	f2py -m spconvz -c spconvz.f90 --fcompiler=gfortran --f90flags="$(F90FLAGS)" $(INC) $(LIBS) -DF2PY_REPORT_ON_ARRAY_COPY=1
-spconvd.so: %: spconvd.f90
-	f2py -m spconvd -c spconvd.f90 --fcompiler=gfortran --f90flags="$(F90FLAGS)" $(INC) $(LIBS) -DF2PY_REPORT_ON_ARRAY_COPY=1
-spconvz.o: spconvz.f90
-	$(F90) -c spconvz.f90
-spconvd.o: spconvd.f90
-	$(F90) -c spconvd.f90
-$(TARGETS_F90): spconv.template.f90 frender.py
+spconv: spconv.o
+	$(F90) -o spconv spconv.o $(LIBS) $(INC) $(F90FLAGS)
+spconv.so: %: spconv.f90
+	f2py -m spconv -c spconv.f90 --fcompiler=gfortran --f90flags="$(F90FLAGS)" $(INC) $(LIBS) -DF2PY_REPORT_ON_ARRAY_COPY=1
+linear.so: %: linear.f90
+	f2py -m linear -c linear.f90 --fcompiler=gfortran --f90flags="$(F90FLAGS)" $(INC) $(LIBS) -DF2PY_REPORT_ON_ARRAY_COPY=1
+spconv.o: spconv.f90
+	$(F90) -c spconv.f90
+linear.o: linear.f90
+	$(F90) -c linear.f90
+$(TARGETS_F90): templates/spconv.template.f90 frender.py
 	python frender.py

@@ -42,11 +42,11 @@ def scan2csc(kernel_shape, img_in_shape, strides, boundary):
     csc_indptr=np.arange(1,dim_kernel*dim_out+2, dim_kernel, dtype='int32')
     csc_indices=[]   #pointer to rows in x
     for ind_out in xrange(dim_out):
-        ijk_out = np.unravel_index(ind_out, img_out_shape, order='C')
+        ijk_out = np.unravel_index(ind_out, img_out_shape, order='F')
         ijk_in0 = np.asarray(ijk_out)*strides
         for ind_offset in xrange(np.prod(kernel_shape)):
-            ijk_in = ijk_in0 + np.unravel_index(ind_offset, kernel_shape, order='C')
-            ind_in = np.ravel_multi_index(ijk_in, img_in_shape, mode='wrap' if boundary=='P' else 'raise', order='C')
+            ijk_in = ijk_in0 + np.unravel_index(ind_offset, kernel_shape, order='F')
+            ind_in = np.ravel_multi_index(ijk_in, img_in_shape, mode='wrap' if boundary=='P' else 'raise', order='F')
             csc_indices.append(ind_in+1)
 
     csc_indices=np.int32(csc_indices)
