@@ -2,10 +2,10 @@ import numpy as np
 from numpy import ma
 import pdb
 
-from core import Layer,Function,RandFunction,SupervisedLayer
+from core import Layer,Function, SupervisedLayer, Tags
 from utils import scan2csc
 
-__all__=['Log2cosh','Sigmoid','Sum','ReLU','MaxPool','DropOut',
+__all__=['Log2cosh','Sigmoid','Sum','Mean','ReLU','MaxPool','DropOut',
         'SoftMax','CrossEntropy','SoftMaxCrossEntropy']
 
 EXP_OVERFLOW=30
@@ -25,37 +25,28 @@ class Log2cosh(Function):
         res[~overflow]=np.log(2*np.cosh(x[~overflow]))
         return res
 
-    def backward(self,x,y,dy=1.):
+    def backward(self,x,y,dy, **kwargs):
         return (),np.tanh(x)*dy
 
 class Sigmoid(Function):
     '''
     Function log(2*cosh(theta)).
     '''
+    tags = Tags(is_runtime = False, is_inplace = True)
     def forward(self,x):
-        #for number
-        if np.ndim(x)==0:
-            if x.real<=-EXP_OVERFLOW:
-                return 0.
-            elif x.real>=EXP_OVERFLOW:
-                return 1.
-            else:
-                return 1/(1+np.exp(-x))
-
         #for ndarray
-        x=np.asarray(x)
-        res=np.zeros_like(x)
-        res[x.real<-EXP_OVERFLOW]=0
-        res[x.real>EXP_OVERFLOW]=1
-        mm=abs(x.real)<=EXP_OVERFLOW
-        res[mm]=1/(1+np.exp(-x[mm]))
-        return res
+        m1=x.real<-EXP_OVERFLOW
+        m2=x.real>EXP_OVERFLOW
+        m3=~(m1|m2)
+        x[m1]=0
+        x[m2]=1
+        x[m3]=1/(1+np.exp(-x[m3]))
+        return x
 
-    def backward(self,x,y,dy=1.):
-        y=np.asarray(y)
+    def backward(self,x,y,dy, **kwargs):
         return (),y*(1-y)*dy
 
-class Reorder(Function):
+class Reorder(Function):  #TODO: fix initialization
     '''
     Switch order of variables.
     '''
@@ -65,7 +56,7 @@ class Reorder(Function):
     def forward(self,x):
         return np.transpose(x,axes=self.order)
 
-    def backward(self,x,y,dy):
+    def backward(self,x,y,dy, **kwargs):
         return (),np.transpose(dy,axes=argsort(self.order))
 
 class Merge(Function):
@@ -74,7 +65,7 @@ class Merge(Function):
     
     Needed?
     '''
-    def __init__(self):
+    def __init__(self):  #TODO: fix initialization
         self.cumdims=None
 
     def forward(self,x):
@@ -84,48 +75,69 @@ class Merge(Function):
         self.cumdims=np.append([0],np.cumsum([xi.shape for xi in x]))
         return np.concatenate(x)
     
-    def backward(self,x,y,dy):
+    def backward(self,x,y,dy, **kwargs):
         return (),[dy[self.cumdims[i]:self.cumdims[i+1]] for i in xrange(len(self.cumdims)-1)]
 
 class Sum(Function):
     '''
     Sum along specific axis.
     '''
-    def __init__(self,axis):
-        self.axis=axis
-        self._nitem=None
+    def __init__(self, input_shape, axis, output_shape=None):
+        self.axis=axis%len(input_shape)
+        if output_shape is None:
+            output_shape = input_shape[:self.axis]+input_shape[self.axis+1:]
+        super(Sum,self).__init__(input_shape, output_shape)
 
     def forward(self,x):
-        self._nitem=x.shape[self.axis]
         return np.sum(x,axis=self.axis)
     
-    def backward(self,x,y,dy):
+    def backward(self,x,y,dy, **kwargs):
         dy_=dy[(slice(None),)*self.axis+(np.newaxis,)]
-        return (),np.repeat(dy_,self._nitem,axis=self.axis)
+        return (),np.repeat(dy_,x.shape[self.axis],axis=self.axis)
 
+class Mean(Function):
+    '''
+    Mean along specific axis.
+    '''
+    def __init__(self,input_shape, axis, output_shape=None):
+        self.axis=axis%len(input_shape)
+        if output_shape is None:
+            output_shape = input_shape[:self.axis]+input_shape[self.axis+1:]
+        super(Mean,self).__init__(input_shape, output_shape)
+
+    def forward(self,x):
+        return np.mean(x,axis=self.axis)
+    
+    def backward(self,x,y,dy, **kwargs):
+        dy_=dy[(slice(None),)*self.axis+(np.newaxis,)]
+        return (),np.repeat(dy_,x.shape[self.axis],axis=self.axis)/x.shape[self.axis]
 
 class ReLU(Function):
     '''
     ReLU.
     '''
-    def __init__(self, leak = 0):
-        self.leak = leak
+    tags = Tags(is_runtime = False, is_inplace = True)
+    def __init__(self, leak = 0, input_shape=None, output_shape=None):
+        super(ReLU,self).__init__(input_shape, output_shape)
         if leak>1 or leak<0:
             raise ValueError('leak parameter should be 0-1!')
+        self.leak = leak
 
     def forward(self, x):
+        xmask=x<0
         if self.leak==0:
-            return maximum(x,0)
+            x[xmask]=0
         else:
-            return maximum(x,self.leak*x)
+            x[xmask]*=self.leak
+        return x
 
-    def backward(self, x, y, dy):
-        dx=dy.copy()
+    def backward(self, x, y, dy, **kwargs):
+        ymask=y<0
         if self.leak==0:
-            dx[x<0]=0
+            dy[ymask]=0
         else:
-            dx[x<0]=leak*dy
-        return (), dx
+            dy[ymask]*=self.leak
+        return (), dy
 
 class MaxPool(Function):
     '''
@@ -134,10 +146,13 @@ class MaxPool(Function):
     Note:
         for complex numbers, what does max pooling looks like?
     '''
-    def __init__(self, kernel_shape, img_in_shape, boundary):
+    def __init__(self, input_shape, kernel_shape, boundary='O', output_shape=None):
         self.kernel_shape = kernel_shape
-        self.img_in_shape = img_in_shape
+        img_in_shape = input_shape[-len(kernel_shape):]
         self.csc_indptr, self.csc_indices, self.img_out_shape = scan2csc(kernel_shape, img_in_shape, strides=kernel_shape, boundary=boundary)
+        if output_shape is None:
+            output_shape = input_shape[:-len(kernel_shape)]+self.img_out_shape
+        super(MaxPool,self).__init__(input_shape, output_shape)
 
     @property
     def img_nd(self):
@@ -151,68 +166,78 @@ class MaxPool(Function):
         Return:
             ndarray, (num_batch, nfo, img_out_dims), output in 'F' order.
         '''
+        self._check_input(x)
         x_nd, img_nd = x.ndim, self.img_nd
-        x=x.reshape(x.shape[:x_nd-img_nd]+(np.prod(self.img_in_shape),), order='F')
-        y=np.empty(x.shape[:x_nd-img_nd]+(np.prod(self.img_out_shape),), order='F')
+        x=x.reshape(x.shape[:x_nd-img_nd]+(-1,), order='F')
+        y=np.empty(x.shape[:x_nd-img_nd]+(np.product(self.img_out_shape),), order='F', dtype=x.dtype)
         for col,(start,end) in enumerate(zip(self.csc_indptr[:-1],self.csc_indptr[1:])):
             indices=self.csc_indices[start-1:end-1]-1
-            y[...,col]=np.max(x[...,indices],keepdims=True,axis=-1)
-        y=y.reshape(y.shape[:x_nd-img_nd]+self.img_out_shape,order='F')
+            y[...,col]=np.max(x[...,indices],keepdims=False,axis=-1)
+        y=y.reshape(self.output_shape, order='F')
+        pdb.set_trace()
         return y
 
-    def backward(self, x, y, dy):
+    def backward(self, x, y, dy, **kwargs):
         '''It will shed a mask on dy'''
         x_nd, img_nd = x.ndim, self.img_nd
-        pre_nd=x_nd-img_nd
-        dim_in=np.prod(self.img_in_shape)
-        dim_out=np.prod(self.img_out_shape)
-        x_=x.reshape(x.shape[:pre_nd]+(dim_in,),order='F')
-        y=y.reshape(y.shape[:pre_nd]+(dim_out,),order='F')
-        dy=dy.reshape(dy.shape[:pre_nd]+(dim_out,),order='F')
-        #dx=ma.zeros(x_.shape,fill_value=0,dtype=dy.dtype)
-        #dx.mask=np.ones(dx.shape,dtype='bool')
-        dx=np.zeros(x_.shape,dtype=dy.dtype)
-        preinds=np.indices(dx.shape[:pre_nd])
+        xpre=x.shape[:x_nd-img_nd]
+        yshape=xpre[:-1]+(-1,np.prod(self.img_out_shape))
+
+        #flatten inputs/outputs
+        x_=x.reshape(xpre+(-1,), order='F')
+        y=y.reshape(yshape, order='F')
+        dy=dy.reshape(yshape, order='F')
+
+        dx=np.zeros_like(x_)
+        preinds=np.indices(dx.shape[:x_nd-img_nd])
         for col,(start,end) in enumerate(zip(self.csc_indptr[:-1],self.csc_indptr[1:])):
             indices=self.csc_indices[start-1:end-1]-1
             maxind=indices[np.argmax(x_[...,indices],axis=-1)]
-            #dx.mask[maxind,ind1,ind2]=False
-            #dx.data[maxind,ind1,ind2]=dyi
             dx[tuple(preinds)+(maxind,)]=dy[...,col]
         return (), dx.reshape(x.shape, order='F')
 
-class DropOut(RandFunction):
+class DropOut(Function):
     '''
-    DropOut.
+    DropOut inplace.
     '''
-    def __init__(self, keep_rate):
-        super(RandFunction, self).__init__()
+    tags = Tags(is_runtime = True, is_inplace = True)
+    def __init__(self, keep_rate, axis, input_shape=None, output_shape=None):
+        self.axis=axis%len(input_shape)
         self.keep_rate = keep_rate
+        super(DropOut, self).__init__(input_shape, output_shape)
 
     def forward(self, x):
         '''
         Parameters:
-            :x: ndarray, (num_feature_in, num_batch), in fortran order.
+            :x: ndarray, (num_batch, num_feature_in), in fortran order.
         '''
         #generate a random state, a keep mask
-        self.state = np.random.random(x.shape[0])<self.keep_rate
-        return x[self.state,:]
+        self.state = np.random.random(x.shape[self.axis])<self.keep_rate
+        x[(slice(None),)*self.axis+(self.state,)]/=self.keep_rate
+        x[(slice(None),)*self.axis+(~self.state,)]=0
+        return x
 
-    def backward(self, x, y, dy):
-        dx=np.zeros_like(x)
-        dx[self.state] = dy
-        return (), dx
+    def backward(self, x, y, dy, **kwargs):
+        dy[(slice(None),)*self.axis+(self.state,)]/=self.keep_rate
+        dy[(slice(None),)*self.axis+(~self.state,)]=0
+        return (), dy
 
 class SoftMax(Function):
     '''
     Soft max function applied on the last axis.
     '''
-    def forward(self, x):
-        x=x-x.max(axis=-1, keepdims=True)
-        rho=np.exp(x)
-        return rho/rho.sum(axis=-1, keepdims=True)
+    def __init__(self, input_shape, axis, output_shape = None):
+        self.axis=axis
+        if output_shape is None:
+            output_shape = input_shape
+        super(SoftMax, self).__init__(input_shape, output_shape)
 
-    def backward(self, x, y, dy):
+    def forward(self, x):
+        x=x-x.max(axis=self.axis, keepdims=True)
+        rho=np.exp(x)
+        return rho/rho.sum(axis=self.axis, keepdims=True)
+
+    def backward(self, x, y, dy, **kwargs):
         return (),dy*y*(1-y)
 
 class CrossEntropy(Function, SupervisedLayer):
@@ -220,37 +245,50 @@ class CrossEntropy(Function, SupervisedLayer):
     Cross Entropy sum(p*log(q)). With p the true labels.
         q = x
     '''
-    def forward(self, x, y_true):
+    def __init__(self, input_shape, axis, output_shape = None):
+        self.axis=axis%len(input_shape)
+        if output_shape is None:
+            output_shape = input_shape[:self.axis]+input_shape[self.axis+1:]
+        super(CrossEntropy, self).__init__(input_shape, output_shape)
+
+    def forward(self, x):
         '''
         Parameters:
             :x: ndarray, note 0 < x <= 1.
             :y_true: ndarray, correct one-hot y.
         '''
-        return (-y_true*np.log(x)).sum(axis=-1)
+        return (-self.y_true*np.log(x)).sum(axis=self.axis)
 
-    def backward(self, x, y, dy, y_true):
-        return (),-dy[...,np.newaxis]*(y_true/x)
+    def backward(self, x, y, dy, **kwargs):
+        return (),-dy[(slice(None),)*self.axis+(np.newaxis,)]*(self.y_true/x)
 
 class SoftMaxCrossEntropy(Function, SupervisedLayer):
     '''
     Cross Entropy sum(p*log(q)). With p the true labels.
         q = exp(x)/sum(exp(x))
     '''
-    def forward(self, x, y_true):
+    def __init__(self, input_shape, axis, output_shape = None):
+        self.axis=axis%len(input_shape)
+        if output_shape is None:
+            output_shape = input_shape[:axis]+input_shape[self.axis+1:]
+        super(SoftMaxCrossEntropy, self).__init__(input_shape, output_shape)
+
+    def forward(self, x):
         '''
         Parameters:
             :x: ndarray, note 0 < x <= 1.
             :y_true: ndarray, correct one-hot y.
         '''
-        x=x-x.max(axis=-1, keepdims=True)
+        x=x-x.max(axis=self.axis, keepdims=True)
         rho=np.exp(x)
-        Z=rho.sum(axis=-1, keepdims=True)
-        return ((np.log(Z)-x)*y_true).sum(axis=-1)
+        pdb.set_trace()
+        Z=rho.sum(axis=self.axis, keepdims=True)
+        return ((np.log(Z)-x)*self.y_true).sum(axis=self.axis)
 
-    def backward(self, x, y, dy, y_true):
-        x=x-x.max(axis=-1, keepdims=True)
+    def backward(self, x, y, dy, **kwargs):
+        x=x-x.max(axis=self.axis, keepdims=True)
         rho=np.exp(x)
-        Z=rho.sum(axis=-1, keepdims=True)
+        Z=rho.sum(axis=self.axis, keepdims=True)
         y1=rho/Z
-        return (),dy[...,np.newaxis]*y_true*(y1-1)
+        return (),dy[(slice(None),)*self.axis+(np.newaxis,)]*self.y_true*(y1-1)
 

@@ -18,7 +18,7 @@ def scan2csc(kernel_shape, img_in_shape, strides, boundary):
         :boundary: str,
     '''
     if len(img_in_shape)!=len(strides) or len(kernel_shape)!=len(strides):
-        raise ValueError("Dimension Error! (%d, %d, %d, %d)"%(len(strides),len(size_out),len(img_in_shape),len(kernel_shape)))
+        raise ValueError("Dimension Error! (%d, %d, %d)"%(len(strides),len(img_in_shape),len(kernel_shape)))
 
     dim_kernel = np.prod(kernel_shape)
     # get output image shape
@@ -51,3 +51,18 @@ def scan2csc(kernel_shape, img_in_shape, strides, boundary):
 
     csc_indices=np.int32(csc_indices)
     return csc_indptr, csc_indices, img_out_shape
+
+def pack_variables(variables):
+    '''Pack tuple of variables to vector.'''
+    shapes = [v.shape for v in variables]
+    return np.concatenate([v.ravel(order='F') for v in variables]), shapes
+
+def unpack_variables(vec, shapes):
+    '''Unpack vector to tuple of variables.'''
+    start = 0
+    variables = []
+    for shape in shapes:
+        end = start+np.prod(shape)
+        variables.append(vec[start:end].reshape(shape, order='F'))
+        start=end
+    return variables

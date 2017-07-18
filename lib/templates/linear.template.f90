@@ -25,31 +25,32 @@ module lib
             weight, nfo, one, y, num_batch)
     end subroutine forward_{{version}}{{dtype_token}}
 
-    subroutine backward_{{version}}{{dtype_token}}(dy,x,dx,dweight,dbias{%if version == "masked"%},mask{%endif%},weight,bias,&
+    subroutine backward_{{version}}{{dtype_token}}(dy,x, weight,bias, dx, dweight,dbias{%if version == "masked"%},mask{%endif%},&
             nfi,nfo, num_batch, do_xgrad, do_wgrad, do_bgrad)
         implicit none
         integer,intent(in) :: num_batch,nfi,nfo
         logical,intent(in) :: do_xgrad, do_wgrad, do_bgrad
         {{dtype}},intent(in) :: x(num_batch, nfi), dy(num_batch, nfo), weight(nfo, nfi), bias(nfo)
         {%if version == "masked"%}logical,intent(in) :: mask(nfo, nfi){%endif%}
-        {{dtype}},intent(inout) :: dweight(nfo, nfi), dbias(nfo), dx(num_batch, nfi)
+        {{dtype}},intent(out) :: dweight(nfo, nfi), dbias(nfo), dx(num_batch, nfi)
 
         integer :: i
         {{dtype}},parameter :: one={{dtype_one}}
+        {{dtype}},parameter :: zero={{dtype_zero}}
 
-        !f2py intent(inplace) dx, dweight, dbias
+        !f2py intent(out) dx, dweight, dbias
 
         if(do_wgrad) then
             call {{dtype_token}}gemm('T', 'N', nfo, nfi, num_batch, one, dy, num_batch,&
-                {%if is_complex%}conjg(x){%else%}x{%endif%}, num_batch, one, dweight, nfo)
+                {%if is_complex%}conjg(x){%else%}x{%endif%}, num_batch, zero, dweight, nfo)
         endif
         if(do_xgrad) then
             call {{dtype_token}}gemm('N', 'N', num_batch, nfi, nfo, one, dy, num_batch,&
-                {%if is_complex%}conjg(weight){%else%}weight{%endif%}, nfo, one, dx, num_batch)
+                {%if is_complex%}conjg(weight){%else%}weight{%endif%}, nfo, zero, dx, num_batch)
         endif
         if(do_bgrad) then
             !calculate dbias
-            dbias=dbias+sum(dy,1)
+            dbias=sum(dy,1)
         endif
     end subroutine backward_{{version}}{{dtype_token}}
     {%endfor -%}

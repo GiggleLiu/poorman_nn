@@ -70,7 +70,8 @@ def test_conv2d_per():
     #2 features, kernel size 3x3
     cv=Conv2d(nfin,nfout,kernel_size=(K1,K2),stride=(1,1),padding=(0,0))
     fltr=cv.weight.data.numpy()
-    sv=SPConv(float32(fltr),float32(cv.bias.data.numpy()),(dim_x,dim_y),strides=(1,1),boundary='O', w_contiguous=True)
+    sv=SPConv((-1,nfin,dim_x,dim_y), float32(fltr),float32(cv.bias.data.numpy()),strides=(1,1),boundary='O', w_contiguous=True, output_shape=(-1,nfout,dim_x-K1+1, dim_y-K2+1))
+    sv2=SPConv((nfin,dim_x,dim_y), float32(fltr),float32(cv.bias.data.numpy()),strides=(1,1),boundary='O', w_contiguous=True, output_shape=(nfout,dim_x-K1+1, dim_y-K2+1))
     xin_np=ts.data.numpy()
     xin_np1=xin_np[0]
     ntest=5
@@ -82,7 +83,7 @@ def test_conv2d_per():
         y2=sv.forward(xin_np)
     t2=time.time()
     for i in xrange(ntest):
-        y3=sv.forward(xin_np1)
+        y3=sv2.forward(xin_np1)
     t3=time.time()
     print "Elapse old = %s, new = %s, new_1 = %s"%(t1-t0,t2-t1,t3-t2)
     res1=y1.data.numpy()
@@ -100,10 +101,10 @@ def test_conv2d_per():
     y1.backward(dy)
     t1=time.time()
     for i in xrange(ntest):
-        (dweight,dbias),dx=sv.backward(xin_np, y2, dy_np, mask=(1,1,1))
+        (dweight,dbias),dx=sv.backward(xin_np, y2, dy_np, mask=(1,1))
     t2=time.time()
     for i in xrange(ntest):
-        (dweight1, dbias1),dx1=sv.backward(xin_np1, y3, dy_np1, mask=(1,1,1))
+        (dweight1, dbias1),dx1=sv2.backward(xin_np1, y3, dy_np1, mask=(1,1))
     t3=time.time()
     print "Elapse old = %s, new = %s, new-1 = %s"%(t1-t0,(t2-t1)/ntest,(t3-t2)/ntest)
 

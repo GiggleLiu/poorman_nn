@@ -40,40 +40,6 @@ from spconv import SPConv
 
 FLAGS = None
 
-def build_dnn():
-    '''deepnn builds the graph for a deep net for classifying digits.'''
-    #first convolution layer
-    K1=5
-    F1=32
-    img_in_shape=(28,28)
-    W_conv1 = randn([F1, 1, K1, K1])  #fout, fin, K1, K2
-    b_conv1 = randn([F1])
-    conv1=SPConv(W_conv1, bias=b_conv1, img_in_shape=img_in_shape, dtype='float32', strides=(1,1), boundary='P')
-    relu1 = functions.ReLU()
-    pooling1 = functions.MaxPool(kernel_shape=(2,2), img_in_shape=conv1.img_out_shape, boundary='O')
-
-    #second convolution layer
-    F2=64
-    W_conv2 = randn([F2, 1, K1, K1])  #fout, fin, K1, K2
-    b_conv2 = randn([F2])
-    conv2=SPConv(W_conv2, bias=b_conv2, img_in_shape=pooling1.img_out_shape, dtype='float32', strides=(1,1), boundary='P')
-    relu2=relu1
-    pooling2 = functions.MaxPool(kernel_shape=(2,2), img_in_shape=conv2.img_out_shape, boundary='O')
-
-    #fully connected layer
-    F3=1024
-    W_fc1 = randn([F3, np.prod(pooling2.img_out_shape)*F2])
-    b_fc1 = randn([F3])
-    linear1 = Linear(W_fc1, b_fc1)
-    dropout1=functions.DropOut(0.5)
-
-    F4=10
-    W_fc2 = randn([F4, F3])
-    b_fc2 = randn([F4])
-    linear2 = Linear(W_fc2, b_fc2)
-
-    return ANN([conv1, relu1, pooling1, conv2, relu2, pooling2, linear1, dropout1, linear2])
-
 def deepnn(x):
     x_image = tf.reshape(x, [-1, 28, 28, 1])
 

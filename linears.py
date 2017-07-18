@@ -6,46 +6,10 @@ import numpy as np
 import scipy.sparse as sps
 import pdb
 
-from core import Layer
+from core import Layer, check_shape
 from lib.linear import lib as flinear
 
-__all__=['L_Tensor', 'Linear']
-
-class L_Tensor(Layer):
-    '''
-    Tensor Layer.
-    
-    Attributes:
-        :W: ndarray, the weight tensor.
-        :einsum_tokens: list, tokens for [x,W,y] in einsum.
-
-    Note:
-        dx=W*dy, need conjugate during BP?
-    '''
-    def __init__(self,W,einsum_tokens):
-        self.W=np.asarray(W)
-        if len(einsum_tokens)!=3:
-            raise ValueError('einsum_tokens should be a len-3 list!')
-        if len(einsum_tokens[1])!=self.W.ndim:
-            raise ValueError('einsum_tokens dimension error!')
-        self.einsum_tokens=einsum_tokens
-
-    def forward(self,x):
-        return np.einsum('%s,%s->%s'%tuple(self.einsum_tokens),x,self.W)
-
-    def backward(self,x,y,dy):
-        einsum_tokens=self.einsum_tokens
-        dx=np.einsum('%s,%s->%s'%tuple(einsum_tokens[::-1]),dy,self.W)
-        dW=np.einsum('%s,%s->%s'%(einsum_tokens[0],einsum_tokens[2],einsum_tokens[1]),x,dy)
-        return dW,dx
-
-    def get_variables(self):
-        return self.W.ravel()
-
-    def set_variables(self,variables):
-        if isinstance(variables,np.ndarray):
-            variables=variables.reshape(self.W.shape)
-        self.W[...]=variables
+__all__=['Linear']
 
 class Linear(Layer):
     '''
@@ -55,10 +19,15 @@ class Linear(Layer):
         :weight: 2darray, (fout, fin), in fortran order.
         :bias: 1darray, (fout,)
     '''
-    def __init__(self, weight, bias, dtype = 'float32'):
-        self.weight = np.asfortranarray(weight)
+    def __init__(self, weight, bias, dtype = 'float32', input_shape=None, output_shape=None):
+        self.weight = np.asfortranarray(weight, dtype=dtype)
         self.bias = bias
         self.dtype = dtype
+        if input_shape is None:
+            input_shape = (-1,weight.shape[1])
+        if output_shape is None:
+            output_shape = (-1,weight.shape[0])
+        super(Linear, self).__init__(input_shape, output_shape)
 
         if dtype=='complex128':
             dtype_token = 'z'
@@ -76,16 +45,15 @@ class Linear(Layer):
         #self._fbackward1=eval('flinear.backward1_%s'%(dtype_token))
 
 
+    @check_shape
     def forward(self, x):
         y = self._fforward(x, self.weight, self.bias)
         return y
 
-    def backward(self, x, y, dy, dx=None, dweight=None, dbias=None, mask=(1,)*3):
-        if dx is None and mask[0]: dx=np.zeros_like(x)
-        if dweight is None and mask[1]: dweight=np.zeros_like(self.weight)
-        if dbias is None and mask[2]: dbias=np.zeros_like(self.bias)
-        y = self._fbackward(dy, x, dx, dweight, dbias, self.weight, self.bias,
-            do_xgrad=mask[0], do_wgrad=mask[1], do_bgrad=mask[2])
+    @check_shape
+    def backward(self, x, y, dy, mask=(1,)*2):
+        dx, dweight, dbias = self._fbackward(dy, x, self.weight, self.bias,
+            do_xgrad=mask[1], do_wgrad=mask[0], do_bgrad=mask[0])
         return (dweight, dbias), dx
 
     def get_variables(self):

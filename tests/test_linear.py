@@ -14,6 +14,7 @@ sys.path.insert(0,'../')
 from linears import Linear
 
 def test_linear():
+    random.seed(2)
     num_batch=10
     nfi=1024
     nfo=512
@@ -60,16 +61,13 @@ def test_linear():
     y1.backward(dy)
     t1=time.time()
     for i in xrange(ntest):
-        sv.backward(xin_np, y2, dy_np, dx, dweight, dbias, mask=(1,1,1))
+        (dweight, dbias), dx=sv.backward(xin_np, y2, dy_np, mask=(1,1))
     t2=time.time()
     #for i in xrange(ntest):
-        #sv.backward(xin_np1, y3, dy_np1, dx1, dweight1, dbias1, mask=(1,1,1))
+        #sv.backward(xin_np1, y3, dy_np1, dx1, dweight1, dbias1, mask=(1,1))
     #t3=time.time()
     #print "Elapse old = %s, new = %s, new-1 = %s"%(t1-t0,(t2-t1)/ntest,(t3-t2)/ntest)
     print "Elapse old = %s, new = %s"%(t1-t0,(t2-t1)/ntest)
-    dweight/=ntest
-    dx/=ntest
-    dbias/=ntest
     #dweight1/=ntest
     #dx1/=ntest
     #dbias1/=ntest

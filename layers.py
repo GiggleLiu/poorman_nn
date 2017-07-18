@@ -24,18 +24,18 @@ class PReLU(Layer):
         else:
             return maximum(x,self.leak*x)
 
-    def backward(self, x, y, dy):
+    def backward(self, x, y, dy, **kwargs):
         dx=dy.copy()
-        mask=x<0
+        xmask=x<0
         if self.leak==0:
-            dx[mask]=0
+            dx[xmask]=0
         else:
-            dx[mask]=leak*dy
-        da = np.sum(dy[mask]*x[mask].conj())
+            dx[xmask]=leak*dy
+        da = np.sum(dy[xmask]*x[xmask].conj())
         return (da,), dx
 
     def get_variables(self):
-        return np.array([self.leak], dtype=self.dtype)
+        return (np.array([self.leak], dtype=self.dtype),)
 
     def set_variables(self, a, mode='set'):
         if mode=='set':

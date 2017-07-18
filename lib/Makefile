@@ -9,6 +9,7 @@ F90 = gfortran
 
 F90FLAGS = -O3
 
+SOURCES = templates/spconv.template.f90 templates/linear.template.f90
 TARGETS = spconv.so linear.so
 TARGETS_F90 = spconv.f90 linear.f90
 OBJS = spconv.o linear.o
@@ -27,5 +28,5 @@ spconv.o: spconv.f90
 	$(F90) -c spconv.f90
 linear.o: linear.f90
 	$(F90) -c linear.f90
-$(TARGETS_F90): templates/spconv.template.f90 frender.py
+$(TARGETS_F90): $(SOURCES) frender.py
 	python frender.py

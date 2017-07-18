@@ -7,13 +7,13 @@ import pdb,time
 
 from lib.spconv import lib as fspconv
 from utils import scan2csc
+from core import Layer, check_shape
 
-class SPConv(object):
+class SPConv(Layer):
     '''
     Attributes:
         :fltr: ndarray, (feature_out, feature_in, kernel_x, ...), in fortran order.
         :bias: 1darray, (feature_out), in fortran order.
-        :img_in_shape: tuple, input image shape.
         :dtype: str, data type.
         :strides: tuple, displace for convolutions.
         :boudnary: choice('P', 'O').
@@ -21,15 +21,32 @@ class SPConv(object):
             * 'O', open boundary condition.
 
     Attributes (Derived):
-        :img_out_shape: tuple, output image shape.
         :csc_indptr: 1darray, column pointers for convolution matrix.
         :csc_indices: 1darray, row indicator for input array.
         :weight_indices: 1darray, row indicator for filter array (if not contiguous).
     '''
-    def __init__(self, fltr, bias, img_in_shape, dtype='float32', strides=(1,1), boundary = "P", w_contiguous = True):
+    def __init__(self, input_shape, fltr, bias, output_shape=None, dtype='float32', strides=None, boundary = "P", w_contiguous = True):
         #set data type
         self.dtype = dtype
 
+        self.fltr = np.asarray(fltr, dtype = dtype, order='F')
+        self.bias = np.asarray(bias, order = 'F', dtype = dtype)
+
+        img_nd = self.fltr.ndim-2
+        if strides is None:
+            strides=(1,)*img_nd
+        else:
+            self.strides = tuple(strides)
+        self.boundary = boundary
+        self.w_contiguous = w_contiguous
+
+        kernel_shape = self.fltr.shape[2:]
+        self.csc_indptr, self.csc_indices, self.img_out_shape = scan2csc(kernel_shape, input_shape[-img_nd:], strides, boundary)
+        if output_shape is None:
+            output_shape = input_shape[:-img_nd-1]+(self.num_feature_out,)+self.img_out_shape
+        super(SPConv, self).__init__(input_shape, output_shape)
+
+        #use the correct fortran subroutine.
         if dtype=='complex128':
             dtype_token = 'z'
         elif dtype=='complex64':
@@ -41,21 +58,8 @@ class SPConv(object):
         else:
             raise TypeError("dtype error!")
 
-        self.fltr = np.asarray(fltr, dtype = dtype, order='F')
-        self.bias = np.asarray(bias, order = 'F', dtype = dtype)
-
-        self.img_in_shape = tuple(img_in_shape)
-        self.strides = tuple(strides)
-        self.boundary = boundary
-        self.w_contiguous = w_contiguous
-
-        num_feature_out, num_feature_in = self.fltr.shape[:2]
-        kernel_shape = self.fltr.shape[2:]
-
-        self.csc_indptr, self.csc_indices, self.img_out_shape = scan2csc(kernel_shape, img_in_shape, strides, boundary)
-        #self.fltr_data = np.asfortranarray(np.transpose(np.tile(fltr.reshape([num_feature_in,num_feature_out,dim_kernel]), [1,1,np.prod(self.img_out_shape)]),axes=(2,0,1)).T)
         if not w_contiguous:
-            self.weight_indices = np.asfortranarray(np.tile(np.arange(np.prod(kernel_shape),dtype='int32'),np.prod(self.img_out_shape)))+1  #pointer to filter data
+            self.weight_indices = np.asfortranarray(np.tile(np.arange(np.prod(kernel_shape),dtype='int32'),np.prod(img_out_shape)))+1  #pointer to filter data
             func_f=eval('fspconv.forward_general%s'%dtype_token)
             func_b=eval('fspconv.backward_general%s'%dtype_token)
             func1_f=eval('fspconv.forward1_general%s'%dtype_token)
@@ -75,6 +79,17 @@ class SPConv(object):
         '''Dimension of input image.'''
         return len(self.strides)
 
+    @property
+    def num_feature_in(self):
+        '''Dimension of input feature.'''
+        return self.fltr.shape[1]
+
+    @property
+    def num_feature_out(self):
+        '''Dimension of input feature.'''
+        return self.fltr.shape[0]
+
+    @check_shape
     def forward(self, x):
         '''
         Parameters:
@@ -83,18 +98,23 @@ class SPConv(object):
             ndarray, (num_batch, nfo, img_out_dims), output in 'F' order.
         '''
         x_nd, img_nd = x.ndim, self.img_nd
-        x=x.reshape(x.shape[:x_nd-img_nd]+(np.prod(self.img_in_shape),),order='F')
+        self._check_input(x)
+
+        #flatten inputs/outputs
+        x=x.reshape(x.shape[:x_nd-img_nd]+(-1,),order='F')
         _fltr_flatten = self.fltr.reshape(self.fltr.shape[:2]+(-1,), order='F')
+
         if x_nd == img_nd + 1:  #single batch wise
             y=self._fforward1(x,csc_indptr=self.csc_indptr,csc_indices=self.csc_indices,fltr_data=_fltr_flatten,
                     bias=self.bias, max_nnz_row=_fltr_flatten.shape[-1])
         else:
             y=self._fforward(x,csc_indptr=self.csc_indptr,csc_indices=self.csc_indices,fltr_data=_fltr_flatten,
                     bias=self.bias, max_nnz_row=_fltr_flatten.shape[-1])
-        y=y.reshape(y.shape[:x_nd-img_nd]+self.img_out_shape,order='F')
+        y=y.reshape(self.output_shape, order='F')
         return y
 
-    def backward(self, x, y, dy, mask=(1,)*3):
+    @check_shape
+    def backward(self, x, y, dy, mask=(1,)*2):
         '''
         Parameters:
             :x: ndarray, (num_batch, nfi, img_in_dims), input in 'F' order.
@@ -106,26 +126,29 @@ class SPConv(object):
             (dweight, dbias), dx
         '''
         x_nd, img_nd = x.ndim, self.img_nd
-        dim_in=np.prod(self.img_in_shape)
-        dim_out=np.prod(self.img_out_shape)
-        x=x.reshape(x.shape[:x_nd-img_nd]+(dim_in,),order='F')
-        y=y.reshape(y.shape[:x_nd-img_nd]+(dim_out,),order='F')
-        dy=dy.reshape(dy.shape[:x_nd-img_nd]+(dim_out,),order='F')
+        xpre=x.shape[:x_nd-img_nd]
+        ypre=xpre[:-1]+(self.num_feature_out,)
+
+        #flatten inputs/outputs
+        x=x.reshape(xpre+(-1,), order='F')
+        y=y.reshape(ypre+(-1,), order='F')
+        dy=dy.reshape(ypre+(-1,), order='F')
         _fltr_flatten = self.fltr.reshape(self.fltr.shape[:2]+(-1,), order='F')
+
         if x_nd == img_nd + 1:  #single batch wise
             dx, dweight, dbias = self._fbackward1(dy,x,self.csc_indptr,self.csc_indices,
                     fltr_data=_fltr_flatten, bias=self.bias, 
-                    do_xgrad=mask[0], do_wgrad=mask[1], do_bgrad=mask[2], max_nnz_row=_fltr_flatten.shape[-1])
+                    do_xgrad=mask[1], do_wgrad=mask[0], do_bgrad=mask[0], max_nnz_row=_fltr_flatten.shape[-1])
         else:
             dx, dweight, dbias = self._fbackward(dy,x,self.csc_indptr,self.csc_indices,
                     fltr_data=_fltr_flatten, bias=self.bias, 
-                    do_xgrad=mask[0], do_wgrad=mask[1], do_bgrad=mask[2], max_nnz_row=_fltr_flatten.shape[-1])
-        dx=dx.reshape(dx.shape[:x_nd-img_nd]+self.img_in_shape, order='F')
+                    do_xgrad=mask[1], do_wgrad=mask[0], do_bgrad=mask[0], max_nnz_row=_fltr_flatten.shape[-1])
+        dx=dx.reshape(self.input_shape, order='F')
         dweight = dweight.reshape(self.fltr.shape, order='F')
         return (dweight, dbias), dx
 
     def get_variables(self):
-        return (self.fltr.ravel(),self.bias)
+        return (self.fltr,self.bias)
 
     def set_variables(self, variables, mode='set'):
         if mode=='set':
