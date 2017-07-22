@@ -28,7 +28,7 @@ def build_dnn():
     W_conv1 = randn(F1, 1, K1, K1)  #fout, fin, K1, K2
     b_conv1 = randn(F1)
     conv1=SPConv((-1,1)+img_in_shape, W_conv1, bias=b_conv1, dtype='float32', strides=(1,1), boundary='P')
-    relu1 = functions.ReLU()
+    relu1 = functions.ReLU_I()
     pooling1 = functions.MaxPool(input_shape=conv1.output_shape, kernel_shape=(2,2), boundary='O')
 
     #second convolution layer
@@ -36,15 +36,18 @@ def build_dnn():
     W_conv2 = randn(F2, F1, K1, K1)  #fout, fin, K1, K2
     b_conv2 = randn(F2)
     conv2=SPConv(pooling1.output_shape, W_conv2, bias=b_conv2, dtype='float32', strides=(1,1), boundary='P')
-    relu2 = functions.ReLU()
+    relu2 = functions.ReLU_I()
     pooling2 = functions.MaxPool(kernel_shape=(2,2), input_shape=conv2.output_shape, output_shape=(-1,F2*I1/4*I2/4), boundary='O')
 
     #fully connected layer
+    #nout=pooling2.output_shape[1]
+    nout=I1*I2
     F3=1024
-    W_fc1 = randn(F3, pooling2.output_shape[1])
+    W_fc1 = randn(F3, nout)
     b_fc1 = randn(F3)
     linear1 = Linear(W_fc1, b_fc1)
-    dropout1=functions.DropOut(input_shape=(-1,F3),keep_rate=0.5, axis=1)
+    relu3 = functions.ReLU_I()
+    dropout1=functions.DropOut_I(input_shape=(-1,F3),keep_rate=0.5, axis=1)
 
     F4=10
     W_fc2 = randn(F4, F3)
@@ -54,7 +57,8 @@ def build_dnn():
     #the cost function
     costfunc = functions.SoftMaxCrossEntropy(input_shape=(-1,F4),axis=1)
     meanfunc = functions.Mean((-1,),axis=0)
-    return ANN([conv1, relu1, pooling1, conv2, relu2, pooling2, linear1, dropout1, linear2, costfunc, meanfunc])
+    return ANN([linear1, relu3, linear2, costfunc, meanfunc])
+    #return ANN([conv1, relu1, pooling1, conv2, relu2, pooling2, linear1, dropout1, linear2, costfunc, meanfunc])
 
 def compute_gradient(weight_vec, info_dict):
     dnn=info_dict['dnn']
@@ -83,21 +87,33 @@ def main(_):
     info_dict = {'dnn':dnn, 'shapes':shapes}
 
     batch = mnist.train.next_batch(50)
-    info_dict['x_batch'] = batch[0].reshape([batch[0].shape[0],1,28,28],order='F')   #add feature axis.
+    info_dict['x_batch'] = asfortranarray(batch[0]).reshape([batch[0].shape[0],-1],order='F')   #add feature axis.
+    #info_dict['x_batch'] = asfortranarray(batch[0]).reshape([batch[0].shape[0],1,28,28],order='F')   #add feature axis.
     info_dict['y_true'] = asfortranarray(batch[1],dtype=batch[0].dtype)
     optimizer=RmsProp(wrt=var_vec,fprime=lambda x: compute_gradient(x,info_dict),step_rate=1e-3,decay=0.9,momentum=0.)
+    #optimizer=GradientDescent(wrt=var_vec,fprime=lambda x: compute_gradient(x,info_dict),step_rate=1e-2,momentum=0.)
+    #optimizer=Adam(wrt=var_vec,fprime=lambda x: compute_gradient(x,info_dict),step_rate=1e-4)
 
+    t0=time.time()
     for k,info in enumerate(optimizer):
-        batch = mnist.train.next_batch(50)
-        info_dict['x_batch'] = batch[0].reshape([batch[0].shape[0],1,28,28],order='F')   #add feature axis.
-        info_dict['y_true'] = batch[1].reshape([-1,10],order='F')
-        if k % 100 == 0:
+        print dnn.layers[0].weight.max()
+        #print dnn.layers[2].weight.max()
+        #print dnn.layers[3].fltr
+        if k % 10 == 0:
+            t1=time.time()
+            print(t1-t0)
+            t0=time.time()
             print 'Analyse Step = %s'%k
             analyse_result(info_dict['ys'], info_dict['y_true'])
-        if k>10000: break
+        batch = mnist.train.next_batch(50)
+        info_dict['x_batch'] = asfortranarray(batch[0]).reshape([batch[0].shape[0],-1],order='F')   #add feature axis.
+        #info_dict['x_batch'] = asfortranarray(batch[0]).reshape([batch[0].shape[0],1,28,28],order='F')   #add feature axis.
+        info_dict['y_true'] = asarray(batch[1],order='F',dtype='float32')
+        if k>8000: break
 
     #apply on test cases
-    ys = dnn.forward(mnist.test.images)
+    dnn.layers[7].keep_rate=1.
+    ys = dnn.feed_input(mnist.test.images, mnist.test.labels)
     analyse_result(ys, mnist.test.labels)
 
 if __name__ == '__main__':

@@ -5,7 +5,7 @@ import pdb
 from core import Layer,Function, SupervisedLayer, Tags
 from utils import scan2csc
 
-__all__=['Log2cosh','Sigmoid','Sum','Mean','ReLU','MaxPool','DropOut',
+__all__=['Log2cosh','Sigmoid','Sigmoid_I','Sum','Mean','ReLU_I','MaxPool','DropOut_I',
         'SoftMax','CrossEntropy','SoftMaxCrossEntropy']
 
 EXP_OVERFLOW=30
@@ -28,7 +28,7 @@ class Log2cosh(Function):
     def backward(self,x,y,dy, **kwargs):
         return (),np.tanh(x)*dy
 
-class Sigmoid(Function):
+class Sigmoid_I(Function):
     '''
     Function log(2*cosh(theta)).
     '''
@@ -44,7 +44,26 @@ class Sigmoid(Function):
         return x
 
     def backward(self,x,y,dy, **kwargs):
+        raise Exception('Inplace backward should change x!')
         return (),y*(1-y)*dy
+
+class Sigmoid(Function):
+    '''
+    Function log(2*cosh(theta)).
+    '''
+    def forward(self,x):
+        #for ndarray
+        y=np.zeros_like(x)
+        m1=x.real<-EXP_OVERFLOW
+        m2=x.real>EXP_OVERFLOW
+        m3=~(m1|m2)
+        y[m2]=1
+        y[m3]=1/(1+np.exp(-x[m3]))
+        return y
+
+    def backward(self,x,y,dy, **kwargs):
+        return (),y*(1-y)*dy
+
 
 class Reorder(Function):  #TODO: fix initialization
     '''
@@ -112,19 +131,19 @@ class Mean(Function):
         dy_=dy[(slice(None),)*self.axis+(np.newaxis,)]
         return (),np.repeat(dy_,x.shape[self.axis],axis=self.axis)/x.shape[self.axis]
 
-class ReLU(Function):
+class ReLU_I(Function):
     '''
     ReLU.
     '''
     tags = Tags(is_runtime = False, is_inplace = True)
     def __init__(self, leak = 0, input_shape=None, output_shape=None):
-        super(ReLU,self).__init__(input_shape, output_shape)
+        super(ReLU_I,self).__init__(input_shape, output_shape)
         if leak>1 or leak<0:
             raise ValueError('leak parameter should be 0-1!')
         self.leak = leak
 
     def forward(self, x):
-        xmask=x<0
+        xmask=x<=0
         if self.leak==0:
             x[xmask]=0
         else:
@@ -132,11 +151,11 @@ class ReLU(Function):
         return x
 
     def backward(self, x, y, dy, **kwargs):
-        ymask=y<0
+        xmask=y<=0
         if self.leak==0:
-            dy[ymask]=0
+            dy[xmask]=0
         else:
-            dy[ymask]*=self.leak
+            dy[xmask]*=self.leak
         return (), dy
 
 class MaxPool(Function):
@@ -174,7 +193,6 @@ class MaxPool(Function):
             indices=self.csc_indices[start-1:end-1]-1
             y[...,col]=np.max(x[...,indices],keepdims=False,axis=-1)
         y=y.reshape(self.output_shape, order='F')
-        pdb.set_trace()
         return y
 
     def backward(self, x, y, dy, **kwargs):
@@ -196,7 +214,7 @@ class MaxPool(Function):
             dx[tuple(preinds)+(maxind,)]=dy[...,col]
         return (), dx.reshape(x.shape, order='F')
 
-class DropOut(Function):
+class DropOut_I(Function):
     '''
     DropOut inplace.
     '''
@@ -204,7 +222,7 @@ class DropOut(Function):
     def __init__(self, keep_rate, axis, input_shape=None, output_shape=None):
         self.axis=axis%len(input_shape)
         self.keep_rate = keep_rate
-        super(DropOut, self).__init__(input_shape, output_shape)
+        super(DropOut_I, self).__init__(input_shape, output_shape)
 
     def forward(self, x):
         '''
@@ -238,13 +256,16 @@ class SoftMax(Function):
         return rho/rho.sum(axis=self.axis, keepdims=True)
 
     def backward(self, x, y, dy, **kwargs):
-        return (),dy*y*(1-y)
+        return (),dy*y-(dy*y).sum(axis=self.axis, keepdims=True)*y
+        #return (),dy*y*(1-y.sum(axis=self.axis, keepdims=True))
 
 class CrossEntropy(Function, SupervisedLayer):
     '''
     Cross Entropy sum(p*log(q)). With p the true labels.
         q = x
     '''
+    ZERO_REF=1e-15
+
     def __init__(self, input_shape, axis, output_shape = None):
         self.axis=axis%len(input_shape)
         if output_shape is None:
@@ -257,10 +278,10 @@ class CrossEntropy(Function, SupervisedLayer):
             :x: ndarray, note 0 < x <= 1.
             :y_true: ndarray, correct one-hot y.
         '''
-        return (-self.y_true*np.log(x)).sum(axis=self.axis)
+        return (-self.y_true*np.log(np.maximum(self.ZERO_REF,x))).sum(axis=self.axis)
 
     def backward(self, x, y, dy, **kwargs):
-        return (),-dy[(slice(None),)*self.axis+(np.newaxis,)]*(self.y_true/x)
+        return (),-dy[(slice(None),)*self.axis+(np.newaxis,)]*(self.y_true/np.maximum(x, self.ZERO_REF))
 
 class SoftMaxCrossEntropy(Function, SupervisedLayer):
     '''
@@ -281,7 +302,6 @@ class SoftMaxCrossEntropy(Function, SupervisedLayer):
         '''
         x=x-x.max(axis=self.axis, keepdims=True)
         rho=np.exp(x)
-        pdb.set_trace()
         Z=rho.sum(axis=self.axis, keepdims=True)
         return ((np.log(Z)-x)*self.y_true).sum(axis=self.axis)
 
@@ -290,5 +310,4 @@ class SoftMaxCrossEntropy(Function, SupervisedLayer):
         rho=np.exp(x)
         Z=rho.sum(axis=self.axis, keepdims=True)
         y1=rho/Z
-        return (),dy[(slice(None),)*self.axis+(np.newaxis,)]*self.y_true*(y1-1)
-
+        return (),dy[(slice(None),)*self.axis+(np.newaxis,)]*(y1-self.y_true)

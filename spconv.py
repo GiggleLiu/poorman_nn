@@ -74,6 +74,9 @@ class SPConv(Layer):
             self._fbackward=eval('fspconv.backward_contiguous%s'%dtype_token)
             self._fbackward1=eval('fspconv.backward1_contiguous%s'%dtype_token)
 
+    def __str__(self):
+        return self.__repr__()+'\n  dtype = %s\n  filter => %s\n  bias => %s'%(self.dtype,self.fltr.shape,self.bias.shape)
+
     @property
     def img_nd(self):
         '''Dimension of input image.'''
@@ -89,7 +92,7 @@ class SPConv(Layer):
         '''Dimension of input feature.'''
         return self.fltr.shape[0]
 
-    @check_shape
+    @check_shape((1,))
     def forward(self, x):
         '''
         Parameters:
@@ -113,7 +116,7 @@ class SPConv(Layer):
         y=y.reshape(self.output_shape, order='F')
         return y
 
-    @check_shape
+    @check_shape((1,-3))
     def backward(self, x, y, dy, mask=(1,)*2):
         '''
         Parameters:
@@ -131,7 +134,6 @@ class SPConv(Layer):
 
         #flatten inputs/outputs
         x=x.reshape(xpre+(-1,), order='F')
-        y=y.reshape(ypre+(-1,), order='F')
         dy=dy.reshape(ypre+(-1,), order='F')
         _fltr_flatten = self.fltr.reshape(self.fltr.shape[:2]+(-1,), order='F')
 
@@ -152,8 +154,9 @@ class SPConv(Layer):
 
     def set_variables(self, variables, mode='set'):
         if mode=='set':
-            self.fltr[...]=variables[0]
-            self.bias[...]=variables[1]
+            #self.fltr[...]=variables[0]
+            #self.bias[...]=variables[1]
+            self.fltr, self.bias = variables
         elif mode=='add':
             self.fltr+=variables[0]
             self.bias+=variables[1]

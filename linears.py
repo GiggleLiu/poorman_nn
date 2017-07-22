@@ -21,7 +21,7 @@ class Linear(Layer):
     '''
     def __init__(self, weight, bias, dtype = 'float32', input_shape=None, output_shape=None):
         self.weight = np.asfortranarray(weight, dtype=dtype)
-        self.bias = bias
+        self.bias = np.asarray(bias,dtype=dtype)
         self.dtype = dtype
         if input_shape is None:
             input_shape = (-1,weight.shape[1])
@@ -44,14 +44,16 @@ class Linear(Layer):
         #self._fforward1=eval('flinear.forward1_%s'%(dtype_token))
         #self._fbackward1=eval('flinear.backward1_%s'%(dtype_token))
 
+    def __str__(self):
+        return self.__repr__()+'\n  dtype = %s\n  weight => %s\n  bias => %s'%(self.dtype,self.weight.shape,self.bias.shape)
 
-    @check_shape
+    @check_shape((1,))
     def forward(self, x):
         y = self._fforward(x, self.weight, self.bias)
         return y
 
-    @check_shape
-    def backward(self, x, y, dy, mask=(1,)*2):
+    @check_shape((1,-3))
+    def backward(self, x, y, dy, mask=(1,1)):
         dx, dweight, dbias = self._fbackward(dy, x, self.weight, self.bias,
             do_xgrad=mask[1], do_wgrad=mask[0], do_bgrad=mask[0])
         return (dweight, dbias), dx
@@ -61,8 +63,11 @@ class Linear(Layer):
 
     def set_variables(self, variables, mode='set'):
         if mode=='set':
-            self.weight[...]=variables[0]
-            self.bias[...]=variables[1]
+            #self.weight[...]=variables[0]
+            #self.bias[...]=variables[1]
+            #self.weight, self.bias = variables
+            np.copyto(self.weight,variables[0])
+            np.copyto(self.bias,variables[1])
         elif mode=='add':
             self.weight+=variables[0]
             self.bias+=variables[1]

@@ -64,7 +64,6 @@ def test_conv2d_per():
     K2=4
     nfin=10
     nfout=16
-    print "Testing forward"
     ts=random.random([num_batch,nfin,dim_x,dim_y])
     ts=autograd.Variable(torch.Tensor(ts),requires_grad=True)
     #2 features, kernel size 3x3
@@ -72,6 +71,7 @@ def test_conv2d_per():
     fltr=cv.weight.data.numpy()
     sv=SPConv((-1,nfin,dim_x,dim_y), float32(fltr),float32(cv.bias.data.numpy()),strides=(1,1),boundary='O', w_contiguous=True, output_shape=(-1,nfout,dim_x-K1+1, dim_y-K2+1))
     sv2=SPConv((nfin,dim_x,dim_y), float32(fltr),float32(cv.bias.data.numpy()),strides=(1,1),boundary='O', w_contiguous=True, output_shape=(nfout,dim_x-K1+1, dim_y-K2+1))
+    print "Testing forward for %s"%sv
     xin_np=ts.data.numpy()
     xin_np1=xin_np[0]
     ntest=5

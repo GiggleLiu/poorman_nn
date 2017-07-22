@@ -27,16 +27,13 @@ from __future__ import division
 from __future__ import print_function
 
 import argparse
-import sys
+import sys, time
 import numpy as np
 from numpy.random import randn
 
 from tensorflow.examples.tutorials.mnist import input_data
 
 import tensorflow as tf
-
-import functions
-from spconv import SPConv
 
 FLAGS = None
 
@@ -123,10 +120,14 @@ def main(_):
     accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
 
     with tf.Session() as sess:
+        t0=time.time()
         sess.run(tf.global_variables_initializer())
         for i in range(20000):
             batch = mnist.train.next_batch(50)
             if i % 100 == 0:
+                t1=time.time()
+                print(t1-t0)
+                t0=time.time()
                 train_accuracy = accuracy.eval(feed_dict={
                 x: batch[0], y_: batch[1], keep_prob: 1.0})
                 print('step %d, training accuracy %g' % (i, train_accuracy))

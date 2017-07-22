@@ -18,13 +18,13 @@ def test_linear():
     num_batch=10
     nfi=1024
     nfo=512
-    print "Testing forward"
     ts=random.randn(num_batch,nfi)
     ts=autograd.Variable(torch.Tensor(ts),requires_grad=True)
     #2 features, kernel size 3x3
     cv=nn.Linear(nfi,nfo)
     fltr=cv.weight.data.numpy()
     sv=Linear(float32(fltr),float32(cv.bias.data.numpy()))
+    print "Testing forward for %s"%sv
     xin_np=asfortranarray(ts.data.numpy())
     xin_np1=xin_np[0]
     ntest=5
