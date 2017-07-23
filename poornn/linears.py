@@ -54,7 +54,7 @@ class Linear(Layer):
 
     @check_shape((1,-3))
     def backward(self, x, y, dy, mask=(1,1)):
-        dx, dweight, dbias = self._fbackward(dy, x, self.weight, self.bias,
+        dx, dweight, dbias = self._fbackward(dy, x, self.weight,
             do_xgrad=mask[1], do_wgrad=mask[0], do_bgrad=mask[0])
         return (dweight, dbias), dx
 

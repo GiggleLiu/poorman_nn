@@ -40,8 +40,8 @@ def build_dnn():
     pooling2 = functions.MaxPool(kernel_shape=(2,2), input_shape=conv2.output_shape, output_shape=(-1,F2*I1/4*I2/4), boundary='O')
 
     #fully connected layer
-    #nout=pooling2.output_shape[1]
-    nout=I1*I2
+    nout=pooling2.output_shape[1]
+    #nout=I1*I2
     F3=1024
     W_fc1 = randn(F3, nout)
     b_fc1 = randn(F3)
@@ -57,8 +57,8 @@ def build_dnn():
     #the cost function
     costfunc = functions.SoftMaxCrossEntropy(input_shape=(-1,F4),axis=1)
     meanfunc = functions.Mean((-1,),axis=0)
-    return ANN([linear1, relu3, linear2, costfunc, meanfunc])
-    #return ANN([conv1, relu1, pooling1, conv2, relu2, pooling2, linear1, dropout1, linear2, costfunc, meanfunc])
+    #return ANN([linear1, relu3, linear2, costfunc, meanfunc])
+    return ANN([conv1, relu1, pooling1, conv2, relu2, pooling2, linear1, dropout1, linear2, costfunc, meanfunc])
 
 def compute_gradient(weight_vec, info_dict):
     dnn=info_dict['dnn']
@@ -87,18 +87,15 @@ def main(_):
     info_dict = {'dnn':dnn, 'shapes':shapes}
 
     batch = mnist.train.next_batch(50)
-    info_dict['x_batch'] = asfortranarray(batch[0]).reshape([batch[0].shape[0],-1],order='F')   #add feature axis.
-    #info_dict['x_batch'] = asfortranarray(batch[0]).reshape([batch[0].shape[0],1,28,28],order='F')   #add feature axis.
+    #info_dict['x_batch'] = asfortranarray(batch[0]).reshape([batch[0].shape[0],-1],order='F')   #add feature axis.
+    info_dict['x_batch'] = asfortranarray(batch[0]).reshape([batch[0].shape[0],1,28,28],order='F')   #add feature axis.
     info_dict['y_true'] = asfortranarray(batch[1],dtype=batch[0].dtype)
     optimizer=RmsProp(wrt=var_vec,fprime=lambda x: compute_gradient(x,info_dict),step_rate=1e-3,decay=0.9,momentum=0.)
     #optimizer=GradientDescent(wrt=var_vec,fprime=lambda x: compute_gradient(x,info_dict),step_rate=1e-2,momentum=0.)
-    #optimizer=Adam(wrt=var_vec,fprime=lambda x: compute_gradient(x,info_dict),step_rate=1e-4)
+    #optimizer=Adam(wrt=var_vec,fprime=lambda x: compute_gradient(x,info_dict),step_rate=1e-3)
 
     t0=time.time()
     for k,info in enumerate(optimizer):
-        print dnn.layers[0].weight.max()
-        #print dnn.layers[2].weight.max()
-        #print dnn.layers[3].fltr
         if k % 10 == 0:
             t1=time.time()
             print(t1-t0)
@@ -106,14 +103,15 @@ def main(_):
             print 'Analyse Step = %s'%k
             analyse_result(info_dict['ys'], info_dict['y_true'])
         batch = mnist.train.next_batch(50)
-        info_dict['x_batch'] = asfortranarray(batch[0]).reshape([batch[0].shape[0],-1],order='F')   #add feature axis.
-        #info_dict['x_batch'] = asfortranarray(batch[0]).reshape([batch[0].shape[0],1,28,28],order='F')   #add feature axis.
+        #info_dict['x_batch'] = asfortranarray(batch[0]).reshape([batch[0].shape[0],-1],order='F')   #add feature axis.
+        info_dict['x_batch'] = asfortranarray(batch[0]).reshape([batch[0].shape[0],1,28,28],order='F')   #add feature axis.
         info_dict['y_true'] = asarray(batch[1],order='F',dtype='float32')
         if k>8000: break
 
     #apply on test cases
     dnn.layers[7].keep_rate=1.
-    ys = dnn.feed_input(mnist.test.images, mnist.test.labels)
+    ys = dnn.feed_input(asfortranarray(mnist.test.images).reshape([-1,1,28,28], order='F'), mnist.test.labels)
+    #ys = dnn.feed_input(mnist.test.images, mnist.test.labels)
     analyse_result(ys, mnist.test.labels)
 
 if __name__ == '__main__':

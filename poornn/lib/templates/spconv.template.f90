@@ -44,13 +44,13 @@ module lib
         enddo
     end subroutine forward_{{version}}{{dtype_token}}
 
-    subroutine backward_{{version}}{{dtype_token}}(dy,x,dx,dweight,dbias,csc_indptr,csc_indices{%if version == "general"%},weight_indices{%endif%},fltr_data,bias,&
+    subroutine backward_{{version}}{{dtype_token}}(dy,x,dx,dweight,dbias,csc_indptr,csc_indices{%if version == "general"%},weight_indices{%endif%},fltr_data,&
             nnz,dim_in,dim_out,nfi,nfo, nd, num_batch, do_xgrad, do_wgrad, do_bgrad, max_nnz_row)
         implicit none
         integer,intent(in) :: num_batch, nnz,dim_in,dim_out,nfi,nfo,nd,max_nnz_row
         logical,intent(in) :: do_xgrad, do_wgrad, do_bgrad
         {{dtype}},intent(in) :: x(num_batch, nfi, dim_in), dy(num_batch, nfo, dim_out),&
-            fltr_data(nfo,nfi,nd), bias(nfo)
+            fltr_data(nfo,nfi,nd)
         integer,intent(in) :: csc_indices(nnz), csc_indptr(dim_out+1){%if version == "general"%}, weight_indices(nnz){%endif%}
         {{dtype}},intent(out) :: dweight(nfo, nfi, nd), dbias(nfo), dx(num_batch, nfi, dim_in)
 
@@ -153,12 +153,12 @@ module lib
         enddo
     end subroutine forward1_{{version}}{{dtype_token}}
 
-    subroutine backward1_{{version}}{{dtype_token}}(dy,x,dx,dweight,dbias,csc_indptr,csc_indices,{%if version == "general"%}weight_indices, {%endif%}fltr_data,bias,&
+    subroutine backward1_{{version}}{{dtype_token}}(dy,x,dx,dweight,dbias,csc_indptr,csc_indices,{%if version == "general"%}weight_indices, {%endif%}fltr_data,&
             nnz,dim_in,dim_out,nfi,nfo, nd, do_xgrad, do_wgrad, do_bgrad, max_nnz_row)
         implicit none
         integer,intent(in) :: nnz,dim_in,dim_out,nfi,nfo,nd,max_nnz_row
         logical,intent(in) :: do_xgrad, do_wgrad, do_bgrad
-        {{dtype}},intent(in) :: x(nfi, dim_in), dy(nfo, dim_out), fltr_data(nfo,nfi,nd), bias(nfo)
+        {{dtype}},intent(in) :: x(nfi, dim_in), dy(nfo, dim_out), fltr_data(nfo,nfi,nd)
         integer,intent(in) :: csc_indices(nnz), csc_indptr(dim_out+1){%if version == "general"%}, weight_indices(nnz) {%endif%}
         {{dtype}},intent(out) :: dweight(nfo, nfi, nd), dbias(nfo), dx(nfi, dim_in)
 

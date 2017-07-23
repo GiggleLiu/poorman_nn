@@ -25,16 +25,15 @@ module lib
             weight, nfo, one, y, num_batch)
     end subroutine forward_{{version}}{{dtype_token}}
 
-    subroutine backward_{{version}}{{dtype_token}}(dy,x, weight,bias, dx, dweight,dbias{%if version == "masked"%},mask{%endif%},&
+    subroutine backward_{{version}}{{dtype_token}}(dy,x, weight, dx, dweight,dbias{%if version == "masked"%},mask{%endif%},&
             nfi,nfo, num_batch, do_xgrad, do_wgrad, do_bgrad)
         implicit none
         integer,intent(in) :: num_batch,nfi,nfo
         logical,intent(in) :: do_xgrad, do_wgrad, do_bgrad
-        {{dtype}},intent(in) :: x(num_batch, nfi), dy(num_batch, nfo), weight(nfo, nfi), bias(nfo)
+        {{dtype}},intent(in) :: x(num_batch, nfi), dy(num_batch, nfo), weight(nfo, nfi)
         {%if version == "masked"%}logical,intent(in) :: mask(nfo, nfi){%endif%}
         {{dtype}},intent(out) :: dweight(nfo, nfi), dbias(nfo), dx(num_batch, nfi)
 
-        integer :: i
         {{dtype}},parameter :: one={{dtype_one}}
         {{dtype}},parameter :: zero={{dtype_zero}}
 

@@ -8,8 +8,8 @@ from torch.nn import functional as F
 import torch
 
 def test_sigmoid():
-    print 'Test forward for Sigmoid'
     func=Sigmoid()
+    print 'Test forward for %s'%func
     xs=array([-1e100,-1e20,-0.5j*pi,-log(2),0,log(2),0.5j*pi,1e20,1e100])
     ys=array([0.,0.,1./(1+1j),1./3,0.5,2./3,1./(1-1j),1.,1.])
     dydx=[0.,0.,1j/(1+1j)**2,2./9,0.25,2./9,-1j/(1-1j)**2,0.,0.]
@@ -18,8 +18,8 @@ def test_sigmoid():
     assert_allclose(func.backward(xs,ys,1.)[1],dydx)
 
 def test_log2cosh():
-    print 'Test forward for Log2cosh'
     func=Log2cosh()
+    print 'Test forward for %s'%func
     xs=array([-1e100,-1e20,-0.25j*pi,-log(2),0,log(2),0.25j*pi,1e20,1e100])
     ys=array([1e100,1e20,log(2.)/2,log(2.5),log(2.),log(2.5),log(2.)/2,1e20,1e100])
     dydx=tanh(xs)
@@ -29,8 +29,8 @@ def test_log2cosh():
 
 def test_maxpool():
     for b in ['P','O']:
-        print 'Test maxpool forward - %sBC'%b
         func=MaxPool(input_shape=(-1,1,4,4), output_shape=(-1,1,2,2), kernel_shape=(2,2), boundary='O')
+        print 'Test forward for %s - %sBC'%(func,b)
         x=arange(16).reshape([1,1,4,4], order='F')
         y=func.forward(x)
         assert_allclose(y.ravel(),[5,13,7,15])
@@ -46,10 +46,10 @@ def test_maxpool():
 
 def test_softmax_cross():
     random.seed(2)
-    print 'Test lost functions'
     f1=SoftMax(input_shape=(-1,4),axis=1)
     f2=CrossEntropy(input_shape=(-1,4),axis=1)
     f3=SoftMaxCrossEntropy(input_shape=(-1,4), axis=1)
+    print 'Test forward for %s, %s, %s.'%(f1,f2,f3)
     x=random.random(12).reshape([3,4], order='F')  #3 batches, 4 logits.
     y_true=random.randint(0,2,[4,3]).T
     y1=f1.forward(x)
@@ -67,8 +67,8 @@ def test_softmax_cross():
 
 def test_dropout():
     random.seed(2)
-    print 'Test DropOut forward'
     func=DropOut_I(input_shape=(-1,2), axis=0, keep_rate=0.5)
+    print 'Test forward for %s'%func
     x=arange(8, dtype='float32').reshape([4,2], order='F')
     y=func.forward(x)
     assert_allclose(y,array([[0,4],[1,5],[0,0],[3,7]])*2)
@@ -79,9 +79,9 @@ def test_dropout():
 
 def test_summean():
     random.seed(2)
-    print 'Test forward for Sum/Mean.'
     func=Sum(input_shape=(-1,2),axis=1)
     func2=Mean(input_shape=(-1,2),axis=1)
+    print 'Test forward for %s, %s.'%(func, func2)
     x=arange(8).reshape([4,2], order='F')
     y=func.forward(x)
     y2=func2.forward(x)
@@ -96,7 +96,7 @@ def test_summean():
 
 def test_relu():
     func=ReLU_I(0.1)
-    print 'Test forward for ReLU.'
+    print 'Test forward for %s'%func
     x=arange(-3,5, dtype='float32').reshape([4,2], order='F')
     y=func.forward(x)
     assert_allclose(y,[[-0.3,1],[-0.2,2],[-0.1,3],[0,4]])
@@ -107,13 +107,13 @@ def test_relu():
 
 def test_relu_per():
     N1,N2,N3=100,20,10
-    print 'Test forward for ReLU.'
     x=torch.randn(N1,N2,N3)
     vx=torch.autograd.Variable(x)
     vx.requires_grad=True
     y0=F.relu(vx)
 
     func=ReLU_I(0.)
+    print 'Test forward for %s'%func
     y=func.forward(x.numpy())
     assert_allclose(y0.data.numpy(),y)
     print 'Test backward'
@@ -124,7 +124,6 @@ def test_relu_per():
 
 def test_softmax_cross_per():
     N1,N3=100,10
-    print 'Test lost functions'
     x=torch.randn(N1,N3)
     y_true=torch.from_numpy(random.randint(0,N3,N1))
     vy_true=torch.autograd.Variable(y_true)
@@ -139,6 +138,7 @@ def test_softmax_cross_per():
     f2=CrossEntropy(input_shape=(N1,N3),axis=1)
     f3=SoftMaxCrossEntropy(input_shape=(N1,N3), axis=1)
     f4=Mean(input_shape=(N1,), axis=0)
+    print 'Test forward for %s, %s, %s, %s'%(f1,f2,f3,f4)
     x_np=x.numpy()
     y_true_hot=zeros(f1.output_shape)
     y_true_hot[arange(N1),y_true.numpy()]=1

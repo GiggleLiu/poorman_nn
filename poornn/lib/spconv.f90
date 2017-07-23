@@ -38,13 +38,13 @@ module lib
         enddo
     end subroutine forward_generalz
 
-    subroutine backward_generalz(dy,x,dx,dweight,dbias,csc_indptr,csc_indices,weight_indices,fltr_data,bias,&
+    subroutine backward_generalz(dy,x,dx,dweight,dbias,csc_indptr,csc_indices,weight_indices,fltr_data,&
             nnz,dim_in,dim_out,nfi,nfo, nd, num_batch, do_xgrad, do_wgrad, do_bgrad, max_nnz_row)
         implicit none
         integer,intent(in) :: num_batch, nnz,dim_in,dim_out,nfi,nfo,nd,max_nnz_row
         logical,intent(in) :: do_xgrad, do_wgrad, do_bgrad
         complex*16,intent(in) :: x(num_batch, nfi, dim_in), dy(num_batch, nfo, dim_out),&
-            fltr_data(nfo,nfi,nd), bias(nfo)
+            fltr_data(nfo,nfi,nd)
         integer,intent(in) :: csc_indices(nnz), csc_indptr(dim_out+1), weight_indices(nnz)
         complex*16,intent(out) :: dweight(nfo, nfi, nd), dbias(nfo), dx(num_batch, nfi, dim_in)
 
@@ -137,12 +137,12 @@ module lib
         enddo
     end subroutine forward1_generalz
 
-    subroutine backward1_generalz(dy,x,dx,dweight,dbias,csc_indptr,csc_indices,weight_indices, fltr_data,bias,&
+    subroutine backward1_generalz(dy,x,dx,dweight,dbias,csc_indptr,csc_indices,weight_indices, fltr_data,&
             nnz,dim_in,dim_out,nfi,nfo, nd, do_xgrad, do_wgrad, do_bgrad, max_nnz_row)
         implicit none
         integer,intent(in) :: nnz,dim_in,dim_out,nfi,nfo,nd,max_nnz_row
         logical,intent(in) :: do_xgrad, do_wgrad, do_bgrad
-        complex*16,intent(in) :: x(nfi, dim_in), dy(nfo, dim_out), fltr_data(nfo,nfi,nd), bias(nfo)
+        complex*16,intent(in) :: x(nfi, dim_in), dy(nfo, dim_out), fltr_data(nfo,nfi,nd)
         integer,intent(in) :: csc_indices(nnz), csc_indptr(dim_out+1), weight_indices(nnz) 
         complex*16,intent(out) :: dweight(nfo, nfi, nd), dbias(nfo), dx(nfi, dim_in)
 
@@ -238,13 +238,13 @@ module lib
         enddo
     end subroutine forward_contiguousz
 
-    subroutine backward_contiguousz(dy,x,dx,dweight,dbias,csc_indptr,csc_indices,fltr_data,bias,&
+    subroutine backward_contiguousz(dy,x,dx,dweight,dbias,csc_indptr,csc_indices,fltr_data,&
             nnz,dim_in,dim_out,nfi,nfo, nd, num_batch, do_xgrad, do_wgrad, do_bgrad, max_nnz_row)
         implicit none
         integer,intent(in) :: num_batch, nnz,dim_in,dim_out,nfi,nfo,nd,max_nnz_row
         logical,intent(in) :: do_xgrad, do_wgrad, do_bgrad
         complex*16,intent(in) :: x(num_batch, nfi, dim_in), dy(num_batch, nfo, dim_out),&
-            fltr_data(nfo,nfi,nd), bias(nfo)
+            fltr_data(nfo,nfi,nd)
         integer,intent(in) :: csc_indices(nnz), csc_indptr(dim_out+1)
         complex*16,intent(out) :: dweight(nfo, nfi, nd), dbias(nfo), dx(num_batch, nfi, dim_in)
 
@@ -326,12 +326,12 @@ module lib
         enddo
     end subroutine forward1_contiguousz
 
-    subroutine backward1_contiguousz(dy,x,dx,dweight,dbias,csc_indptr,csc_indices,fltr_data,bias,&
+    subroutine backward1_contiguousz(dy,x,dx,dweight,dbias,csc_indptr,csc_indices,fltr_data,&
             nnz,dim_in,dim_out,nfi,nfo, nd, do_xgrad, do_wgrad, do_bgrad, max_nnz_row)
         implicit none
         integer,intent(in) :: nnz,dim_in,dim_out,nfi,nfo,nd,max_nnz_row
         logical,intent(in) :: do_xgrad, do_wgrad, do_bgrad
-        complex*16,intent(in) :: x(nfi, dim_in), dy(nfo, dim_out), fltr_data(nfo,nfi,nd), bias(nfo)
+        complex*16,intent(in) :: x(nfi, dim_in), dy(nfo, dim_out), fltr_data(nfo,nfi,nd)
         integer,intent(in) :: csc_indices(nnz), csc_indptr(dim_out+1)
         complex*16,intent(out) :: dweight(nfo, nfi, nd), dbias(nfo), dx(nfi, dim_in)
 
@@ -417,13 +417,13 @@ module lib
         enddo
     end subroutine forward_generald
 
-    subroutine backward_generald(dy,x,dx,dweight,dbias,csc_indptr,csc_indices,weight_indices,fltr_data,bias,&
+    subroutine backward_generald(dy,x,dx,dweight,dbias,csc_indptr,csc_indices,weight_indices,fltr_data,&
             nnz,dim_in,dim_out,nfi,nfo, nd, num_batch, do_xgrad, do_wgrad, do_bgrad, max_nnz_row)
         implicit none
         integer,intent(in) :: num_batch, nnz,dim_in,dim_out,nfi,nfo,nd,max_nnz_row
         logical,intent(in) :: do_xgrad, do_wgrad, do_bgrad
         real*8,intent(in) :: x(num_batch, nfi, dim_in), dy(num_batch, nfo, dim_out),&
-            fltr_data(nfo,nfi,nd), bias(nfo)
+            fltr_data(nfo,nfi,nd)
         integer,intent(in) :: csc_indices(nnz), csc_indptr(dim_out+1), weight_indices(nnz)
         real*8,intent(out) :: dweight(nfo, nfi, nd), dbias(nfo), dx(num_batch, nfi, dim_in)
 
@@ -516,12 +516,12 @@ module lib
         enddo
     end subroutine forward1_generald
 
-    subroutine backward1_generald(dy,x,dx,dweight,dbias,csc_indptr,csc_indices,weight_indices, fltr_data,bias,&
+    subroutine backward1_generald(dy,x,dx,dweight,dbias,csc_indptr,csc_indices,weight_indices, fltr_data,&
             nnz,dim_in,dim_out,nfi,nfo, nd, do_xgrad, do_wgrad, do_bgrad, max_nnz_row)
         implicit none
         integer,intent(in) :: nnz,dim_in,dim_out,nfi,nfo,nd,max_nnz_row
         logical,intent(in) :: do_xgrad, do_wgrad, do_bgrad
-        real*8,intent(in) :: x(nfi, dim_in), dy(nfo, dim_out), fltr_data(nfo,nfi,nd), bias(nfo)
+        real*8,intent(in) :: x(nfi, dim_in), dy(nfo, dim_out), fltr_data(nfo,nfi,nd)
         integer,intent(in) :: csc_indices(nnz), csc_indptr(dim_out+1), weight_indices(nnz) 
         real*8,intent(out) :: dweight(nfo, nfi, nd), dbias(nfo), dx(nfi, dim_in)
 
@@ -617,13 +617,13 @@ module lib
         enddo
     end subroutine forward_contiguousd
 
-    subroutine backward_contiguousd(dy,x,dx,dweight,dbias,csc_indptr,csc_indices,fltr_data,bias,&
+    subroutine backward_contiguousd(dy,x,dx,dweight,dbias,csc_indptr,csc_indices,fltr_data,&
             nnz,dim_in,dim_out,nfi,nfo, nd, num_batch, do_xgrad, do_wgrad, do_bgrad, max_nnz_row)
         implicit none
         integer,intent(in) :: num_batch, nnz,dim_in,dim_out,nfi,nfo,nd,max_nnz_row
         logical,intent(in) :: do_xgrad, do_wgrad, do_bgrad
         real*8,intent(in) :: x(num_batch, nfi, dim_in), dy(num_batch, nfo, dim_out),&
-            fltr_data(nfo,nfi,nd), bias(nfo)
+            fltr_data(nfo,nfi,nd)
         integer,intent(in) :: csc_indices(nnz), csc_indptr(dim_out+1)
         real*8,intent(out) :: dweight(nfo, nfi, nd), dbias(nfo), dx(num_batch, nfi, dim_in)
 
@@ -705,12 +705,12 @@ module lib
         enddo
     end subroutine forward1_contiguousd
 
-    subroutine backward1_contiguousd(dy,x,dx,dweight,dbias,csc_indptr,csc_indices,fltr_data,bias,&
+    subroutine backward1_contiguousd(dy,x,dx,dweight,dbias,csc_indptr,csc_indices,fltr_data,&
             nnz,dim_in,dim_out,nfi,nfo, nd, do_xgrad, do_wgrad, do_bgrad, max_nnz_row)
         implicit none
         integer,intent(in) :: nnz,dim_in,dim_out,nfi,nfo,nd,max_nnz_row
         logical,intent(in) :: do_xgrad, do_wgrad, do_bgrad
-        real*8,intent(in) :: x(nfi, dim_in), dy(nfo, dim_out), fltr_data(nfo,nfi,nd), bias(nfo)
+        real*8,intent(in) :: x(nfi, dim_in), dy(nfo, dim_out), fltr_data(nfo,nfi,nd)
         integer,intent(in) :: csc_indices(nnz), csc_indptr(dim_out+1)
         real*8,intent(out) :: dweight(nfo, nfi, nd), dbias(nfo), dx(nfi, dim_in)
 
@@ -796,13 +796,13 @@ module lib
         enddo
     end subroutine forward_generals
 
-    subroutine backward_generals(dy,x,dx,dweight,dbias,csc_indptr,csc_indices,weight_indices,fltr_data,bias,&
+    subroutine backward_generals(dy,x,dx,dweight,dbias,csc_indptr,csc_indices,weight_indices,fltr_data,&
             nnz,dim_in,dim_out,nfi,nfo, nd, num_batch, do_xgrad, do_wgrad, do_bgrad, max_nnz_row)
         implicit none
         integer,intent(in) :: num_batch, nnz,dim_in,dim_out,nfi,nfo,nd,max_nnz_row
         logical,intent(in) :: do_xgrad, do_wgrad, do_bgrad
         real*4,intent(in) :: x(num_batch, nfi, dim_in), dy(num_batch, nfo, dim_out),&
-            fltr_data(nfo,nfi,nd), bias(nfo)
+            fltr_data(nfo,nfi,nd)
         integer,intent(in) :: csc_indices(nnz), csc_indptr(dim_out+1), weight_indices(nnz)
         real*4,intent(out) :: dweight(nfo, nfi, nd), dbias(nfo), dx(num_batch, nfi, dim_in)
 
@@ -895,12 +895,12 @@ module lib
         enddo
     end subroutine forward1_generals
 
-    subroutine backward1_generals(dy,x,dx,dweight,dbias,csc_indptr,csc_indices,weight_indices, fltr_data,bias,&
+    subroutine backward1_generals(dy,x,dx,dweight,dbias,csc_indptr,csc_indices,weight_indices, fltr_data,&
             nnz,dim_in,dim_out,nfi,nfo, nd, do_xgrad, do_wgrad, do_bgrad, max_nnz_row)
         implicit none
         integer,intent(in) :: nnz,dim_in,dim_out,nfi,nfo,nd,max_nnz_row
         logical,intent(in) :: do_xgrad, do_wgrad, do_bgrad
-        real*4,intent(in) :: x(nfi, dim_in), dy(nfo, dim_out), fltr_data(nfo,nfi,nd), bias(nfo)
+        real*4,intent(in) :: x(nfi, dim_in), dy(nfo, dim_out), fltr_data(nfo,nfi,nd)
         integer,intent(in) :: csc_indices(nnz), csc_indptr(dim_out+1), weight_indices(nnz) 
         real*4,intent(out) :: dweight(nfo, nfi, nd), dbias(nfo), dx(nfi, dim_in)
 
@@ -996,13 +996,13 @@ module lib
         enddo
     end subroutine forward_contiguouss
 
-    subroutine backward_contiguouss(dy,x,dx,dweight,dbias,csc_indptr,csc_indices,fltr_data,bias,&
+    subroutine backward_contiguouss(dy,x,dx,dweight,dbias,csc_indptr,csc_indices,fltr_data,&
             nnz,dim_in,dim_out,nfi,nfo, nd, num_batch, do_xgrad, do_wgrad, do_bgrad, max_nnz_row)
         implicit none
         integer,intent(in) :: num_batch, nnz,dim_in,dim_out,nfi,nfo,nd,max_nnz_row
         logical,intent(in) :: do_xgrad, do_wgrad, do_bgrad
         real*4,intent(in) :: x(num_batch, nfi, dim_in), dy(num_batch, nfo, dim_out),&
-            fltr_data(nfo,nfi,nd), bias(nfo)
+            fltr_data(nfo,nfi,nd)
         integer,intent(in) :: csc_indices(nnz), csc_indptr(dim_out+1)
         real*4,intent(out) :: dweight(nfo, nfi, nd), dbias(nfo), dx(num_batch, nfi, dim_in)
 
@@ -1084,12 +1084,12 @@ module lib
         enddo
     end subroutine forward1_contiguouss
 
-    subroutine backward1_contiguouss(dy,x,dx,dweight,dbias,csc_indptr,csc_indices,fltr_data,bias,&
+    subroutine backward1_contiguouss(dy,x,dx,dweight,dbias,csc_indptr,csc_indices,fltr_data,&
             nnz,dim_in,dim_out,nfi,nfo, nd, do_xgrad, do_wgrad, do_bgrad, max_nnz_row)
         implicit none
         integer,intent(in) :: nnz,dim_in,dim_out,nfi,nfo,nd,max_nnz_row
         logical,intent(in) :: do_xgrad, do_wgrad, do_bgrad
-        real*4,intent(in) :: x(nfi, dim_in), dy(nfo, dim_out), fltr_data(nfo,nfi,nd), bias(nfo)
+        real*4,intent(in) :: x(nfi, dim_in), dy(nfo, dim_out), fltr_data(nfo,nfi,nd)
         integer,intent(in) :: csc_indices(nnz), csc_indptr(dim_out+1)
         real*4,intent(out) :: dweight(nfo, nfi, nd), dbias(nfo), dx(nfi, dim_in)
 

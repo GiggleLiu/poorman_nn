@@ -139,11 +139,11 @@ class SPConv(Layer):
 
         if x_nd == img_nd + 1:  #single batch wise
             dx, dweight, dbias = self._fbackward1(dy,x,self.csc_indptr,self.csc_indices,
-                    fltr_data=_fltr_flatten, bias=self.bias, 
+                    fltr_data=_fltr_flatten,
                     do_xgrad=mask[1], do_wgrad=mask[0], do_bgrad=mask[0], max_nnz_row=_fltr_flatten.shape[-1])
         else:
             dx, dweight, dbias = self._fbackward(dy,x,self.csc_indptr,self.csc_indices,
-                    fltr_data=_fltr_flatten, bias=self.bias, 
+                    fltr_data=_fltr_flatten,
                     do_xgrad=mask[1], do_wgrad=mask[0], do_bgrad=mask[0], max_nnz_row=_fltr_flatten.shape[-1])
         dx=dx.reshape(self.input_shape, order='F')
         dweight = dweight.reshape(self.fltr.shape, order='F')
