@@ -6,7 +6,7 @@ from core import Layer,Function, SupervisedLayer, Tags
 from utils import scan2csc
 
 __all__=['Log2cosh','Sigmoid','Sigmoid_I','Sum','Mean','ReLU_I','MaxPool','DropOut_I',
-        'SoftMax','CrossEntropy','SoftMaxCrossEntropy']
+        'SoftMax','CrossEntropy','SoftMaxCrossEntropy','Exp', 'Reshape','Transpose']
 
 EXP_OVERFLOW=30
 
@@ -23,10 +23,10 @@ class Log2cosh(Function):
         to=x[overflow]
         res[overflow]=np.sign(to.real)*to
         res[~overflow]=np.log(2*np.cosh(x[~overflow]))
-        return res
+        return res.reshape(self.output_shape, order='F')
 
     def backward(self,x,y,dy, **kwargs):
-        return (),np.tanh(x)*dy
+        return (),(np.tanh(x)*dy.reshape(self.input_shape, order='F'))
 
 class Sigmoid_I(Function):
     '''
@@ -311,3 +311,36 @@ class SoftMaxCrossEntropy(Function, SupervisedLayer):
         Z=rho.sum(axis=self.axis, keepdims=True)
         y1=rho/Z
         return (),dy[(slice(None),)*self.axis+(np.newaxis,)]*(y1-self.y_true)
+
+class Exp(Function):
+    '''
+    Function exp(x)
+    '''
+    def forward(self,x):
+        return np.exp(x)
+
+    def backward(self,x,y,dy, **kwargs):
+        return (),dy*y
+
+class Reshape(Function):
+    def forward(self, x):
+        return x.reshape(self.output_shape)
+
+    def backward(self, x, y, dy, **kwargs):
+        return (), dy.reshape(self.input_shape)
+
+
+class Transpose(Function):
+    def __init__(self, input_shape, axes, output_shape=None):
+        self.axes=axes
+        if len(axes)!=len(input_shape):
+            raise ValueError('axes incorrect!')
+        if output_shape is None:
+            output_shape=tuple([input_shape[axis] for axis in self.axes])
+        super(Transpose, self).__init__(input_shape, output_shape)
+
+    def forward(self, x):
+        return x.transpose(self.axes)
+
+    def backward(self, x, y, dy, **kwargs):
+        return (), dy.transpose(np.argsort(self.axes))

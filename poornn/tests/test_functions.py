@@ -44,6 +44,40 @@ def test_maxpool():
             0,2,0,3])
         assert_allclose(dx.shape,[1,1,4,4])
 
+def test_exp():
+    oldshape=(3,4,2)
+    func=Exp()
+    xs=random.random(oldshape)
+    print 'Test forward for %s'%func
+    ys=func.forward(xs)
+    assert_allclose(ys,exp(xs))
+    print 'Test backward'
+    assert_allclose(func.backward(xs,ys,1.)[1],ys)
+
+def test_reshape():
+    oldshape=(3,4,2)
+    newshape=(3,8)
+    func=Reshape(oldshape, newshape)
+    xs=random.random(oldshape)
+    print 'Test forward for %s'%func
+    ys=func.forward(xs)
+    assert_allclose(ys,xs.reshape(newshape))
+    print 'Test backward'
+    dy=random.random(newshape)
+    assert_allclose(func.backward(xs,ys,dy)[1],dy.reshape(oldshape))
+
+def test_transpose():
+    axes=(2,3,1,0)
+    func=Transpose((2,3,4,5), axes=axes)
+    xs=random.random(func.input_shape)
+    print 'Test forward for %s'%func
+    ys=func.forward(xs)
+    assert_allclose(ys,transpose(xs, axes=axes))
+    print 'Test backward'
+    dy=random.random([4,5,3,2])
+    assert_allclose(func.backward(xs,ys,dy)[1],transpose(dy,(3,2,0,1)))
+
+
 def test_softmax_cross():
     random.seed(2)
     f1=SoftMax(input_shape=(-1,4),axis=1)
@@ -164,6 +198,9 @@ def test_softmax_cross_per():
     assert_allclose(dx,vx.grad.data.numpy(),atol=1e-5)
 
 def test_all():
+    test_reshape()
+    test_exp()
+    test_transpose()
     test_softmax_cross_per()
     test_relu_per()
     test_relu()
