@@ -1,7 +1,7 @@
 import numpy as np
 import pdb
 
-__all__=['take_slice', 'scan2csc']
+__all__=['take_slice', 'scan2csc', 'typed_random']
 
 def take_slice(arr,sls,axis):
     '''take using slices.'''
@@ -66,3 +66,13 @@ def unpack_variables(vec, shapes):
         variables.append(vec[start:end].reshape(shape, order='F'))
         start=end
     return variables
+
+def typed_random(dtype='float64', *args, **kwargs):
+    if dtype is None:
+        return np.random.random(*args, **kwargs)
+    if dtype=='complex128':
+        return np.random.random(*args, **kwargs)+1j*np.random.random(*args, **kwargs)
+    elif dtype=='complex64':
+        return np.complex64(typed_random(*args, dtype='complex128', **kwargs))
+    else:
+        return np.random.random(*args, **kwargs).astype(np.dtype(dtype))

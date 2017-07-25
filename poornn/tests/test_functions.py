@@ -6,9 +6,10 @@ sys.path.insert(0,'../')
 from functions import *
 from torch.nn import functional as F
 import torch
+from core import check_numdiff
 
 def test_sigmoid():
-    func=Sigmoid()
+    func=Sigmoid(dtype='complex128')
     print 'Test forward for %s'%func
     xs=array([-1e100,-1e20,-0.5j*pi,-log(2),0,log(2),0.5j*pi,1e20,1e100])
     ys=array([0.,0.,1./(1+1j),1./3,0.5,2./3,1./(1-1j),1.,1.])
@@ -16,9 +17,10 @@ def test_sigmoid():
     assert_allclose(func.forward(xs),ys)
     print 'Test backward for Sigmoid'
     assert_allclose(func.backward(xs,ys,1.)[1],dydx)
+    assert_(check_numdiff(func, xs))
 
 def test_log2cosh():
-    func=Log2cosh()
+    func=Log2cosh(dtype='complex128')
     print 'Test forward for %s'%func
     xs=array([-1e100,-1e20,-0.25j*pi,-log(2),0,log(2),0.25j*pi,1e20,1e100])
     ys=array([1e100,1e20,log(2.)/2,log(2.5),log(2.),log(2.5),log(2.)/2,1e20,1e100])
@@ -26,12 +28,14 @@ def test_log2cosh():
     assert_allclose(func.forward(xs),ys)
     print 'Test backward'
     assert_allclose(func.backward(xs,ys,1.)[1],dydx)
+    #can not pass num check for inifity values
+    check_numdiff(func, xs)
 
 def test_maxpool():
     for b in ['P','O']:
         func=MaxPool(input_shape=(-1,1,4,4), output_shape=(-1,1,2,2), kernel_shape=(2,2), boundary='O')
         print 'Test forward for %s - %sBC'%(func,b)
-        x=arange(16).reshape([1,1,4,4], order='F')
+        x=arange(16,dtype=func.dtype).reshape([1,1,4,4], order='F')
         y=func.forward(x)
         assert_allclose(y.ravel(),[5,13,7,15])
         assert_allclose(y.shape,[1,1,2,2])
@@ -43,6 +47,7 @@ def test_maxpool():
             0,0,0,0,
             0,2,0,3])
         assert_allclose(dx.shape,[1,1,4,4])
+        assert_(check_numdiff(func, x))
 
 def test_exp():
     oldshape=(3,4,2)
@@ -53,6 +58,7 @@ def test_exp():
     assert_allclose(ys,exp(xs))
     print 'Test backward'
     assert_allclose(func.backward(xs,ys,1.)[1],ys)
+    assert_(check_numdiff(func, xs))
 
 def test_reshape():
     oldshape=(3,4,2)
@@ -65,6 +71,7 @@ def test_reshape():
     print 'Test backward'
     dy=random.random(newshape)
     assert_allclose(func.backward(xs,ys,dy)[1],dy.reshape(oldshape))
+    assert_(check_numdiff(func, xs))
 
 def test_transpose():
     axes=(2,3,1,0)
@@ -76,7 +83,7 @@ def test_transpose():
     print 'Test backward'
     dy=random.random([4,5,3,2])
     assert_allclose(func.backward(xs,ys,dy)[1],transpose(dy,(3,2,0,1)))
-
+    assert_(check_numdiff(func, xs))
 
 def test_softmax_cross():
     random.seed(2)
@@ -85,7 +92,7 @@ def test_softmax_cross():
     f3=SoftMaxCrossEntropy(input_shape=(-1,4), axis=1)
     print 'Test forward for %s, %s, %s.'%(f1,f2,f3)
     x=random.random(12).reshape([3,4], order='F')  #3 batches, 4 logits.
-    y_true=random.randint(0,2,[4,3]).T
+    y_true=array([[0.,1.,0.,0.], [0,0,1.,0],[1,0,0,0]],order='F')
     y1=f1.forward(x)
     f2.set_y_true(y_true)
     f3.set_y_true(y_true)
@@ -98,6 +105,9 @@ def test_softmax_cross():
     dx=f1.backward(x,y1,dy1)[1]
     dx_=f3.backward(x,y2_,dy2)[1]
     assert_allclose(dx,dx_)
+    assert_(check_numdiff(f1, x))
+    assert_(check_numdiff(f2, y1))
+    assert_(check_numdiff(f3, x))
 
 def test_dropout():
     random.seed(2)
@@ -127,6 +137,8 @@ def test_summean():
     dx2=func2.backward(x,y2,dy)[1]
     assert_allclose(dx, reshape([0,1,2,3,0,1,2,3],[4,2], order='F'))
     assert_allclose(dx2, dx/2.)
+    assert_(check_numdiff(func, x))
+    assert_(check_numdiff(func2, x))
 
 def test_relu():
     func=ReLU_I(0.1)
@@ -196,8 +208,14 @@ def test_softmax_cross_per():
     dx_=f3.backward(x_np,y2_,dy2)[1]
     assert_allclose(dx,dx_,atol=1e-5)
     assert_allclose(dx,vx.grad.data.numpy(),atol=1e-5)
+    assert_(check_numdiff(f1, x_np))
+    assert_(check_numdiff(f2, y1))
+    assert_(check_numdiff(f3, x_np))
+    assert_(check_numdiff(f4, y2))
 
 def test_all():
+    random.seed(3)
+    torch.manual_seed(3)
     test_reshape()
     test_exp()
     test_transpose()

@@ -22,12 +22,11 @@ class Linear(Layer):
     def __init__(self, weight, bias, dtype = 'float32', input_shape=None, output_shape=None):
         self.weight = np.asfortranarray(weight, dtype=dtype)
         self.bias = np.asarray(bias,dtype=dtype)
-        self.dtype = dtype
         if input_shape is None:
             input_shape = (-1,weight.shape[1])
         if output_shape is None:
             output_shape = (-1,weight.shape[0])
-        super(Linear, self).__init__(input_shape, output_shape)
+        super(Linear, self).__init__(input_shape, output_shape, dtype=dtype)
 
         if dtype=='complex128':
             dtype_token = 'z'
@@ -56,23 +55,19 @@ class Linear(Layer):
     def backward(self, x, y, dy, mask=(1,1)):
         dx, dweight, dbias = self._fbackward(dy, x, self.weight,
             do_xgrad=mask[1], do_wgrad=mask[0], do_bgrad=mask[0])
-        return (dweight, dbias), dx
+        return np.concatenate([dweight.ravel(order='F'), dbias]), dx
 
     def get_variables(self):
-        return (self.weight,self.bias)
+        return np.concatenate([self.weight.ravel(order='F'),self.bias])
 
     def set_variables(self, variables, mode='set'):
         if mode=='set':
-            np.copyto(self.weight,variables[0].reshape(self.weight.shape, order='F'))
-            np.copyto(self.bias,variables[1].reshape(self.bias.shape, order='F'))
+            np.copyto(self.weight,variables[:self.weight.size].reshape(self.weight.shape, order='F'))
+            np.copyto(self.bias,variables[self.weight.size:].reshape(self.bias.shape, order='F'))
         elif mode=='add':
             self.weight+=variables[0]
             self.bias+=variables[1]
 
     @property
     def num_variables(self):
-        return 2
-
-    @property
-    def variable_shapes(self):
-        return (self.weight.shape, self.bias.shape)
+        return self.weight.size+self.bias.size

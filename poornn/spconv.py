@@ -26,9 +26,6 @@ class SPConv(Layer):
         :weight_indices: 1darray, row indicator for filter array (if not contiguous).
     '''
     def __init__(self, input_shape, fltr, bias, output_shape=None, dtype='float32', strides=None, boundary = "P", w_contiguous = True):
-        #set data type
-        self.dtype = dtype
-
         self.fltr = np.asarray(fltr, dtype = dtype, order='F')
         self.bias = np.asarray(bias, order = 'F', dtype = dtype)
 
@@ -43,7 +40,7 @@ class SPConv(Layer):
         self.csc_indptr, self.csc_indices, self.img_out_shape = scan2csc(kernel_shape, input_shape[-img_nd:], strides, boundary)
         if output_shape is None:
             output_shape = input_shape[:-img_nd-1]+(self.num_feature_out,)+self.img_out_shape
-        super(SPConv, self).__init__(input_shape, output_shape)
+        super(SPConv, self).__init__(input_shape, output_shape, dtype=dtype)
 
         #use the correct fortran subroutine.
         if dtype=='complex128':
@@ -145,24 +142,19 @@ class SPConv(Layer):
                     fltr_data=_fltr_flatten,
                     do_xgrad=mask[1], do_wgrad=mask[0], do_bgrad=mask[0], max_nnz_row=_fltr_flatten.shape[-1])
         dx=dx.reshape(self.input_shape, order='F')
-        dweight = dweight.reshape(self.fltr.shape, order='F')
-        return (dweight, dbias), dx
+        return np.concatenate([dweight.ravel(order='F'), dbias]), dx
 
     def get_variables(self):
-        return (self.fltr,self.bias)
+        return np.concatenate([self.fltr.ravel(order='F'),self.bias])
 
     def set_variables(self, variables, mode='set'):
         if mode=='set':
-            np.copyto(self.fltr, variables[0].reshape(self.fltr.shape, order='F'))
-            np.copyto(self.bias, variables[1].reshape(self.bias.shape, order='F'))
+            np.copyto(self.fltr, variables[:self.fltr.size].reshape(self.fltr.shape, order='F'))
+            np.copyto(self.bias, variables[self.fltr.size:].reshape(self.bias.shape, order='F'))
         elif mode=='add':
             self.fltr+=variables[0]
             self.bias+=variables[1]
 
     @property
     def num_variables(self):
-        return 2
-
-    @property
-    def variable_shapes(self):
-        return (self.fltr.shape, self.bias.shape)
+        return self.fltr.size+self.bias.size

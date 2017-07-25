@@ -12,7 +12,6 @@ from core import ANN
 import functions
 from spconv import SPConv
 from linears import Linear
-from utils import unpack_variables, pack_variables
 
 FLAGS = None
 
@@ -62,13 +61,12 @@ def build_dnn():
 
 def compute_gradient(weight_vec, info_dict):
     dnn=info_dict['dnn']
-    dnn.set_variables(unpack_variables(weight_vec, info_dict['shapes']))
+    dnn.set_variables(weight_vec)
     ys = dnn.feed_input(info_dict['x_batch'], info_dict['y_true'])
     gradient_w, gradient_x = dnn.back_propagate(ys, dy=ones_like(ys[-1]))
     info_dict['gradient_x'] = gradient_x
     info_dict['ys'] = ys
-    vec, shapes = pack_variables(gradient_w)
-    info_dict['shapes'] = shapes
+    vec = gradient_w
     return vec
 
 def analyse_result(ys, y_true):
@@ -83,8 +81,8 @@ def main(_):
     random.seed(2)
     mnist = input_data.read_data_sets(FLAGS.data_dir, one_hot=True)
     dnn = build_dnn()
-    var_vec, shapes = pack_variables(dnn.get_variables())
-    info_dict = {'dnn':dnn, 'shapes':shapes}
+    var_vec = dnn.get_variables()
+    info_dict = {'dnn':dnn}
 
     batch = mnist.train.next_batch(50)
     #info_dict['x_batch'] = asfortranarray(batch[0]).reshape([batch[0].shape[0],-1],order='F')   #add feature axis.
