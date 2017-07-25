@@ -22,3 +22,5 @@ core.*
 *build/
 run.py
 tests/data/
+dist/
+poornn.egg-info/

@@ -35,8 +35,7 @@ class SPConv(Layer):
         img_nd = self.fltr.ndim-2
         if strides is None:
             strides=(1,)*img_nd
-        else:
-            self.strides = tuple(strides)
+        self.strides = tuple(strides)
         self.boundary = boundary
         self.w_contiguous = w_contiguous
 
@@ -154,9 +153,8 @@ class SPConv(Layer):
 
     def set_variables(self, variables, mode='set'):
         if mode=='set':
-            #self.fltr[...]=variables[0]
-            #self.bias[...]=variables[1]
-            self.fltr, self.bias = variables
+            np.copyto(self.fltr, variables[0].reshape(self.fltr.shape, order='F'))
+            np.copyto(self.bias, variables[1].reshape(self.bias.shape, order='F'))
         elif mode=='add':
             self.fltr+=variables[0]
             self.bias+=variables[1]
@@ -164,3 +162,7 @@ class SPConv(Layer):
     @property
     def num_variables(self):
         return 2
+
+    @property
+    def variable_shapes(self):
+        return (self.fltr.shape, self.bias.shape)

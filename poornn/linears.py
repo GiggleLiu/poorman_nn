@@ -63,11 +63,8 @@ class Linear(Layer):
 
     def set_variables(self, variables, mode='set'):
         if mode=='set':
-            #self.weight[...]=variables[0]
-            #self.bias[...]=variables[1]
-            #self.weight, self.bias = variables
-            np.copyto(self.weight,variables[0])
-            np.copyto(self.bias,variables[1])
+            np.copyto(self.weight,variables[0].reshape(self.weight.shape, order='F'))
+            np.copyto(self.bias,variables[1].reshape(self.bias.shape, order='F'))
         elif mode=='add':
             self.weight+=variables[0]
             self.bias+=variables[1]
@@ -75,3 +72,7 @@ class Linear(Layer):
     @property
     def num_variables(self):
         return 2
+
+    @property
+    def variable_shapes(self):
+        return (self.weight.shape, self.bias.shape)

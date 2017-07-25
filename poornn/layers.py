@@ -47,3 +47,8 @@ class PReLU(Layer):
     def num_variables(self):
         return 1
 
+    @property
+    def variable_shapes(self):
+        '''Shapes of variables.'''
+        return ((),)
+
