@@ -15,12 +15,10 @@ setting/local*.py
 *.log
 *.synctex.gz
 *.npy
-core.*
 *.dvi
 *.log
 *data/
 *build/
-run.py
 tests/data/
 dist/
 poornn.egg-info/
