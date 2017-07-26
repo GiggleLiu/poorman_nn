@@ -18,14 +18,27 @@ def render_f90s():
 render_f90s()
 def configuration(parent_package='',top_path=None):
     from numpy.distutils.misc_util import Configuration
-    os.environ["CC"] = "gfortran"
-    os.environ["CXX"] = "gfortran"
-    include_dirs=[os.curdir,'/intel/mkl/include']
-    library_dirs=[os.path.expanduser('~')+'/intel/mkl/lib/intel64']
-    libraries=['mkl_intel_lp64','mkl_sequential','mkl_core', 'm', 'pthread']
-
+    from numpy.distutils.system_info import get_info, NotFoundError, numpy_info
     config=Configuration('lib',parent_package,top_path)
+
+    #get lapack options
+    lapack_opt = get_info('lapack_opt')
+
+    if not lapack_opt:
+        raise NotFoundError('no lapack/blas resources found')
+
+    atlas_version = ([v[3:-3] for k, v in lapack_opt.get('define_macros', [])
+                      if k == 'ATLAS_INFO']+[None])[0]
+    if atlas_version:
+        print(('ATLAS version: %s' % atlas_version))
+
+    #include_dirs=[os.curdir,'$MKLROOT/include']
+    #library_dirs=['$MKLROOT/lib/intel64']
+    #libraries=['mkl_intel_lp64','mkl_sequential','mkl_core', 'm', 'pthread']
+
+
     for extension, source in zip(extension_list, source_list):
-        config.add_extension(extension, [os.path.join(libdir, source)], libraries=libraries,
-                library_dirs=library_dirs, include_dirs=include_dirs)
+        #config.add_extension(extension, [os.path.join(libdir, source)], libraries=libraries,
+        #        library_dirs=library_dirs, include_dirs=include_dirs)
+        config.add_extension(extension, [os.path.join(libdir, source)], extra_info=lapack_opt)
     return config

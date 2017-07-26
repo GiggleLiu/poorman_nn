@@ -113,7 +113,7 @@ class Sum(Function):
         return np.sum(x,axis=self.axis)
     
     def backward(self,x,y,dy, **kwargs):
-        dy_=dy[(slice(None),)*self.axis+(np.newaxis,)]
+        dy_=np.asfortranarray(dy)[(slice(None),)*self.axis+(np.newaxis,)]
         return EMPTY_VAR(x.dtype),np.repeat(dy_,x.shape[self.axis],axis=self.axis)
 
 class Mean(Function):
