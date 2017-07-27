@@ -2,10 +2,10 @@ import numpy as np
 from numbers import Number
 import pdb
 
-from core import Layer,Function, SupervisedLayer, Tags, EXP_OVERFLOW, EMPTY_VAR
+from core import Layer,Function, SupervisedLayer, Tags, EXP_OVERFLOW, EMPTY_VAR, check_shape
 from utils import scan2csc
 
-__all__=['Log2cosh','Sigmoid','Sigmoid_I','Sum','Mean','ReLU_I','MaxPool','DropOut_I',
+__all__=['Log2cosh','Sigmoid','Sigmoid_I','Sum','Mean','ReLU_I','Pooling','DropOut_I',
         'SoftMax','CrossEntropy','SoftMaxCrossEntropy','Exp', 'Reshape','Transpose']
 
 class Log2cosh(Function):
@@ -160,25 +160,40 @@ class ReLU_I(Function):
             dy[xmask]*=self.leak
         return EMPTY_VAR(x.dtype), dy
 
-class MaxPool(Function):
+class Pooling(Function):
     '''
-    Max pooling.
+    Max/Mean pooling.
 
     Note:
         for complex numbers, what does max pooling looks like?
     '''
-    def __init__(self, input_shape, kernel_shape, boundary='O', output_shape=None, dtype='float32'):
+    mode_dict = {'max':np.max,
+            'mean':np.mean}
+
+    def __init__(self, input_shape, kernel_shape, mode, boundary='O', output_shape=None, dtype='float32'):
         self.kernel_shape = kernel_shape
+        self.mode = mode
+        if not self.mode_dict.has_key(mode):
+            raise ValueError('mode %s not allowed!'%mode)
         img_in_shape = input_shape[-len(kernel_shape):]
         self.csc_indptr, self.csc_indices, self.img_out_shape = scan2csc(kernel_shape, img_in_shape, strides=kernel_shape, boundary=boundary)
         if output_shape is None:
             output_shape = input_shape[:-len(kernel_shape)]+self.img_out_shape
-        super(MaxPool,self).__init__(input_shape, output_shape, dtype='float32')
+        super(Pooling,self).__init__(input_shape, output_shape, dtype='float32')
+
+    def __repr__(self):
+        return '<%s>(%s): %s -> %s'%(self.__class__.__name__,self.mode, self.input_shape,self.output_shape)
 
     @property
     def img_nd(self):
         return len(self.kernel_shape)
 
+    @property
+    def pooling_func(self):
+        '''Pooling Function.'''
+        return self.mode_dict[self.mode]
+
+    @check_shape((1,))
     def forward(self, x):
         '''
         Parameters:
@@ -187,16 +202,17 @@ class MaxPool(Function):
         Return:
             ndarray, (num_batch, nfo, img_out_dims), output in 'F' order.
         '''
-        self._check_input(x)
         x_nd, img_nd = x.ndim, self.img_nd
+        pooling_func = self.pooling_func
         x=x.reshape(x.shape[:x_nd-img_nd]+(-1,), order='F')
         y=np.empty(x.shape[:x_nd-img_nd]+(np.product(self.img_out_shape),), order='F', dtype=x.dtype)
         for col,(start,end) in enumerate(zip(self.csc_indptr[:-1],self.csc_indptr[1:])):
             indices=self.csc_indices[start-1:end-1]-1
-            y[...,col]=np.max(x[...,indices],keepdims=False,axis=-1)
+            y[...,col]=pooling_func(x[...,indices],keepdims=False,axis=-1)
         y=y.reshape(self.output_shape, order='F')
         return y
 
+    @check_shape((1, -3))
     def backward(self, x, y, dy, **kwargs):
         '''It will shed a mask on dy'''
         x_nd, img_nd = x.ndim, self.img_nd
@@ -205,15 +221,22 @@ class MaxPool(Function):
 
         #flatten inputs/outputs
         x_=x.reshape(xpre+(-1,), order='F')
-        y=y.reshape(yshape, order='F')
         dy=dy.reshape(yshape, order='F')
 
         dx=np.zeros_like(x_)
         preinds=np.indices(dx.shape[:x_nd-img_nd])
-        for col,(start,end) in enumerate(zip(self.csc_indptr[:-1],self.csc_indptr[1:])):
-            indices=self.csc_indices[start-1:end-1]-1
-            maxind=indices[np.argmax(x_[...,indices],axis=-1)]
-            dx[tuple(preinds)+(maxind,)]=dy[...,col]
+        if self.mode == 'max':
+            for col,(start,end) in enumerate(zip(self.csc_indptr[:-1],self.csc_indptr[1:])):
+                indices=self.csc_indices[start-1:end-1]-1
+                maxind=indices[np.argmax(x_[...,indices],axis=-1)]
+                dx[tuple(preinds)+(maxind,)]=dy[...,col]
+        else:
+            kernel_size = np.prod(self.kernel_shape)
+            for col,(start,end) in enumerate(zip(self.csc_indptr[:-1],self.csc_indptr[1:])):
+                indices=self.csc_indices[start-1:end-1]-1
+                dy_=dy[...,col]/kernel_size
+                for index in indices:
+                    dx[tuple(preinds)+(index,)]=dy_
         return EMPTY_VAR(x.dtype), dx.reshape(x.shape, order='F')
 
 class DropOut_I(Function):

@@ -1,7 +1,7 @@
 import numpy as np
 import pdb
 
-__all__=['take_slice', 'scan2csc', 'typed_random']
+__all__=['take_slice', 'scan2csc', 'typed_random', 'typed_randn']
 
 def take_slice(arr,sls,axis):
     '''take using slices.'''
@@ -76,3 +76,13 @@ def typed_random(dtype='float64', *args, **kwargs):
         return np.complex64(typed_random(*args, dtype='complex128', **kwargs))
     else:
         return np.random.random(*args, **kwargs).astype(np.dtype(dtype))
+
+def typed_randn(dtype, shape):
+    if dtype is None:
+        return np.random.randn(*shape)
+    if dtype=='complex128':
+        return np.random.randn(*shape)+1j*np.random.randn(*shape)
+    elif dtype=='complex64':
+        return np.complex64(typed_randn('complex128', shape))
+    else:
+        return np.random.randn(*shape).astype(np.dtype(dtype))

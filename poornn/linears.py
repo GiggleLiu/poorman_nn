@@ -48,14 +48,14 @@ class Linear(Layer):
 
     @check_shape((1,))
     def forward(self, x):
-        y = self._fforward(x, self.weight, self.bias)
-        return y
+        y = self._fforward(np.atleast_2d(x), self.weight, self.bias)
+        return y.reshape(self.output_shape, order='F')
 
     @check_shape((1,-3))
     def backward(self, x, y, dy, mask=(1,1)):
-        dx, dweight, dbias = self._fbackward(dy, x, self.weight,
+        dx, dweight, dbias = self._fbackward(np.atleast_2d(dy), np.atleast_2d(x), self.weight,
             do_xgrad=mask[1], do_wgrad=mask[0], do_bgrad=mask[0])
-        return np.concatenate([dweight.ravel(order='F'), dbias]), dx
+        return np.concatenate([dweight.ravel(order='F'), dbias]), dx.reshape(self.input_shape)
 
     def get_variables(self):
         return np.concatenate([self.weight.ravel(order='F'),self.bias])

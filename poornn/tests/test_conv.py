@@ -3,16 +3,15 @@ Tests for MPS and MPO
 '''
 from numpy import *
 from numpy.testing import dec,assert_,assert_raises,assert_almost_equal,assert_allclose
-import torch.nn.functional as F
-from torch.nn import Conv1d,Conv2d
-from torch import autograd
-import torch
 import sys,pdb,time
 sys.path.insert(0,'../')
-
 from spconv import SPConv
 from core import check_numdiff
 from utils import typed_random
+import torch
+import torch.nn.functional as F
+from torch.nn import Conv1d,Conv2d
+from torch import autograd
 
 random.seed(2)
 torch.manual_seed(2)
@@ -52,7 +51,7 @@ def test_conv2d_per():
     fltr=cv.weight.data.numpy()
     sv=SPConv((-1,nfin,dim_x,dim_y), float32(fltr),float32(cv.bias.data.numpy()),strides=(1,1),boundary='O', w_contiguous=True, output_shape=(-1,nfout,dim_x-K1+1, dim_y-K2+1))
     sv2=SPConv((nfin,dim_x,dim_y), float32(fltr),float32(cv.bias.data.numpy()),strides=(1,1),boundary='O', w_contiguous=True, output_shape=(nfout,dim_x-K1+1, dim_y-K2+1))
-    print "Testing forward for %s"%sv
+    print "Testing forward for %s, 2D"%sv
     xin_np=ts.data.numpy()
     xin_np1=xin_np[0]
     ntest=5
@@ -122,7 +121,7 @@ def test_conv1d_per():
     fltr=cv.weight.data.numpy()
     sv=SPConv((-1,nfin,dim_x), float32(fltr),float32(cv.bias.data.numpy()),strides=(1,),boundary='O', w_contiguous=True, output_shape=(-1,nfout,dim_x-K1+1))
     sv2=SPConv((nfin,dim_x), float32(fltr),float32(cv.bias.data.numpy()),strides=(1,),boundary='O', w_contiguous=True, output_shape=(nfout,dim_x-K1+1))
-    print "Testing forward for %s"%sv
+    print "Testing forward for %s, 1D"%sv
     xin_np=asfortranarray(ts.data.numpy())
     xin_np1=xin_np[0]
     ntest=5
@@ -235,5 +234,5 @@ def test_conv2d_complex():
 
 test_conv2d_complex()
 test_conv2d()
-test_conv1d_per()
 test_conv2d_per()
+test_conv1d_per()

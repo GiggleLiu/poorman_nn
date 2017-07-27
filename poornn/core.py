@@ -6,7 +6,6 @@ import numpy as np
 from abc import ABCMeta, abstractmethod
 from collections import namedtuple
 import pdb
-from profilehooks import profile
 
 from utils import typed_random
 
@@ -36,22 +35,29 @@ class Layer(object):
         self.output_shape = output_shape
         self.dtype = dtype
 
+    def __str__(self):
+        return self.__repr__()
+
     def __repr__(self):
         return '<%s>: %s -> %s'%(self.__class__.__name__,self.input_shape,self.output_shape)
 
     def _check_input(self, x):
         if self.input_shape is None:
             return
+        if x.ndim!=len(self.input_shape):
+            raise ValueError('Dimension mismatch! x %s, desire %s'%(x.ndim, len(self.input_shape)))
         for shape_i, xshape_i in zip(self.input_shape, x.shape):
             if shape_i!=-1 and shape_i!=xshape_i:
-                raise ValueError('Illegal Input shape! x%s, desire %s'%(x.shape, self.input_shape))
+                raise ValueError('Illegal Input shape! x %s, desire %s'%(x.shape, self.input_shape))
 
     def _check_output(self, y):
         if self.output_shape is None:
             return
+        if y.ndim!=len(self.output_shape):
+            raise ValueError('Dimension mismatch! y %s, desire %s'%(y.ndim, len(self.output_shape)))
         for shape_i, yshape_i in zip(self.output_shape, y.shape):
             if shape_i!=-1 and shape_i!=yshape_i:
-                raise ValueError('Illegal Output shape!')
+                raise ValueError('Illegal Output shape! y %s, desire %s'%(y.shape, self.output_shape))
 
     @abstractmethod
     def forward(self,x):
@@ -184,7 +190,7 @@ class ANN(object):
             ys.append(x)
         return ys
 
-    def back_propagate(self,ys, dy=1):
+    def back_propagate(self,ys, dy=np.array(1)):
         '''
         Compute gradients.
 

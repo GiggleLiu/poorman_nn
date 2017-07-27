@@ -11,5 +11,5 @@ def render_f90(template_folder, template_file,var_dict,out_file):
         of.write('!This is an f90 file automatically generated.\n'+res)
 
 if __name__=='__main__':
-    render_f90('template','spconv.template.f90',{'version_list':['general','contiguous'],'dtype_list':['complex*16','real*8','real*4']},out_file='spconv.f90')
-    render_f90('template','linear.template.f90',{'version_list':[''],'dtype_list':['complex*16','real*8','real*4']},out_file='linear.f90')
+    render_f90('templates','spconv.template.f90',{'version_list':['general','contiguous'],'dtype_list':['complex*16','real*8','real*4']},out_file='spconv.f90')
+    render_f90('templates','linear.template.f90',{'version_list':[''],'dtype_list':['complex*16','real*8','real*4']},out_file='linear.f90')

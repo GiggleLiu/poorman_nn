@@ -11,8 +11,8 @@ def render_f90s():
     from frender import render_f90
     for template, source in zip(template_list, source_list):
         if not os.path.exists(os.path.join(libdir, source)):
-            render_f90(libdir, os.path.join(libdir, 'templates', template),{
-                'version_list':['general','contiguous'],
+            render_f90(libdir, os.path.join('templates', template),{
+                'version_list':['general','contiguous'] if source=='spconv.f90' else [''],
                 'dtype_list':['complex*16','real*8','real*4']
                 }, out_file=os.path.join(libdir, source))
 render_f90s()

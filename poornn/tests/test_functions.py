@@ -31,23 +31,33 @@ def test_log2cosh():
     #can not pass num check for inifity values
     check_numdiff(func, xs)
 
-def test_maxpool():
+def test_pooling():
     for b in ['P','O']:
-        func=MaxPool(input_shape=(-1,1,4,4), output_shape=(-1,1,2,2), kernel_shape=(2,2), boundary='O')
-        print 'Test forward for %s - %sBC'%(func,b)
-        x=arange(16,dtype=func.dtype).reshape([1,1,4,4], order='F')
-        y=func.forward(x)
-        assert_allclose(y.ravel(),[5,13,7,15])
-        assert_allclose(y.shape,[1,1,2,2])
-        print 'Test backward'
-        dy=arange(4).reshape([1,1,2,2])
-        dx=func.backward(x,y,dy)[1]
-        assert_allclose(dx.ravel(),[0,0,0,0,
-            0,0,0,1,
-            0,0,0,0,
-            0,2,0,3])
-        assert_allclose(dx.shape,[1,1,4,4])
-        assert_(check_numdiff(func, x))
+        for mode in ['max', 'mean']:
+            func=Pooling(input_shape=(-1,1,4,4), output_shape=(-1,1,2,2), kernel_shape=(2,2), mode=mode, boundary=b)
+            print 'Test forward for %s - %sBC'%(func,b)
+            x=arange(16,dtype=func.dtype).reshape([1,1,4,4], order='F')
+            dy=arange(4, dtype='float32').reshape([1,1,2,2])
+            y=func.forward(x)
+            if mode=='max':
+                y_true_ravel=[5,13,7,15]
+                dx_true_ravel=[0,0,0,0,
+                    0,0,0,1,
+                    0,0,0,0,
+                    0,2,0,3]
+            else:
+                y_true_ravel=[2.5,10.5,4.5,12.5]
+                dx_true_ravel=[0,0,0.25,0.25,
+                    0,0,0.25,0.25,
+                    0.5,0.5,0.75,0.75,
+                    0.5,0.5,0.75,0.75]
+            assert_allclose(y.ravel(),y_true_ravel)
+            assert_allclose(y.shape,[1,1,2,2])
+            print 'Test backward'
+            dx=func.backward(x,y,dy)[1]
+            assert_allclose(dx.ravel(),dx_true_ravel)
+            assert_allclose(dx.shape,[1,1,4,4])
+            assert_(check_numdiff(func, x))
 
 def test_exp():
     oldshape=(3,4,2)
@@ -225,7 +235,7 @@ def test_all():
     test_summean()
     test_softmax_cross()
     test_dropout()
-    test_maxpool()
+    test_pooling()
     test_log2cosh()
     test_sigmoid()
 
