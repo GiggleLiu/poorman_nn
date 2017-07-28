@@ -6,8 +6,8 @@ from numpy.testing import dec,assert_,assert_raises,assert_almost_equal,assert_a
 import sys,pdb,time
 sys.path.insert(0,'../')
 from spconv import SPConv
-from core import check_numdiff
-from utils import typed_random
+from checks import check_numdiff
+from utils import typed_randn
 import torch
 import torch.nn.functional as F
 from torch.nn import Conv1d,Conv2d
@@ -32,7 +32,7 @@ def test_conv2d():
 
     #new
     sv=SPConv((2,1,4,4), fltr=cv.weight.data.numpy(), bias=cv.bias.data.numpy(), dtype='complex128',strides=(1,1),boundary='O')
-    x=asfortranarray(ts.data.numpy(), dtype=complex128)
+    x=asfortranarray(ts.data.numpy(), dtype='complex128')
     res2=sv.forward(x)
     assert_allclose(res2,[[[[40,48],[72,80]],[[21,25],[37,41]]],[[[48,56],[80,88]],[[25,29],[41,45]]]])
 
@@ -81,10 +81,10 @@ def test_conv2d_per():
     y1.backward(dy)
     t1=time.time()
     for i in xrange(ntest):
-        dwb,dx=sv.backward(xin_np, y2, dy_np, mask=(1,1))
+        dwb,dx=sv.backward([xin_np, y2], dy_np, mask=(1,1))
     t2=time.time()
     for i in xrange(ntest):
-        dwb1,dx1=sv2.backward(xin_np1, y3, dy_np1, mask=(1,1))
+        dwb1,dx1=sv2.backward([xin_np1, y3], dy_np1, mask=(1,1))
     t3=time.time()
     print "Elapse old = %s, new = %s, new-1 = %s"%(t1-t0,(t2-t1)/ntest,(t3-t2)/ntest)
 
@@ -106,7 +106,7 @@ def test_conv2d_per():
 
     assert_allclose(cv.weight.grad.data.numpy()/wfactor,dweight1,atol=2e-3)
     assert_allclose(cv.weight.grad.data.numpy()/wfactor,dweight,atol=2e-3)
-    assert_(check_numdiff(sv, xin_np))
+    assert_(all(check_numdiff(sv, xin_np)))
 
 def test_conv1d_per():
     num_batch=1
@@ -151,10 +151,10 @@ def test_conv1d_per():
     y1.backward(dy)
     t1=time.time()
     for i in xrange(ntest):
-        dwb,dx=sv.backward(xin_np, y2, dy_np, mask=(1,1))
+        dwb,dx=sv.backward([xin_np, y2], dy_np, mask=(1,1))
     t2=time.time()
     for i in xrange(ntest):
-        dwb1,dx1=sv2.backward(xin_np1, y3, dy_np1, mask=(1,1))
+        dwb1,dx1=sv2.backward([xin_np1, y3], dy_np1, mask=(1,1))
     t3=time.time()
     print "Elapse old = %s, new = %s, new-1 = %s"%(t1-t0,(t2-t1)/ntest,(t3-t2)/ntest)
 
@@ -176,19 +176,19 @@ def test_conv1d_per():
 
     assert_allclose(cv.weight.grad.data.numpy()/wfactor,dweight1,atol=2e-3)
     assert_allclose(cv.weight.grad.data.numpy()/wfactor,dweight,atol=2e-3)
-    assert_(check_numdiff(sv, xin_np))
+    assert_(all(check_numdiff(sv, xin_np)))
 
 def test_conv2d_complex():
     num_batch=1
-    dim_x=30
-    dim_y=40
+    dim_x=10
+    dim_y=20
     K1=3
     K2=4
-    nfin=10
-    nfout=16
-    xin_np=asfortranarray(typed_random(complex128,[num_batch,nfin,dim_x,dim_y]))
-    fltr=asfortranarray(typed_random(complex128,[nfout,nfin,K1,K2]))
-    bias=typed_random(complex128,nfout)
+    nfin=4
+    nfout=6
+    xin_np=asfortranarray(typed_randn('complex128',[num_batch,nfin,dim_x,dim_y]))
+    fltr=asfortranarray(typed_randn('complex128',[nfout,nfin,K1,K2]))
+    bias=typed_randn('complex128',[nfout])
     sv=SPConv((-1,nfin,dim_x,dim_y), fltr, bias, strides=(1,1), boundary='O', w_contiguous=True, output_shape=(-1,nfout,dim_x-K1+1, dim_y-K2+1),dtype='complex128')
     sv2=SPConv((nfin,dim_x,dim_y), fltr, bias, strides=(1,1), boundary='O', w_contiguous=True, output_shape=(nfout,dim_x-K1+1, dim_y-K2+1),dtype='complex128')
     print "Testing forward for %s"%sv
@@ -207,15 +207,15 @@ def test_conv2d_complex():
     assert_allclose(res2,res2,atol=1e-4)
 
     print "Testing backward"
-    dy_np=typed_random(complex128, y2.shape)
+    dy_np=typed_randn('complex128', y2.shape)
     dy_np1=dy_np[0]
 
     t1=time.time()
     for i in xrange(ntest):
-        dwb,dx=sv.backward(xin_np, y2, dy_np, mask=(1,1))
+        dwb,dx=sv.backward([xin_np, y2], dy_np, mask=(1,1))
     t2=time.time()
     for i in xrange(ntest):
-        dwb1,dx1=sv2.backward(xin_np1, y3, dy_np1, mask=(1,1))
+        dwb1,dx1=sv2.backward([xin_np1, y3], dy_np1, mask=(1,1))
     t3=time.time()
     print "Elapse new = %s, new-1 = %s"%((t2-t1)/ntest,(t3-t2)/ntest)
 
@@ -230,7 +230,8 @@ def test_conv2d_complex():
     assert_allclose(dx,dx1,atol=1e-3)
     assert_allclose(dweight1,dweight,atol=1e-3)
 
-    assert_(check_numdiff(sv, xin_np))
+    assert_(all(check_numdiff(sv, num_check=100)))
+    assert_(all(check_numdiff(sv2, num_check=100)))
 
 test_conv2d_complex()
 test_conv2d()

@@ -9,8 +9,8 @@ import sys,pdb,time
 sys.path.insert(0,'../')
 
 from linears import Linear
-from core import check_numdiff
-from utils import typed_random
+from checks import check_numdiff
+from utils import typed_randn
 import torch.nn as nn
 from torch import autograd
 import torch
@@ -52,7 +52,7 @@ def test_linear():
     y1.backward(dy)
     t1=time.time()
     for i in xrange(ntest):
-        dwb, dx=sv.backward(xin_np, y2, dy_np, mask=(1,1))
+        dwb, dx=sv.backward([xin_np, y2], dy_np, mask=(1,1))
     t2=time.time()
     print "Elapse old = %s, new = %s"%(t1-t0,(t2-t1)/ntest)
 
@@ -66,17 +66,17 @@ def test_linear():
     assert_allclose(dx0,dx,atol=2e-3)
     assert_allclose(cv.weight.grad.data.numpy()/wfactor,dweight,atol=2e-3)
     assert_allclose(cv.bias.grad.data.numpy()/bfactor,dbias/bfactor,atol=3e-3)
-    assert_(check_numdiff(sv, xin_np))
+    assert_(all(check_numdiff(sv, xin_np)))
 
 def test_linear_complex():
     num_batch=1
-    dim_in=300
-    dim_out=40
-    xin_np=asfortranarray(typed_random(complex128,[num_batch,dim_in]))
-    weight=asfortranarray(typed_random(complex128,[dim_out, dim_in]))
-    bias=typed_random(complex128,dim_out)
+    dim_in=30
+    dim_out=400
+    xin_np=asfortranarray(typed_randn('complex128',[num_batch,dim_in]))
+    weight=asfortranarray(typed_randn('complex128',[dim_out, dim_in]))
+    bias=typed_randn('complex128',[dim_out])
     sv=Linear(weight, bias, dtype='complex128')
-    assert_(check_numdiff(sv, xin_np))
+    assert_(all(check_numdiff(sv, num_check=100)))
 
 def test_linear1():
     random.seed(2)
@@ -114,7 +114,7 @@ def test_linear1():
     y1.backward(dy)
     t1=time.time()
     for i in xrange(ntest):
-        dwb, dx=sv.backward(xin_np[0], y2, dy_np, mask=(1,1))
+        dwb, dx=sv.backward([xin_np[0], y2], dy_np, mask=(1,1))
     t2=time.time()
     print "Elapse old = %s, new = %s"%(t1-t0,(t2-t1)/ntest)
 
@@ -128,7 +128,7 @@ def test_linear1():
     assert_allclose(dx0[0],dx,atol=2e-3)
     assert_allclose(cv.weight.grad.data.numpy()/wfactor,dweight,atol=2e-3)
     assert_allclose(cv.bias.grad.data.numpy()/bfactor,dbias/bfactor,atol=3e-3)
-    assert_(check_numdiff(sv, xin_np[0]))
+    assert_(all(check_numdiff(sv, xin_np[0])))
 
 
 def test_all():

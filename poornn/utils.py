@@ -67,22 +67,25 @@ def unpack_variables(vec, shapes):
         start=end
     return variables
 
-def typed_random(dtype='float64', *args, **kwargs):
+def typed_random(dtype, shape):
     if dtype is None:
-        return np.random.random(*args, **kwargs)
+        return np.transpose(np.random.random(shape[::-1]))
     if dtype=='complex128':
-        return np.random.random(*args, **kwargs)+1j*np.random.random(*args, **kwargs)
+        return np.transpose(np.random.random(shape[::-1])+1j*np.random.random(shape[::-1]))
     elif dtype=='complex64':
-        return np.complex64(typed_random(*args, dtype='complex128', **kwargs))
+        return np.complex64(typed_random('complex128', shape))
     else:
-        return np.random.random(*args, **kwargs).astype(np.dtype(dtype))
+        return np.transpose(np.random.random(shape[::-1])).astype(np.dtype(dtype))
 
 def typed_randn(dtype, shape):
+    '''
+    Typed random normal distributions, in fortran order.
+    '''
     if dtype is None:
-        return np.random.randn(*shape)
+        return np.transpose(np.random.randn(*shape[::-1]))
     if dtype=='complex128':
-        return np.random.randn(*shape)+1j*np.random.randn(*shape)
+        return np.transpose(np.random.randn(*shape[::-1])+1j*np.random.randn(*shape[::-1]))
     elif dtype=='complex64':
         return np.complex64(typed_randn('complex128', shape))
     else:
-        return np.random.randn(*shape).astype(np.dtype(dtype))
+        return np.transpose(np.random.randn(*shape[::-1])).astype(np.dtype(dtype))

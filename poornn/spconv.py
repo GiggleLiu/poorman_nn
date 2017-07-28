@@ -7,7 +7,7 @@ import pdb,time
 
 from lib.spconv import lib as fspconv
 from utils import scan2csc
-from core import Layer, check_shape
+from core import Layer
 
 class SPConv(Layer):
     '''
@@ -88,7 +88,6 @@ class SPConv(Layer):
         '''Dimension of input feature.'''
         return self.fltr.shape[0]
 
-    @check_shape((1,))
     def forward(self, x):
         '''
         Parameters:
@@ -97,7 +96,6 @@ class SPConv(Layer):
             ndarray, (num_batch, nfo, img_out_dims), output in 'F' order.
         '''
         x_nd, img_nd = x.ndim, self.img_nd
-        self._check_input(x)
 
         #flatten inputs/outputs
         x=x.reshape(x.shape[:x_nd-img_nd]+(-1,),order='F')
@@ -112,18 +110,19 @@ class SPConv(Layer):
         y=y.reshape(self.output_shape, order='F')
         return y
 
-    @check_shape((1,-3))
-    def backward(self, x, y, dy, mask=(1,)*2):
+    def backward(self, xy, dy, mask=(1,)*2):
         '''
         Parameters:
-            :x: ndarray, (num_batch, nfi, img_in_dims), input in 'F' order.
-            :y: ndarray, (num_batch, nfo, img_out_dims), output in 'F' order.
+            :xy: (ndarray, ndarray),
+                * x -> (num_batch, nfi, img_in_dims), input in 'F' order.
+                * y -> (num_batch, nfo, img_out_dims), output in 'F' order.
             :dy: ndarray, (num_batch, nfo, img_out_dims), gradient of output in 'F' order.
             :mask: booleans, (do_xgrad, do_wgrad, do_bgrad).
 
         Return:
             (dweight, dbias), dx
         '''
+        x,y = xy
         x_nd, img_nd = x.ndim, self.img_nd
         xpre=x.shape[:x_nd-img_nd]
         ypre=xpre[:-1]+(self.num_feature_out,)

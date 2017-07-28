@@ -8,10 +8,11 @@ from tensorflow.examples.tutorials.mnist import input_data
 import tensorflow as tf
 
 from climin import RmsProp,GradientDescent,Adam
-from core import ANN
+from nets import ANN
 import functions
 from spconv import SPConv
 from linears import Linear
+from checks import check_numdiff
 
 FLAGS = None
 
@@ -27,16 +28,16 @@ def build_dnn():
     W_conv1 = randn(F1, 1, K1, K1)  #fout, fin, K1, K2
     b_conv1 = randn(F1)
     conv1=SPConv((-1,1)+img_in_shape, W_conv1, bias=b_conv1, dtype='float32', strides=(1,1), boundary='P')
-    relu1 = functions.ReLU_I()
-    pooling1 = functions.MaxPool(input_shape=conv1.output_shape, kernel_shape=(2,2), boundary='O')
+    relu1 = functions.ReLU()
+    pooling1 = functions.Pooling(mode='max',input_shape=conv1.output_shape, kernel_shape=(2,2), boundary='O')
 
     #second convolution layer
     F2=64
     W_conv2 = randn(F2, F1, K1, K1)  #fout, fin, K1, K2
     b_conv2 = randn(F2)
     conv2=SPConv(pooling1.output_shape, W_conv2, bias=b_conv2, dtype='float32', strides=(1,1), boundary='P')
-    relu2 = functions.ReLU_I()
-    pooling2 = functions.MaxPool(kernel_shape=(2,2), input_shape=conv2.output_shape, output_shape=(-1,F2*I1/4*I2/4), boundary='O')
+    relu2 = functions.ReLU()
+    pooling2 = functions.Pooling(mode='max',kernel_shape=(2,2), input_shape=conv2.output_shape, output_shape=(-1,F2*I1/4*I2/4), boundary='O')
 
     #fully connected layer
     nout=pooling2.output_shape[1]
@@ -45,8 +46,8 @@ def build_dnn():
     W_fc1 = randn(F3, nout)
     b_fc1 = randn(F3)
     linear1 = Linear(W_fc1, b_fc1)
-    relu3 = functions.ReLU_I()
-    dropout1=functions.DropOut_I(input_shape=(-1,F3),keep_rate=0.5, axis=1)
+    relu3 = functions.ReLU()
+    dropout1=functions.DropOut(input_shape=(-1,F3),keep_rate=0.5, axis=1)
 
     F4=10
     W_fc2 = randn(F4, F3)
@@ -56,14 +57,19 @@ def build_dnn():
     #the cost function
     costfunc = functions.SoftMaxCrossEntropy(input_shape=(-1,F4),axis=1)
     meanfunc = functions.Mean((-1,),axis=0)
-    #return ANN([linear1, relu3, linear2, costfunc, meanfunc])
-    return ANN([conv1, relu1, pooling1, conv2, relu2, pooling2, linear1, dropout1, linear2, costfunc, meanfunc])
+    ann=ANN([conv1, relu1, pooling1, conv2, relu2, pooling2, linear1, dropout1, linear2, costfunc, meanfunc], do_shape_check=True)
+
+    #random num-diff check
+    y_true=zeros(10); y_true[3]=1
+    assert(all(check_numdiff(ann, var_dict={'y_true':y_true, 'seed':2}, eta=1e-3)))
+    return ann
 
 def compute_gradient(weight_vec, info_dict):
     dnn=info_dict['dnn']
     dnn.set_variables(weight_vec)
-    ys = dnn.feed_input(info_dict['x_batch'], info_dict['y_true'])
-    gradient_w, gradient_x = dnn.back_propagate(ys, dy=ones_like(ys[-1]))
+    dnn.set_runtime_vars({'y_true':info_dict['y_true'], 'seed':random.randint(1,99999)})
+    ys = dnn.forward(info_dict['x_batch'])
+    gradient_w, gradient_x = dnn.backward(ys, dy=ones_like(ys[-1]))
     info_dict['gradient_x'] = gradient_x
     info_dict['ys'] = ys
     vec = gradient_w
@@ -108,8 +114,9 @@ def main(_):
 
     #apply on test cases
     dnn.layers[7].keep_rate=1.
-    ys = dnn.feed_input(asfortranarray(mnist.test.images).reshape([-1,1,28,28], order='F'), mnist.test.labels)
-    #ys = dnn.feed_input(mnist.test.images, mnist.test.labels)
+    dnn.set_runtime_vars({'y_true':mnist.test.labels, 'seed':random.randint(1,99999)})
+    ys = dnn.forward(asfortranarray(mnist.test.images).reshape([-1,1,28,28], order='F'))
+    #ys = dnn.forward(mnist.test.images, mnist.test.labels)
     analyse_result(ys, mnist.test.labels)
 
 if __name__ == '__main__':

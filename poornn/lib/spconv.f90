@@ -72,7 +72,7 @@ module lib
 
                 !calculate dweight
                 call zgemm('T', 'N', nfo, k, num_batch, one, dy(:,:,col), num_batch,&
-                    conjg(x_work), num_batch, zero, w_work, nfo)
+                    x_work, num_batch, zero, w_work, nfo)
 
                 !extract rows
                 do ii=1,nnz_row
@@ -86,8 +86,8 @@ module lib
                     w_work(:,:,ii)=fltr_data(:,:,weight_indices(start_+ii-1))
                 enddo
                 !calculate dx
-                call zgemm('N', 'N', num_batch, k, nfo, one, dy(:,:,col), num_batch,&
-                    conjg(w_work), nfo, zero, x_work, num_batch)
+                call zgemm('N', 'N', num_batch, k, nfo, one, (dy(:,:,col)), num_batch,&
+                    w_work, nfo, zero, x_work, num_batch)
                 !extract rows
                 do ii=1,nnz_row
                     row=csc_indices(start_+ii-1)
@@ -172,8 +172,8 @@ module lib
                 w_work=0
                 !call zgerc(nfo, k, one, dy(:,col), 1,&
                 !    x_work, 1, w_work, nfo)
-                call zgemm('N', 'N', nfo, k, 1, one, dy(:,col), nfo,&
-                    conjg(x_work), 1, zero, w_work, nfo)
+                call zgemm('N', 'N', nfo, k, 1, one, (dy(:,col)), nfo,&
+                    x_work, 1, zero, w_work, nfo)
                 !extract rows
                 do ii=1,nnz_row
                     row=weight_indices(start_+ii-1)
@@ -188,8 +188,8 @@ module lib
                 enddo
                 
                 !calculate dx
-                call zgemv('C', nfo, k, one,&
-                    w_work, nfo, dy(:,col), 1, zero, x_work, 1)
+                call zgemv('T', nfo, k, one,&
+                    w_work, nfo, (dy(:,col)), 1, zero, x_work, 1)
                 !extract rows
                 do ii=1,nnz_row
                     row=csc_indices(start_+ii-1)
@@ -272,11 +272,11 @@ module lib
 
                 !calculate dweight
                 call zgemm('T', 'N', nfo, k, num_batch, one, dy(:,:,col), num_batch,&
-                    conjg(x_work), num_batch, one, dweight, nfo)
+                    x_work, num_batch, one, dweight, nfo)
                 endif
             if(do_xgrad) then
-                call zgemm('N', 'N', num_batch, k, nfo, one, dy(:,:,col), num_batch,&
-                    conjg(fltr_data), nfo, zero, x_work, num_batch)
+                call zgemm('N', 'N', num_batch, k, nfo, one, (dy(:,:,col)), num_batch,&
+                    fltr_data, nfo, zero, x_work, num_batch)
                 !extract rows
                 do ii=1,nnz_row
                     row=csc_indices(start_+ii-1)
@@ -361,14 +361,14 @@ module lib
                 !Q: slow!!!!
                 !call zgerc(nfo, k, one, dy(:,col), 1,& 
                 !    conjg(x_work), 1, dweight, nfo)
-                call zgemm('N', 'N', nfo, k, 1, one, dy(:,col), nfo,&
-                    conjg(x_work), 1, one, dweight, nfo)
+                call zgemm('N', 'N', nfo, k, 1, one, (dy(:,col)), nfo,&
+                    x_work, 1, one, dweight, nfo)
                 endif
             if(do_xgrad) then
                 
                 !calculate dx
-                call zgemv('C', nfo, k, one,&
-                    fltr_data, nfo, dy(:,col), 1, zero, x_work, 1)
+                call zgemv('T', nfo, k, one,&
+                    fltr_data, nfo, (dy(:,col)), 1, zero, x_work, 1)
                 !extract rows
                 do ii=1,nnz_row
                     row=csc_indices(start_+ii-1)

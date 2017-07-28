@@ -6,7 +6,7 @@ sys.path.insert(0,'../')
 from functions import *
 from torch.nn import functional as F
 import torch
-from core import check_numdiff
+from checks import check_numdiff
 
 def test_sigmoid():
     func=Sigmoid(dtype='complex128')
@@ -16,8 +16,8 @@ def test_sigmoid():
     dydx=[0.,0.,1j/(1+1j)**2,2./9,0.25,2./9,-1j/(1-1j)**2,0.,0.]
     assert_allclose(func.forward(xs),ys)
     print 'Test backward for Sigmoid'
-    assert_allclose(func.backward(xs,ys,1.)[1],dydx)
-    assert_(check_numdiff(func, xs))
+    assert_allclose(func.backward([xs,ys],1.)[1],dydx)
+    assert_(all(check_numdiff(func, xs)))
 
 def test_log2cosh():
     func=Log2cosh(dtype='complex128')
@@ -27,7 +27,7 @@ def test_log2cosh():
     dydx=tanh(xs)
     assert_allclose(func.forward(xs),ys)
     print 'Test backward'
-    assert_allclose(func.backward(xs,ys,1.)[1],dydx)
+    assert_allclose(func.backward([xs,ys],1.)[1],dydx)
     #can not pass num check for inifity values
     check_numdiff(func, xs)
 
@@ -54,10 +54,10 @@ def test_pooling():
             assert_allclose(y.ravel(),y_true_ravel)
             assert_allclose(y.shape,[1,1,2,2])
             print 'Test backward'
-            dx=func.backward(x,y,dy)[1]
+            dx=func.backward([x,y],dy)[1]
             assert_allclose(dx.ravel(),dx_true_ravel)
             assert_allclose(dx.shape,[1,1,4,4])
-            assert_(check_numdiff(func, x))
+            assert_(all(check_numdiff(func, x)))
 
 def test_exp():
     oldshape=(3,4,2)
@@ -67,8 +67,8 @@ def test_exp():
     ys=func.forward(xs)
     assert_allclose(ys,exp(xs))
     print 'Test backward'
-    assert_allclose(func.backward(xs,ys,1.)[1],ys)
-    assert_(check_numdiff(func, xs))
+    assert_allclose(func.backward([xs,ys],1.)[1],ys)
+    assert_(all(check_numdiff(func, xs)))
 
 def test_reshape():
     oldshape=(3,4,2)
@@ -80,8 +80,8 @@ def test_reshape():
     assert_allclose(ys,xs.reshape(newshape))
     print 'Test backward'
     dy=random.random(newshape)
-    assert_allclose(func.backward(xs,ys,dy)[1],dy.reshape(oldshape))
-    assert_(check_numdiff(func, xs))
+    assert_allclose(func.backward([xs,ys],dy)[1],dy.reshape(oldshape))
+    assert_(all(check_numdiff(func, xs)))
 
 def test_transpose():
     axes=(2,3,1,0)
@@ -92,8 +92,8 @@ def test_transpose():
     assert_allclose(ys,transpose(xs, axes=axes))
     print 'Test backward'
     dy=random.random([4,5,3,2])
-    assert_allclose(func.backward(xs,ys,dy)[1],transpose(dy,(3,2,0,1)))
-    assert_(check_numdiff(func, xs))
+    assert_allclose(func.backward([xs,ys],dy)[1],transpose(dy,(3,2,0,1)))
+    assert_(all(check_numdiff(func, xs)))
 
 def test_softmax_cross():
     random.seed(2)
@@ -104,31 +104,32 @@ def test_softmax_cross():
     x=random.random(12).reshape([3,4], order='F')  #3 batches, 4 logits.
     y_true=array([[0.,1.,0.,0.], [0,0,1.,0],[1,0,0,0]],order='F')
     y1=f1.forward(x)
-    f2.set_y_true(y_true)
-    f3.set_y_true(y_true)
+    rd={'y_true':y_true}
+    f2.set_runtime_vars(var_dict=rd)
+    f3.set_runtime_vars(var_dict=rd)
     y2=f2.forward(y1)
     y2_=f3.forward(x)
     assert_allclose(y2,y2_)
     print 'Test backward'
     dy2=array([0,1,0.])
-    dy1=f2.backward(y1, y2, dy=dy2)[1]
-    dx=f1.backward(x,y1,dy1)[1]
-    dx_=f3.backward(x,y2_,dy2)[1]
+    dy1=f2.backward([y1, y2], dy=dy2)[1]
+    dx=f1.backward([x,y1],dy1)[1]
+    dx_=f3.backward([x,y2_],dy2)[1]
     assert_allclose(dx,dx_)
-    assert_(check_numdiff(f1, x))
-    assert_(check_numdiff(f2, y1))
-    assert_(check_numdiff(f3, x))
+    assert_(all(check_numdiff(f1, x)))
+    assert_(all(check_numdiff(f2, y1, var_dict=rd)))
+    assert_(all(check_numdiff(f3, x, var_dict=rd)))
 
 def test_dropout():
-    random.seed(2)
-    func=DropOut_I(input_shape=(-1,2), axis=0, keep_rate=0.5)
+    func=DropOut(input_shape=(4,2), axis=0, keep_rate=0.5)
+    func.set_runtime_vars({'seed':2})
     print 'Test forward for %s'%func
     x=arange(8, dtype='float32').reshape([4,2], order='F')
     y=func.forward(x)
     assert_allclose(y,array([[0,4],[1,5],[0,0],[3,7]])*2)
     print 'Test backward'
     dy=arange(8, dtype='float32').reshape([4,2])
-    dx=func.backward(x,y,dy)[1]
+    dx=func.backward([x,y],dy)[1]
     assert_allclose(dx,array([[0,1],[2,3],[0,0],[6,7]])*2)
 
 def test_summean():
@@ -143,22 +144,22 @@ def test_summean():
     assert_allclose(y2,y/2.)
     print 'Test backward'
     dy=arange(4,dtype='float32')
-    dx=func.backward(x,y,dy)[1]
-    dx2=func2.backward(x,y2,dy)[1]
+    dx=func.backward([x,y],dy)[1]
+    dx2=func2.backward([x,y2],dy)[1]
     assert_allclose(dx, reshape([0,1,2,3,0,1,2,3],[4,2], order='F'))
     assert_allclose(dx2, dx/2.)
-    assert_(check_numdiff(func, x))
-    assert_(check_numdiff(func2, x))
+    assert_(all(check_numdiff(func, x)))
+    assert_(all(check_numdiff(func2, x)))
 
 def test_relu():
-    func=ReLU_I(0.1)
+    func=ReLU(0.1)
     print 'Test forward for %s'%func
     x=arange(-3,5, dtype='float32').reshape([4,2], order='F')
     y=func.forward(x)
     assert_allclose(y,[[-0.3,1],[-0.2,2],[-0.1,3],[0,4]])
     print 'Test backward'
     dy=arange(-2,6,dtype='float32').reshape([4,2],order='F')
-    dx=func.backward(x,y,dy)[1]
+    dx=func.backward([x,y],dy)[1]
     assert_allclose(dx, [[-0.2,2],[-0.1,3],[0,4],[0.1,5]])
 
 def test_relu_per():
@@ -168,14 +169,14 @@ def test_relu_per():
     vx.requires_grad=True
     y0=F.relu(vx)
 
-    func=ReLU_I(0.)
+    func=ReLU(0.)
     print 'Test forward for %s'%func
     y=func.forward(x.numpy())
     assert_allclose(y0.data.numpy(),y)
     print 'Test backward'
     dy=torch.randn(N1,N2,N3)
     y0.backward(gradient=dy)
-    dx=func.backward(x.numpy(),y,dy.numpy())[1]
+    dx=func.backward([x.numpy(),y],dy.numpy())[1]
     assert_allclose(dx, vx.grad.data.numpy())
 
 def test_softmax_cross_per():
@@ -199,8 +200,9 @@ def test_softmax_cross_per():
     y_true_hot=zeros(f1.output_shape)
     y_true_hot[arange(N1),y_true.numpy()]=1
     y1=f1.forward(x_np)
-    f2.set_y_true(y_true_hot)
-    f3.set_y_true(y_true_hot)
+    rd={'y_true':y_true_hot}
+    f2.set_runtime_vars(var_dict=rd)
+    f3.set_runtime_vars(var_dict=rd)
     y2=f2.forward(y1)
     y2_=f3.forward(x_np)
     assert_allclose(y2,y2_,atol=1e-5)
@@ -212,16 +214,16 @@ def test_softmax_cross_per():
     y0c.backward(dyc)
 
     dy4=dyc.numpy()[0]
-    dy2=f4.backward(y2,y4,dy4)[1]
-    dy1=f2.backward(y1, y2, dy=dy2)[1]
-    dx=f1.backward(x_np,y1,dy1)[1]
-    dx_=f3.backward(x_np,y2_,dy2)[1]
+    dy2=f4.backward([y2,y4],dy4)[1]
+    dy1=f2.backward([y1, y2], dy=dy2)[1]
+    dx=f1.backward([x_np,y1],dy1)[1]
+    dx_=f3.backward([x_np,y2_],dy2)[1]
     assert_allclose(dx,dx_,atol=1e-5)
     assert_allclose(dx,vx.grad.data.numpy(),atol=1e-5)
-    assert_(check_numdiff(f1, x_np))
-    assert_(check_numdiff(f2, y1))
-    assert_(check_numdiff(f3, x_np))
-    assert_(check_numdiff(f4, y2))
+    assert_(all(check_numdiff(f1, x_np)))
+    assert_(all(check_numdiff(f2, y1, var_dict=rd)))
+    assert_(all(check_numdiff(f3, x_np, var_dict=rd)))
+    assert_(all(check_numdiff(f4, y2)))
 
 def test_all():
     random.seed(3)

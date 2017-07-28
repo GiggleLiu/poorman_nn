@@ -9,7 +9,8 @@ from tensorflow.examples.tutorials.mnist import input_data
 import tensorflow as tf
 
 from climin import RmsProp,GradientDescent,Adam
-from core import ANN
+from nets import ANN
+from checks import check_numdiff
 import functions
 from spconv import SPConv
 from linears import Linear
@@ -26,7 +27,7 @@ def build_dnn():
     W_fc1 = randn(size=(F1, I1*I2))
     b_fc1 = randn(size=(F1))
     linear1 = Linear(W_fc1, b_fc1, dtype='float32')
-    relu1 = functions.ReLU_I()
+    relu1 = functions.ReLU()
 
     #the cost function
     softmax = functions.SoftMax(input_shape=(-1,F1),axis=1)
@@ -34,14 +35,19 @@ def build_dnn():
     costfunc = functions.SoftMaxCrossEntropy(input_shape=(-1,F1),axis=1)
 
     meanfunc = functions.Mean(input_shape=(-1,),axis=0)
-    return ANN([linear1, costfunc, meanfunc])
-    #return ANN([linear1, softmax, costfunc2, meanfunc])
+    ann=ANN([linear1, costfunc, meanfunc],do_shape_check=True)
+
+    #random num-diff check
+    y_true=zeros(10); y_true[3]=1
+    assert(all(check_numdiff(ann, var_dict={'y_true':y_true})))
+    return ann
 
 def compute_gradient(weight_vec, info_dict):
     dnn=info_dict['dnn']
     dnn.set_variables(weight_vec)
-    ys = dnn.feed_input(info_dict['x_batch'], info_dict['y_true'])
-    gradient_w, gradient_x = dnn.back_propagate(ys, dy=ones_like(ys[-1]))
+    dnn.set_runtime_vars({'y_true':info_dict['y_true']})
+    ys = dnn.forward(info_dict['x_batch'])
+    gradient_w, gradient_x = dnn.backward(ys, dy=ones_like(ys[-1]))
     info_dict['ys'] = ys
     vec = gradient_w
     return vec
@@ -78,7 +84,8 @@ def main(_):
         if k>5000: break
 
     #apply on test cases
-    ys = dnn.feed_input(mnist.test.images, y_true=mnist.test.labels)
+    dnn.set_runtime_vars({'y_true':mnist.test.labels})
+    ys = dnn.forward(mnist.test.images)
     analyse_result(ys, mnist.test.labels)
 
 if __name__ == '__main__':

@@ -78,8 +78,8 @@ module lib
 
                 !calculate dweight
                 {%if version == "general" -%}
-                call {{dtype_token}}gemm('T', 'N', nfo, k, num_batch, one, dy(:,:,col), num_batch,&
-                    {%if is_complex%}conjg(x_work){%else%}x_work{%endif%}, num_batch, zero, w_work, nfo)
+                call {{dtype_token}}gemm({%if is_complex%}'T'{%else%}'T'{%endif%}, 'N', nfo, k, num_batch, one, dy(:,:,col), num_batch,&
+                    x_work, num_batch, zero, w_work, nfo)
 
                 !extract rows
                 do ii=1,nnz_row
@@ -87,8 +87,8 @@ module lib
                     dweight(:,:,row)=dweight(:,:,row)+w_work(:,:,ii)
                 enddo
                 {%else -%}
-                call {{dtype_token}}gemm('T', 'N', nfo, k, num_batch, one, dy(:,:,col), num_batch,&
-                    {%if is_complex%}conjg(x_work){%else%}x_work{%endif%}, num_batch, one, dweight, nfo)
+                call {{dtype_token}}gemm({%if is_complex%}'T'{%else%}'T'{%endif%}, 'N', nfo, k, num_batch, one, dy(:,:,col), num_batch,&
+                    x_work, num_batch, one, dweight, nfo)
                 {%endif -%}
             endif
             if(do_xgrad) then
@@ -98,11 +98,11 @@ module lib
                     w_work(:,:,ii)=fltr_data(:,:,weight_indices(start_+ii-1))
                 enddo
                 !calculate dx
-                call {{dtype_token}}gemm('N', 'N', num_batch, k, nfo, one, dy(:,:,col), num_batch,&
-                    {%if is_complex%}conjg(w_work){%else%}w_work{%endif%}, nfo, zero, x_work, num_batch)
+                call {{dtype_token}}gemm('N', 'N', num_batch, k, nfo, one, {%if is_complex%}(dy(:,:,col)){%else%}dy(:,:,col){%endif%}, num_batch,&
+                    w_work, nfo, zero, x_work, num_batch)
                 {%else -%}
-                call {{dtype_token}}gemm('N', 'N', num_batch, k, nfo, one, dy(:,:,col), num_batch,&
-                    {%if is_complex%}conjg(fltr_data){%else%}fltr_data{%endif%}, nfo, zero, x_work, num_batch)
+                call {{dtype_token}}gemm('N', 'N', num_batch, k, nfo, one, {%if is_complex%}(dy(:,:,col)){%else%}dy(:,:,col){%endif%}, num_batch,&
+                    fltr_data, nfo, zero, x_work, num_batch)
                 {%endif -%}
                 !extract rows
                 do ii=1,nnz_row
@@ -189,8 +189,8 @@ module lib
                 w_work=0
                 !call {{dtype_token}}ger{%if is_complex%}c{%endif%}(nfo, k, one, dy(:,col), 1,&
                 !    x_work, 1, w_work, nfo)
-                call {{dtype_token}}gemm('N', 'N', nfo, k, 1, one, dy(:,col), nfo,&
-                    {%if is_complex%}conjg(x_work){%else%}x_work{%endif%}, 1, zero, w_work, nfo)
+                call {{dtype_token}}gemm('N', 'N', nfo, k, 1, one, {%if is_complex%}(dy(:,col)){%else%}dy(:,col){%endif%}, nfo,&
+                    x_work, 1, zero, w_work, nfo)
                 !extract rows
                 do ii=1,nnz_row
                     row=weight_indices(start_+ii-1)
@@ -200,8 +200,8 @@ module lib
                 !Q: slow!!!!
                 !call {{dtype_token}}ger{%if is_complex%}c{%endif%}(nfo, k, one, dy(:,col), 1,& 
                 !    {%if is_complex%}conjg(x_work){%else%}x_work{%endif%}, 1, dweight, nfo)
-                call {{dtype_token}}gemm('N', 'N', nfo, k, 1, one, dy(:,col), nfo,&
-                    {%if is_complex%}conjg(x_work){%else%}x_work{%endif%}, 1, one, dweight, nfo)
+                call {{dtype_token}}gemm('N', 'N', nfo, k, 1, one, {%if is_complex%}(dy(:,col)){%else%}dy(:,col){%endif%}, nfo,&
+                    x_work, 1, one, dweight, nfo)
                 {%endif -%}
             endif
             if(do_xgrad) then
@@ -212,8 +212,8 @@ module lib
                 enddo
                 {%endif%}
                 !calculate dx
-                call {{dtype_token}}gemv({%if is_complex%}'C'{%else%}'T'{%endif%}, nfo, k, one,&
-                    {%if version == "general"%}w_work{%else%}fltr_data{%endif%}, nfo, dy(:,col), 1, zero, x_work, 1)
+                call {{dtype_token}}gemv('T', nfo, k, one,&
+                    {%if version == "general"%}w_work{%else%}fltr_data{%endif%}, nfo, {%if is_complex%}(dy(:,col)){%else%}dy(:,col){%endif%}, 1, zero, x_work, 1)
                 !extract rows
                 do ii=1,nnz_row
                     row=csc_indices(start_+ii-1)
