@@ -6,7 +6,10 @@ import numpy as np
 import pdb
 
 from checks import check_shape_forward, check_shape_backward
-from core import Layer
+from core import Layer, Function
+import functions
+from spconv import SPConv
+from linears import Linear
 
 __class__=['ANN']
 
@@ -14,12 +17,14 @@ class ANN(object):
     '''
     Artificial Neural network state.
     '''
-    def __init__(self,layers, dtype='float32', do_shape_check=False):
+    def __init__(self, input_shape, dtype, layers=[], do_shape_check=False):
         self.layers=layers
         self.do_shape_check = do_shape_check
-        self.dtype=dtype
+        self.dtype = dtype
+        self.input_shape = input_shape
 
         #check connections
+        if len(layers)<2: return
         for la,lb in zip(layers[:-1], layers[1:]):
             if lb.input_shape==None:
                 lb.input_shape=la.output_shape
@@ -105,10 +110,6 @@ class ANN(object):
             layer.set_variables(v[start:stop], mode=mode)
             start=stop
 
-    @property
-    def input_shape(self):
-        return self.layers[0].input_shape
-
     def get_runtimes(self):
         '''Show requested runtime variables'''
         rd = {}
@@ -119,3 +120,15 @@ class ANN(object):
                     raise Exception('runtime variables conflicts %s and %s not same'%(rd[var], value))
                 rd[var]=value
         return rd
+
+    def add_layer(self, cls, **kwargs):
+        '''
+        Add a new layer. *args and **kwargs specifies parameters excluding `input_shape` and `dtype`.
+        input_shape inherit the output_shape of last layer, and dtype inherit dtype of last layer(network with mixed dtype?).
+        '''
+        if len(self.layers)==0:
+            input_shape, dtype = self.input_shape, self.dtype
+        else:
+            input_shape, dtype = self.layers[-1].output_shape, self.layers[-1].dtype
+        obj=cls(input_shape=input_shape, dtype=dtype, **kwargs)
+        self.layers.append(obj)

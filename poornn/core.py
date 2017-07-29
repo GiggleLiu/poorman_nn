@@ -26,7 +26,7 @@ class Layer(object):
 
     __metaclass__ = ABCMeta
 
-    def __init__(self, input_shape, output_shape, dtype='float32', tags=Tags(runtimes = [], is_inplace = False)):
+    def __init__(self, input_shape, output_shape, dtype, tags=Tags(runtimes = [], is_inplace = False)):
         self.input_shape = input_shape
         self.output_shape = output_shape
         self.dtype = dtype
@@ -105,11 +105,6 @@ class Layer(object):
 
 class Function(Layer):
     '''Function layer with no variables.'''
-    def __init__(self, input_shape = None, output_shape = None, dtype = 'float32', **kwargs):
-        if output_shape is None:
-            output_shape = input_shape
-        super(Function, self).__init__(input_shape, output_shape, dtype = dtype, **kwargs)
-
     def __call__(self,x):
         return self.forward(x)
 

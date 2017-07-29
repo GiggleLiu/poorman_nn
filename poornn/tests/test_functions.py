@@ -7,9 +7,10 @@ from functions import *
 from torch.nn import functional as F
 import torch
 from checks import check_numdiff
+from utils import typed_randn
 
 def test_sigmoid():
-    func=Sigmoid(dtype='complex128')
+    func=Sigmoid((-1,),dtype='complex128')
     print 'Test forward for %s'%func
     xs=array([-1e100,-1e20,-0.5j*pi,-log(2),0,log(2),0.5j*pi,1e20,1e100])
     ys=array([0.,0.,1./(1+1j),1./3,0.5,2./3,1./(1-1j),1.,1.])
@@ -20,7 +21,7 @@ def test_sigmoid():
     assert_(all(check_numdiff(func, xs)))
 
 def test_log2cosh():
-    func=Log2cosh(dtype='complex128')
+    func=Log2cosh((-1,),dtype='complex128')
     print 'Test forward for %s'%func
     xs=array([-1e100,-1e20,-0.25j*pi,-log(2),0,log(2),0.25j*pi,1e20,1e100])
     ys=array([1e100,1e20,log(2.)/2,log(2.5),log(2.),log(2.5),log(2.)/2,1e20,1e100])
@@ -34,7 +35,7 @@ def test_log2cosh():
 def test_pooling():
     for b in ['P','O']:
         for mode in ['max', 'mean']:
-            func=Pooling(input_shape=(-1,1,4,4), output_shape=(-1,1,2,2), kernel_shape=(2,2), mode=mode, boundary=b)
+            func=Pooling(input_shape=(-1,1,4,4), dtype='float32', kernel_shape=(2,2), mode=mode, boundary=b)
             print 'Test forward for %s - %sBC'%(func,b)
             x=arange(16,dtype=func.dtype).reshape([1,1,4,4], order='F')
             dy=arange(4, dtype='float32').reshape([1,1,2,2])
@@ -61,8 +62,9 @@ def test_pooling():
 
 def test_exp():
     oldshape=(3,4,2)
-    func=Exp()
-    xs=random.random(oldshape)
+    dtype='complex128'
+    func=Exp(oldshape, dtype)
+    xs=typed_randn(dtype, oldshape)
     print 'Test forward for %s'%func
     ys=func.forward(xs)
     assert_allclose(ys,exp(xs))
@@ -73,7 +75,7 @@ def test_exp():
 def test_reshape():
     oldshape=(3,4,2)
     newshape=(3,8)
-    func=Reshape(oldshape, newshape)
+    func=Reshape(oldshape, newshape, 'float32')
     xs=random.random(oldshape)
     print 'Test forward for %s'%func
     ys=func.forward(xs)
@@ -85,7 +87,7 @@ def test_reshape():
 
 def test_transpose():
     axes=(2,3,1,0)
-    func=Transpose((2,3,4,5), axes=axes)
+    func=Transpose((2,3,4,5), 'float32', axes=axes)
     xs=random.random(func.input_shape)
     print 'Test forward for %s'%func
     ys=func.forward(xs)
@@ -97,9 +99,9 @@ def test_transpose():
 
 def test_softmax_cross():
     random.seed(2)
-    f1=SoftMax(input_shape=(-1,4),axis=1)
-    f2=CrossEntropy(input_shape=(-1,4),axis=1)
-    f3=SoftMaxCrossEntropy(input_shape=(-1,4), axis=1)
+    f1=SoftMax(input_shape=(-1,4), dtype='float32',axis=1)
+    f2=CrossEntropy(input_shape=(-1,4), dtype='float32', axis=1)
+    f3=SoftMaxCrossEntropy(input_shape=(-1,4), dtype='float32', axis=1)
     print 'Test forward for %s, %s, %s.'%(f1,f2,f3)
     x=random.random(12).reshape([3,4], order='F')  #3 batches, 4 logits.
     y_true=array([[0.,1.,0.,0.], [0,0,1.,0],[1,0,0,0]],order='F')
@@ -121,7 +123,7 @@ def test_softmax_cross():
     assert_(all(check_numdiff(f3, x, var_dict=rd)))
 
 def test_dropout():
-    func=DropOut(input_shape=(4,2), axis=0, keep_rate=0.5)
+    func=DropOut(input_shape=(4,2), dtype='float32', axis=0, keep_rate=0.5)
     func.set_runtime_vars({'seed':2})
     print 'Test forward for %s'%func
     x=arange(8, dtype='float32').reshape([4,2], order='F')
@@ -134,8 +136,8 @@ def test_dropout():
 
 def test_summean():
     random.seed(2)
-    func=Sum(input_shape=(-1,2),axis=1)
-    func2=Mean(input_shape=(-1,2),axis=1)
+    func=Sum(input_shape=(-1,2), dtype='float32',axis=1)
+    func2=Mean(input_shape=(-1,2), dtype='float32',axis=1)
     print 'Test forward for %s, %s.'%(func, func2)
     x=arange(8).reshape([4,2], order='F')
     y=func.forward(x)
@@ -152,7 +154,7 @@ def test_summean():
     assert_(all(check_numdiff(func2, x)))
 
 def test_relu():
-    func=ReLU(0.1)
+    func=ReLU((4,2), 'float32',0.1)
     print 'Test forward for %s'%func
     x=arange(-3,5, dtype='float32').reshape([4,2], order='F')
     y=func.forward(x)
@@ -169,7 +171,7 @@ def test_relu_per():
     vx.requires_grad=True
     y0=F.relu(vx)
 
-    func=ReLU(0.)
+    func=ReLU(x.size(), 'float32', 0.)
     print 'Test forward for %s'%func
     y=func.forward(x.numpy())
     assert_allclose(y0.data.numpy(),y)
@@ -191,10 +193,10 @@ def test_softmax_cross_per():
     y0c=F.nll_loss(y0s,vy_true)  #to the last dimension
     y0c_one=F.cross_entropy(vx, vy_true)
 
-    f1=SoftMax(input_shape=(N1,N3),axis=1)
-    f2=CrossEntropy(input_shape=(N1,N3),axis=1)
-    f3=SoftMaxCrossEntropy(input_shape=(N1,N3), axis=1)
-    f4=Mean(input_shape=(N1,), axis=0)
+    f1=SoftMax(input_shape=(N1,N3),dtype='float32',axis=1)
+    f2=CrossEntropy(input_shape=(N1,N3),dtype='float32',axis=1)
+    f3=SoftMaxCrossEntropy(input_shape=(N1,N3), dtype='float32',axis=1)
+    f4=Mean(input_shape=(N1,), dtype='float32',axis=0)
     print 'Test forward for %s, %s, %s, %s'%(f1,f2,f3,f4)
     x_np=x.numpy()
     y_true_hot=zeros(f1.output_shape)

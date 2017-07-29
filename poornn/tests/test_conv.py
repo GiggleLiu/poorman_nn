@@ -31,7 +31,7 @@ def test_conv2d():
     assert_allclose(res.data.numpy(),[[[[40,48],[72,80]],[[21,25],[37,41]]],[[[48,56],[80,88]],[[25,29],[41,45]]]])
 
     #new
-    sv=SPConv((2,1,4,4), fltr=cv.weight.data.numpy(), bias=cv.bias.data.numpy(), dtype='complex128',strides=(1,1),boundary='O')
+    sv=SPConv((2,1,4,4), 'complex128',fltr=cv.weight.data.numpy(), bias=cv.bias.data.numpy(),strides=(1,1),boundary='O')
     x=asfortranarray(ts.data.numpy(), dtype='complex128')
     res2=sv.forward(x)
     assert_allclose(res2,[[[[40,48],[72,80]],[[21,25],[37,41]]],[[[48,56],[80,88]],[[25,29],[41,45]]]])
@@ -49,8 +49,8 @@ def test_conv2d_per():
     #2 features, kernel size 3x3
     cv=Conv2d(nfin,nfout,kernel_size=(K1,K2),stride=(1,1),padding=(0,0))
     fltr=cv.weight.data.numpy()
-    sv=SPConv((-1,nfin,dim_x,dim_y), float32(fltr),float32(cv.bias.data.numpy()),strides=(1,1),boundary='O', w_contiguous=True, output_shape=(-1,nfout,dim_x-K1+1, dim_y-K2+1))
-    sv2=SPConv((nfin,dim_x,dim_y), float32(fltr),float32(cv.bias.data.numpy()),strides=(1,1),boundary='O', w_contiguous=True, output_shape=(nfout,dim_x-K1+1, dim_y-K2+1))
+    sv=SPConv((-1,nfin,dim_x,dim_y), 'float32', float32(fltr),float32(cv.bias.data.numpy()),strides=(1,1),boundary='O', w_contiguous=True)
+    sv2=SPConv((nfin,dim_x,dim_y), 'float32', float32(fltr),float32(cv.bias.data.numpy()),strides=(1,1),boundary='O', w_contiguous=True)
     print "Testing forward for %s, 2D"%sv
     xin_np=ts.data.numpy()
     xin_np1=xin_np[0]
@@ -119,8 +119,8 @@ def test_conv1d_per():
     #2 features, kernel size 3x3
     cv=Conv2d(nfin,nfout,kernel_size=(K1,),stride=(1,),padding=(0,))
     fltr=cv.weight.data.numpy()
-    sv=SPConv((-1,nfin,dim_x), float32(fltr),float32(cv.bias.data.numpy()),strides=(1,),boundary='O', w_contiguous=True, output_shape=(-1,nfout,dim_x-K1+1))
-    sv2=SPConv((nfin,dim_x), float32(fltr),float32(cv.bias.data.numpy()),strides=(1,),boundary='O', w_contiguous=True, output_shape=(nfout,dim_x-K1+1))
+    sv=SPConv((-1,nfin,dim_x), 'float32', float32(fltr),float32(cv.bias.data.numpy()),strides=(1,),boundary='O', w_contiguous=True)
+    sv2=SPConv((nfin,dim_x), 'float32', float32(fltr),float32(cv.bias.data.numpy()),strides=(1,),boundary='O', w_contiguous=True)
     print "Testing forward for %s, 1D"%sv
     xin_np=asfortranarray(ts.data.numpy())
     xin_np1=xin_np[0]
@@ -189,8 +189,8 @@ def test_conv2d_complex():
     xin_np=asfortranarray(typed_randn('complex128',[num_batch,nfin,dim_x,dim_y]))
     fltr=asfortranarray(typed_randn('complex128',[nfout,nfin,K1,K2]))
     bias=typed_randn('complex128',[nfout])
-    sv=SPConv((-1,nfin,dim_x,dim_y), fltr, bias, strides=(1,1), boundary='O', w_contiguous=True, output_shape=(-1,nfout,dim_x-K1+1, dim_y-K2+1),dtype='complex128')
-    sv2=SPConv((nfin,dim_x,dim_y), fltr, bias, strides=(1,1), boundary='O', w_contiguous=True, output_shape=(nfout,dim_x-K1+1, dim_y-K2+1),dtype='complex128')
+    sv=SPConv((-1,nfin,dim_x,dim_y), 'complex128', fltr, bias, strides=(1,1), boundary='O', w_contiguous=True)
+    sv2=SPConv((nfin,dim_x,dim_y), 'complex128', fltr, bias, strides=(1,1), boundary='O', w_contiguous=True)
     print "Testing forward for %s"%sv
     xin_np1=xin_np[0]
     ntest=5

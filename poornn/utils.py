@@ -68,8 +68,9 @@ def unpack_variables(vec, shapes):
     return variables
 
 def typed_random(dtype, shape):
-    if dtype is None:
-        return np.transpose(np.random.random(shape[::-1]))
+    #fix shape with dummy index.
+    shp=[si if si>=0 else np.random.randint(1,21) for si in shape]
+
     if dtype=='complex128':
         return np.transpose(np.random.random(shape[::-1])+1j*np.random.random(shape[::-1]))
     elif dtype=='complex64':
@@ -81,8 +82,9 @@ def typed_randn(dtype, shape):
     '''
     Typed random normal distributions, in fortran order.
     '''
-    if dtype is None:
-        return np.transpose(np.random.randn(*shape[::-1]))
+    #fix shape with dummy index.
+    shp=[si if si>=0 else np.random.randint(1,21) for si in shape]
+
     if dtype=='complex128':
         return np.transpose(np.random.randn(*shape[::-1])+1j*np.random.randn(*shape[::-1]))
     elif dtype=='complex64':

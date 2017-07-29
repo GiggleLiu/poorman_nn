@@ -12,6 +12,9 @@ class Log2cosh(Function):
     '''
     Function log(2*cosh(theta)).
     '''
+    def __init__(self, input_shape, dtype):
+        super(Log2cosh, self).__init__(input_shape, input_shape, dtype)
+
     def forward(self,x):
         if np.ndim(x)==0:
             return np.log(2*np.cosh(x)) if abs(x.real)<=12 else np.sign(x.real)*x
@@ -33,6 +36,9 @@ class Sigmoid(Function):
     '''
     Function log(2*cosh(theta)).
     '''
+    def __init__(self, input_shape, dtype):
+        super(Sigmoid, self).__init__(input_shape, input_shape, dtype)
+
     def forward(self,x):
         #for ndarray
         y=np.zeros_like(x)
@@ -47,51 +53,13 @@ class Sigmoid(Function):
         x, y = xy
         return EMPTY_VAR(x.dtype),y*(1-y)*dy
 
-
-class Reorder(Function):  #TODO: fix initialization
-    '''
-    Switch order of variables.
-    '''
-    def __init__(self,order, *args, **kwargs):
-        self.order=order
-        super(Reorder, self).__init__(*args, **kwargs)
-
-    def forward(self,x):
-        return np.transpose(x,axes=self.order)
-
-    def backward(self,xy,dy, **kwargs):
-        x, y = xy
-        return EMPTY_VAR(x.dtype),np.transpose(dy,axes=argsort(self.order))
-
-class Merge(Function):
-    '''
-    Merge x and x' into a single array.
-    
-    Needed?
-    '''
-    def __init__(self,order, *args, **kwargs):
-        self.cumdims=None
-        super(Reorder, self).__init__(*args, **kwargs)
-
-    def forward(self,x):
-        '''
-        x is a list of inputs.
-        '''
-        self.cumdims=np.append([0],np.cumsum([xi.shape for xi in x]))
-        return np.concatenate(x)
-    
-    def backward(self,xy,dy, **kwargs):
-        x, y = xy
-        return EMPTY_VAR(x.dtype),[dy[self.cumdims[i]:self.cumdims[i+1]] for i in xrange(len(self.cumdims)-1)]
-
 class Sum(Function):
     '''
     Sum along specific axis.
     '''
-    def __init__(self, input_shape, axis, output_shape=None, dtype='float32'):
+    def __init__(self, input_shape, dtype, axis):
         self.axis=axis%len(input_shape)
-        if output_shape is None:
-            output_shape = input_shape[:self.axis]+input_shape[self.axis+1:]
+        output_shape = input_shape[:self.axis]+input_shape[self.axis+1:]
         super(Sum,self).__init__(input_shape, output_shape, dtype=dtype)
 
     def forward(self,x):
@@ -106,10 +74,9 @@ class Mean(Function):
     '''
     Mean along specific axis.
     '''
-    def __init__(self,input_shape, axis, output_shape=None, dtype='float32'):
+    def __init__(self,input_shape, dtype, axis):
         self.axis=axis%len(input_shape)
-        if output_shape is None:
-            output_shape = input_shape[:self.axis]+input_shape[self.axis+1:]
+        output_shape = input_shape[:self.axis]+input_shape[self.axis+1:]
         super(Mean,self).__init__(input_shape, output_shape, dtype=dtype)
 
     def forward(self,x):
@@ -124,8 +91,8 @@ class ReLU(Function):
     '''
     ReLU.
     '''
-    def __init__(self, leak = 0, input_shape=None, output_shape=None, dtype='float32', is_inplace=False):
-        super(ReLU,self).__init__(input_shape, output_shape, dtype=dtype, tags=Tags(runtimes=[],is_inplace=is_inplace))
+    def __init__(self, input_shape, dtype, leak = 0, is_inplace=False):
+        super(ReLU,self).__init__(input_shape, input_shape, dtype=dtype, tags=Tags(runtimes=[], is_inplace=is_inplace))
         if leak>1 or leak<0:
             raise ValueError('leak parameter should be 0-1!')
         self.leak = leak
@@ -158,15 +125,14 @@ class Pooling(Function):
     mode_dict = {'max':np.max,
             'mean':np.mean}
 
-    def __init__(self, input_shape, kernel_shape, mode, boundary='O', output_shape=None, dtype='float32'):
+    def __init__(self, input_shape, dtype, kernel_shape, mode, boundary='O'):
         self.kernel_shape = kernel_shape
         self.mode = mode
         if not self.mode_dict.has_key(mode):
             raise ValueError('mode %s not allowed!'%mode)
         img_in_shape = input_shape[-len(kernel_shape):]
         self.csc_indptr, self.csc_indices, self.img_out_shape = scan2csc(kernel_shape, img_in_shape, strides=kernel_shape, boundary=boundary)
-        if output_shape is None:
-            output_shape = input_shape[:-len(kernel_shape)]+self.img_out_shape
+        output_shape = input_shape[:-len(kernel_shape)]+self.img_out_shape
         super(Pooling,self).__init__(input_shape, output_shape, dtype=dtype)
 
     def __repr__(self):
@@ -230,12 +196,12 @@ class DropOut(Function):
     '''
     DropOut inplace.
     '''
-    def __init__(self, keep_rate, axis, input_shape=None, output_shape=None, dtype='float32', is_inplace=False):
+    def __init__(self, input_shape, dtype, keep_rate, axis, is_inplace=False):
         self.axis=axis%len(input_shape)
         self.keep_rate = keep_rate
         self.seed = None
         self.mask = None
-        super(DropOut, self).__init__(input_shape, output_shape, dtype=dtype, tags=Tags(runtimes=['seed'],is_inplace=is_inplace))
+        super(DropOut, self).__init__(input_shape, input_shape, dtype=dtype, tags=Tags(runtimes=['seed'],is_inplace=is_inplace))
 
     def set_runtime_vars(self, var_dict):
         '''Set the runtime variable by seed.'''
@@ -265,11 +231,9 @@ class SoftMax(Function):
     '''
     Soft max function applied on the last axis.
     '''
-    def __init__(self, input_shape, axis, output_shape = None, dtype='float32'):
+    def __init__(self, input_shape, dtype, axis):
         self.axis=axis
-        if output_shape is None:
-            output_shape = input_shape
-        super(SoftMax, self).__init__(input_shape, output_shape, dtype=dtype)
+        super(SoftMax, self).__init__(input_shape, input_shape, dtype=dtype)
 
     def forward(self, x):
         x=x-x.max(axis=self.axis, keepdims=True)
@@ -287,11 +251,10 @@ class CrossEntropy(Function):
     '''
     ZERO_REF=1e-15
 
-    def __init__(self, input_shape, axis, output_shape = None, dtype='float32'):
+    def __init__(self, input_shape, dtype, axis):
         self.axis=axis%len(input_shape)
         self.y_true = None
-        if output_shape is None:
-            output_shape = input_shape[:self.axis]+input_shape[self.axis+1:]
+        output_shape = input_shape[:self.axis]+input_shape[self.axis+1:]
         super(CrossEntropy, self).__init__(input_shape, output_shape, dtype=dtype, tags=Tags(runtimes=['y_true'], is_inplace=False))
 
     def forward(self, x):
@@ -311,11 +274,10 @@ class SoftMaxCrossEntropy(Function):
     Cross Entropy sum(p*log(q)). With p the true labels.
         q = exp(x)/sum(exp(x))
     '''
-    def __init__(self, input_shape, axis, output_shape = None, dtype='float32'):
+    def __init__(self, input_shape, dtype, axis):
         self.axis=axis%len(input_shape)
         self.y_true = None
-        if output_shape is None:
-            output_shape = input_shape[:axis]+input_shape[self.axis+1:]
+        output_shape = input_shape[:axis]+input_shape[self.axis+1:]
         super(SoftMaxCrossEntropy, self).__init__(input_shape, output_shape, dtype=dtype, tags=Tags(runtimes=['y_true'], is_inplace=False))
 
     def forward(self, x):
@@ -343,6 +305,9 @@ class Exp(Function):
     '''
     Function exp(x)
     '''
+    def __init__(self, input_shape, dtype):
+        super(Exp, self).__init__(input_shape, input_shape, dtype)
+
     def forward(self,x):
         return np.exp(x)
 
@@ -360,12 +325,11 @@ class Reshape(Function):
 
 
 class Transpose(Function):
-    def __init__(self, input_shape, axes, output_shape=None, dtype='float32'):
+    def __init__(self, input_shape, dtype, axes):
         self.axes=axes
         if len(axes)!=len(input_shape):
             raise ValueError('axes incorrect!')
-        if output_shape is None:
-            output_shape=tuple([input_shape[axis] for axis in self.axes])
+        output_shape=tuple([input_shape[axis] for axis in self.axes])
         super(Transpose, self).__init__(input_shape, output_shape, dtype=dtype)
 
     def forward(self, x):

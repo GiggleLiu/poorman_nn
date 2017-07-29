@@ -4,7 +4,8 @@ import pdb
 from utils import typed_randn
 
 
-__all__=['dec_check_shape', 'check_numdiff', 'generate_randx', 'check_shape_backward', 'check_shape_forward']
+__all__=['dec_check_shape', 'check_numdiff', 'generate_randx',
+        'check_shape_backward', 'check_shape_forward', 'check_shape_match']
 
 def dec_check_shape(pos):
     '''
@@ -173,3 +174,37 @@ def _check_output(layer, y):
             raise ValueError('Illegal Output shape! y %s, desire %s'%(y.shape, layer.output_shape))
 
 
+def check_shape_match(shape_get, shape_desire):
+    '''
+    check whether shape_get matches shape_desire.
+
+    Parameters:
+        :shape_get: tuple, obtained shape.
+        :shape_desire: tuple, desired shape.
+
+    Return:
+        tuple, the shape with more details.
+    '''
+    #match None shapes
+    if shape_get is None:
+        return shape_desire
+    if shape_desire is None:
+        return shape_get
+
+    #dimension mismatch
+    if shape_get!=len(shape_desire):
+        raise ValueError('Dimension mismatch! y %s, desire %s'%(y.ndim, len(layer.output_shape)))
+
+    #element wise check
+    shape=[]
+    for shape_get_i, shape_desire_i in zip(shape_get, shape_desire):
+        if shape_desire_i==-1:
+            shape.append(shape_get_i)
+        elif shape_get_i==-1:
+            shape.append(shape_desire_i)
+        else:
+            if shape_desire_i!=shape_get_i:
+                raise ValueError('Shape Mismatch! get %s, desire %s'%(shape_get, shape_desire))
+            else:
+                shape.append(shape_get_i)
+    return tuple(shape)

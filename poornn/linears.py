@@ -16,16 +16,16 @@ class Linear(Layer):
     Linear Layer.
 
     Attributes:
+        :input_shape: two types allowed, (num_batch, weight.shape[1]), or (weight.shape[1],)
         :weight: 2darray, (fout, fin), in fortran order.
         :bias: 1darray, (fout,)
     '''
-    def __init__(self, weight, bias, dtype = 'float32', input_shape=None, output_shape=None):
+    def __init__(self, input_shape, dtype, weight, bias):
         self.weight = np.asfortranarray(weight, dtype=dtype)
         self.bias = np.asarray(bias,dtype=dtype)
-        if input_shape is None:
-            input_shape = (-1,weight.shape[1])
-        if output_shape is None:
-            output_shape = (-1,weight.shape[0])
+        if input_shape[-1] != weight.shape[1]:
+            raise ValueError('Shape Mismatch!')
+        output_shape = input_shape[:-1]+(weight.shape[0],)
         super(Linear, self).__init__(input_shape, output_shape, dtype=dtype)
 
         if dtype=='complex128':

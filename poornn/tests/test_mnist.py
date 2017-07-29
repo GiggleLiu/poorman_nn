@@ -13,54 +13,55 @@ import functions
 from spconv import SPConv
 from linears import Linear
 from checks import check_numdiff
+from utils import typed_randn
 
 FLAGS = None
-
-randn=lambda *args,**kwargs:random.randn(*args,**kwargs)*0.1
 
 def build_dnn():
     '''deepnn builds the graph for a deep net for classifying digits.'''
     #first convolution layer
     K1=5
-    F1=32
+    F1, F2, F3, F4 = 32, 64, 1024, 10
+    F3=1024
     I1, I2 = 28, 28
-    img_in_shape=(I1,I2)
-    W_conv1 = randn(F1, 1, K1, K1)  #fout, fin, K1, K2
-    b_conv1 = randn(F1)
-    conv1=SPConv((-1,1)+img_in_shape, W_conv1, bias=b_conv1, dtype='float32', strides=(1,1), boundary='P')
-    relu1 = functions.ReLU()
-    pooling1 = functions.Pooling(mode='max',input_shape=conv1.output_shape, kernel_shape=(2,2), boundary='O')
+    dtype = 'float32'
+    eta=0.1
+
+    ann=ANN(input_shape=(-1,1,I1,I2), dtype=dtype, do_shape_check=True)
+
+    W_conv1 = eta*typed_randn(dtype, (F1, 1, K1, K1))  #fout, fin, K1, K2
+    b_conv1 = eta*typed_randn(dtype, (F1,))
+    ann.add_layer(SPConv, fltr=W_conv1, bias=b_conv1, strides=(1,1), boundary='P')
+    ann.add_layer(functions.ReLU)
+    ann.add_layer(functions.Pooling, mode='max', kernel_shape=(2,2), boundary='O')
 
     #second convolution layer
-    F2=64
-    W_conv2 = randn(F2, F1, K1, K1)  #fout, fin, K1, K2
-    b_conv2 = randn(F2)
-    conv2=SPConv(pooling1.output_shape, W_conv2, bias=b_conv2, dtype='float32', strides=(1,1), boundary='P')
-    relu2 = functions.ReLU()
-    pooling2 = functions.Pooling(mode='max',kernel_shape=(2,2), input_shape=conv2.output_shape, output_shape=(-1,F2*I1/4*I2/4), boundary='O')
+    W_conv2 = eta*typed_randn(dtype, (F2, F1, K1, K1))  #fout, fin, K1, K2
+    b_conv2 = eta*typed_randn(dtype, (F2,))
+    ann.add_layer(SPConv, fltr=W_conv2, bias=b_conv2, strides=(1,1), boundary='P')
+    ann.add_layer(functions.ReLU)
+    ann.add_layer(functions.Pooling, mode='max', kernel_shape=(2,2), boundary='O')
+
+    nout=prod(ann.layers[-1].output_shape[1:])
+    ann.add_layer(functions.Reshape, output_shape=(-1, nout))
 
     #fully connected layer
-    nout=pooling2.output_shape[1]
-    #nout=I1*I2
-    F3=1024
-    W_fc1 = randn(F3, nout)
-    b_fc1 = randn(F3)
-    linear1 = Linear(W_fc1, b_fc1)
-    relu3 = functions.ReLU()
-    dropout1=functions.DropOut(input_shape=(-1,F3),keep_rate=0.5, axis=1)
+    W_fc1 = eta*typed_randn(dtype, (F3, nout))
+    b_fc1 = eta*typed_randn(dtype, (F3,))
+    ann.add_layer(Linear, weight=W_fc1, bias=b_fc1)
+    ann.add_layer(functions.ReLU)
+    ann.add_layer(functions.DropOut, keep_rate=0.5, axis=1)
 
-    F4=10
-    W_fc2 = randn(F4, F3)
-    b_fc2 = randn(F4)
-    linear2 = Linear(W_fc2, b_fc2)
+    W_fc2 = eta*typed_randn(dtype, (F4, F3))
+    b_fc2 = eta*typed_randn(dtype, (F4,))
+    ann.add_layer(Linear, weight=W_fc2, bias=b_fc2)
 
     #the cost function
-    costfunc = functions.SoftMaxCrossEntropy(input_shape=(-1,F4),axis=1)
-    meanfunc = functions.Mean((-1,),axis=0)
-    ann=ANN([conv1, relu1, pooling1, conv2, relu2, pooling2, linear1, dropout1, linear2, costfunc, meanfunc], do_shape_check=True)
+    ann.add_layer(functions.SoftMaxCrossEntropy, axis=1)
+    ann.add_layer(functions.Mean, axis=0)
 
     #random num-diff check
-    y_true=zeros(10); y_true[3]=1
+    y_true=zeros(F4); y_true[3]=1
     assert(all(check_numdiff(ann, var_dict={'y_true':y_true, 'seed':2}, eta=1e-3)))
     return ann
 

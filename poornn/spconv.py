@@ -12,9 +12,9 @@ from core import Layer
 class SPConv(Layer):
     '''
     Attributes:
+        :input_shape: (batch, feature_in, img_x, img_y ...), or (feature_in, img_x, img_y ...)
         :fltr: ndarray, (feature_out, feature_in, kernel_x, ...), in fortran order.
         :bias: 1darray, (feature_out), in fortran order.
-        :dtype: str, data type.
         :strides: tuple, displace for convolutions.
         :boudnary: choice('P', 'O').
             * 'P', periodic boundary condiction.
@@ -25,7 +25,7 @@ class SPConv(Layer):
         :csc_indices: 1darray, row indicator for input array.
         :weight_indices: 1darray, row indicator for filter array (if not contiguous).
     '''
-    def __init__(self, input_shape, fltr, bias, output_shape=None, dtype='float32', strides=None, boundary = "P", w_contiguous = True):
+    def __init__(self, input_shape, dtype, fltr, bias, strides=None, boundary = "P", w_contiguous = True):
         self.fltr = np.asarray(fltr, dtype = dtype, order='F')
         self.bias = np.asarray(bias, order = 'F', dtype = dtype)
 
@@ -38,8 +38,7 @@ class SPConv(Layer):
 
         kernel_shape = self.fltr.shape[2:]
         self.csc_indptr, self.csc_indices, self.img_out_shape = scan2csc(kernel_shape, input_shape[-img_nd:], strides, boundary)
-        if output_shape is None:
-            output_shape = input_shape[:-img_nd-1]+(self.num_feature_out,)+self.img_out_shape
+        output_shape = input_shape[:-img_nd-1]+(self.num_feature_out,)+self.img_out_shape
         super(SPConv, self).__init__(input_shape, output_shape, dtype=dtype)
 
         #use the correct fortran subroutine.

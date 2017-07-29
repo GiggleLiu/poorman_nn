@@ -12,30 +12,40 @@ from climin import RmsProp,GradientDescent,Adam
 from nets import ANN
 from checks import check_numdiff
 import functions
+from utils import typed_randn
 from spconv import SPConv
 from linears import Linear
 
 FLAGS = None
-randn=lambda *args,**kwargs:random.normal(*args,**kwargs)*0.001
 
 def build_dnn():
     '''deepnn builds the graph for a deep net for classifying digits.'''
     #first convolution layer
     F1=10
     I1, I2 = 28, 28
+    eta=0.1
+    dtype='float32'
 
-    W_fc1 = randn(size=(F1, I1*I2))
-    b_fc1 = randn(size=(F1))
-    linear1 = Linear(W_fc1, b_fc1, dtype='float32')
-    relu1 = functions.ReLU()
+    W_fc1 = typed_randn(dtype, (F1, I1*I2))*eta
+    b_fc1 = typed_randn(dtype, (F1,))*eta
 
-    #the cost function
-    softmax = functions.SoftMax(input_shape=(-1,F1),axis=1)
-    costfunc2 = functions.CrossEntropy(input_shape=(-1,F1),axis=1)
-    costfunc = functions.SoftMaxCrossEntropy(input_shape=(-1,F1),axis=1)
+    traditional_mode=False
+    if traditional_mode:
+        linear1 = Linear((-1, I1*I2), dtype, W_fc1, b_fc1)
+        #relu1 = functions.ReLU(linear1.output_shape, dtype)
 
-    meanfunc = functions.Mean(input_shape=(-1,),axis=0)
-    ann=ANN([linear1, costfunc, meanfunc],do_shape_check=True)
+        #the cost function
+        #softmax = functions.SoftMax((-1,F1), dtype, axis=1)
+        #costfunc2 = functions.CrossEntropy((-1,F1), dtype, axis=1)
+        costfunc = functions.SoftMaxCrossEntropy((-1,F1), dtype, axis=1)
+
+        meanfunc = functions.Mean((-1,), dtype, axis=0)
+        ann=ANN((-1,I1*I2), dtype, layers=[linear1, costfunc, meanfunc] ,do_shape_check=True)
+    else:
+        ann=ANN((-1,I1*I2), dtype, do_shape_check=True)  #do not specify layers.
+        ann.add_layer(Linear, weight=W_fc1, bias=b_fc1)
+        ann.add_layer(functions.SoftMaxCrossEntropy, axis=1)
+        ann.add_layer(functions.Mean, axis=0)
 
     #random num-diff check
     y_true=zeros(10); y_true[3]=1

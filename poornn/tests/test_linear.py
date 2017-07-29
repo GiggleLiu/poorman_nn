@@ -25,7 +25,7 @@ def test_linear():
     #2 features, kernel size 3x3
     cv=nn.Linear(nfi,nfo)
     weight=cv.weight.data.numpy()
-    sv=Linear(float32(weight),float32(cv.bias.data.numpy()))
+    sv=Linear((num_batch, nfi), 'float32', float32(weight),float32(cv.bias.data.numpy()))
     print "Testing forward for %s"%sv
     xin_np=asfortranarray(ts.data.numpy())
     ntest=5
@@ -75,7 +75,7 @@ def test_linear_complex():
     xin_np=asfortranarray(typed_randn('complex128',[num_batch,dim_in]))
     weight=asfortranarray(typed_randn('complex128',[dim_out, dim_in]))
     bias=typed_randn('complex128',[dim_out])
-    sv=Linear(weight, bias, dtype='complex128')
+    sv=Linear((num_batch, dim_in), 'complex128',weight, bias)
     assert_(all(check_numdiff(sv, num_check=100)))
 
 def test_linear1():
@@ -87,7 +87,7 @@ def test_linear1():
     #2 features, kernel size 3x3
     cv=nn.Linear(nfi,nfo)
     weight=cv.weight.data.numpy()
-    sv=Linear(input_shape=(nfi,), weight=float32(weight),bias=float32(cv.bias.data.numpy()))
+    sv=Linear(input_shape=(nfi,), dtype='float32', weight=float32(weight),bias=float32(cv.bias.data.numpy()))
     print "Testing forward for %s"%sv
     xin_np=asfortranarray(ts.data.numpy())
     ntest=5
@@ -101,7 +101,7 @@ def test_linear1():
     print "Elapse old = %s, new = %s"%(t1-t0,t2-t1)
     res1=y1.data.numpy()
     res2=y2
-    assert_allclose(res1,res2,atol=1e-4)
+    assert_allclose(res1[0],res2,atol=1e-4)
 
     print "Testing backward"
     dy=torch.randn(*y1.size())
