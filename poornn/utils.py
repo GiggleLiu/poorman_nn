@@ -1,7 +1,8 @@
+from operator import mul
 import numpy as np
 import pdb
 
-__all__=['take_slice', 'scan2csc', 'typed_random', 'typed_randn']
+__all__=['take_slice', 'scan2csc', 'typed_random', 'typed_randn', 'tuple_prod']
 
 def take_slice(arr,sls,axis):
     '''take using slices.'''
@@ -20,7 +21,7 @@ def scan2csc(kernel_shape, img_in_shape, strides, boundary):
     if len(img_in_shape)!=len(strides) or len(kernel_shape)!=len(strides):
         raise ValueError("Dimension Error! (%d, %d, %d)"%(len(strides),len(img_in_shape),len(kernel_shape)))
 
-    dim_kernel = np.prod(kernel_shape)
+    dim_kernel = tuple_prod(kernel_shape)
     # get output image shape
     dimension = len(strides)
     img_out_shape=[]
@@ -36,7 +37,7 @@ def scan2csc(kernel_shape, img_in_shape, strides, boundary):
         num_sweep_i=dim_scan/strides[i]
         img_out_shape.append(num_sweep_i)
     img_out_shape = tuple(img_out_shape)
-    dim_out = np.prod(img_out_shape)
+    dim_out = tuple_prod(img_out_shape)
 
     # create a sparse csc_matrix(dim_in, dim_out), used in fortran and start from 1!.
     csc_indptr=np.arange(1,dim_kernel*dim_out+2, dim_kernel, dtype='int32')
@@ -44,7 +45,7 @@ def scan2csc(kernel_shape, img_in_shape, strides, boundary):
     for ind_out in xrange(dim_out):
         ijk_out = np.unravel_index(ind_out, img_out_shape, order='F')
         ijk_in0 = np.asarray(ijk_out)*strides
-        for ind_offset in xrange(np.prod(kernel_shape)):
+        for ind_offset in xrange(tuple_prod(kernel_shape)):
             ijk_in = ijk_in0 + np.unravel_index(ind_offset, kernel_shape, order='F')
             ind_in = np.ravel_multi_index(ijk_in, img_in_shape, mode='wrap' if boundary=='P' else 'raise', order='F')
             csc_indices.append(ind_in+1)
@@ -62,7 +63,7 @@ def unpack_variables(vec, shapes):
     start = 0
     variables = []
     for shape in shapes:
-        end = start+np.prod(shape)
+        end = start+tuple_prod(shape)
         variables.append(vec[start:end].reshape(shape, order='F'))
         start=end
     return variables
@@ -91,3 +92,5 @@ def typed_randn(dtype, shape):
         return np.complex64(typed_randn('complex128', shape))
     else:
         return np.transpose(np.random.randn(*shape[::-1])).astype(np.dtype(dtype))
+
+tuple_prod = lambda tp: reduce(mul,tp,1)

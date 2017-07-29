@@ -6,7 +6,7 @@ import numpy as np
 import pdb,time
 
 from lib.spconv import lib as fspconv
-from utils import scan2csc
+from utils import scan2csc, tuple_prod
 from core import Layer
 
 class SPConv(Layer):
@@ -54,7 +54,7 @@ class SPConv(Layer):
             raise TypeError("dtype error!")
 
         if not w_contiguous:
-            self.weight_indices = np.asfortranarray(np.tile(np.arange(np.prod(kernel_shape),dtype='int32'),np.prod(img_out_shape)))+1  #pointer to filter data
+            self.weight_indices = np.asfortranarray(np.tile(np.arange(tuple_prod(kernel_shape),dtype='int32'),tuple_prod(img_out_shape)))+1  #pointer to filter data
             func_f=eval('fspconv.forward_general%s'%dtype_token)
             func_b=eval('fspconv.backward_general%s'%dtype_token)
             func1_f=eval('fspconv.forward1_general%s'%dtype_token)

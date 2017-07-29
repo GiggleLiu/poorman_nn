@@ -3,7 +3,9 @@ from numbers import Number
 import pdb
 
 from core import Layer,Function, Tags, EXP_OVERFLOW, EMPTY_VAR
-from utils import scan2csc
+from lib.pooling import lib as fpooling
+from lib.relu import lib as frelu
+from utils import scan2csc, tuple_prod
 
 __all__=['Log2cosh','Sigmoid','Sum','Mean','ReLU','Pooling','DropOut',
         'SoftMax','CrossEntropy','SoftMaxCrossEntropy','Exp', 'Reshape','Transpose']
@@ -30,7 +32,7 @@ class Log2cosh(Function):
 
     def backward(self,xy,dy, **kwargs):
         x, y = xy
-        return EMPTY_VAR(x.dtype),np.tanh(x)*dy
+        return EMPTY_VAR(self.dtype),np.tanh(x)*dy
 
 class Sigmoid(Function):
     '''
@@ -51,7 +53,7 @@ class Sigmoid(Function):
 
     def backward(self,xy,dy, **kwargs):
         x, y = xy
-        return EMPTY_VAR(x.dtype),y*(1-y)*dy
+        return EMPTY_VAR(self.dtype),y*(1-y)*dy
 
 class Sum(Function):
     '''
@@ -68,7 +70,7 @@ class Sum(Function):
     def backward(self,xy,dy, **kwargs):
         x, y = xy
         dy_=np.asfortranarray(dy)[(slice(None),)*self.axis+(np.newaxis,)]
-        return EMPTY_VAR(x.dtype),np.repeat(dy_,x.shape[self.axis],axis=self.axis)
+        return EMPTY_VAR(self.dtype),np.repeat(dy_,x.shape[self.axis],axis=self.axis)
 
 class Mean(Function):
     '''
@@ -85,7 +87,8 @@ class Mean(Function):
     def backward(self,xy,dy, **kwargs):
         x, y = xy
         dy_=dy[(slice(None),)*self.axis+(np.newaxis,)]
-        return EMPTY_VAR(x.dtype),np.repeat(dy_,x.shape[self.axis],axis=self.axis)/x.shape[self.axis]
+        return EMPTY_VAR(self.dtype),np.repeat(dy_,x.shape[self.axis],axis=self.axis)/x.shape[self.axis]
+
 
 class ReLU(Function):
     '''
@@ -97,23 +100,29 @@ class ReLU(Function):
             raise ValueError('leak parameter should be 0-1!')
         self.leak = leak
 
-    def forward(self, x):
-        y=x if self.tags.is_inplace else x.copy(order='F')
-        xmask=x<=0
-        if self.leak==0:
-            y[xmask]=0
+        #use the correct fortran subroutine.
+        if dtype=='complex128':
+            dtype_token = 'z'
+        elif dtype=='complex64':
+            dtype_token = 'c'
+        elif dtype=='float64':
+            dtype_token = 'd'
+        elif dtype=='float32':
+            dtype_token = 's'
         else:
-            y[xmask]*=self.leak
+            raise TypeError("dtype error!")
+
+        #use the correct function
+        self._fforward=eval('frelu.forward_%s'%dtype_token)
+        self._fbackward=eval('frelu.backward_%s'%dtype_token)
+
+    def forward(self, x):
+        y=self._fforward(x.ravel(order='F'),self.leak).reshape(self.output_shape, order='F')
         return y
 
     def backward(self, xy, dy, **kwargs):
-        x, y = xy
-        xmask=x<=0
-        if self.leak==0:
-            dy[xmask]=0
-        else:
-            dy[xmask]*=self.leak
-        return EMPTY_VAR(x.dtype), dy
+        dx=self._fbackward(x=xy[0].ravel(order='F'),dy=dy.ravel(order='F'),leak=self.leak).reshape(self.input_shape, order='F')
+        return EMPTY_VAR(self.dtype), dx
 
 class Pooling(Function):
     '''
@@ -134,6 +143,22 @@ class Pooling(Function):
         self.csc_indptr, self.csc_indices, self.img_out_shape = scan2csc(kernel_shape, img_in_shape, strides=kernel_shape, boundary=boundary)
         output_shape = input_shape[:-len(kernel_shape)]+self.img_out_shape
         super(Pooling,self).__init__(input_shape, output_shape, dtype=dtype)
+
+        #use the correct fortran subroutine.
+        if dtype=='complex128':
+            dtype_token = 'z'
+        elif dtype=='complex64':
+            dtype_token = 'c'
+        elif dtype=='float64':
+            dtype_token = 'd'
+        elif dtype=='float32':
+            dtype_token = 's'
+        else:
+            raise TypeError("dtype error!")
+
+        #use the correct function
+        self._fforward=eval('fpooling.forward_%s'%dtype_token)
+        self._fbackward=eval('fpooling.backward_%s'%dtype_token)
 
     def __repr__(self):
         return '<%s>(%s): %s -> %s'%(self.__class__.__name__,self.mode, self.input_shape,self.output_shape)
@@ -156,41 +181,22 @@ class Pooling(Function):
             ndarray, (num_batch, nfo, img_out_dims), output in 'F' order.
         '''
         x_nd, img_nd = x.ndim, self.img_nd
-        pooling_func = self.pooling_func
-        x=x.reshape(x.shape[:x_nd-img_nd]+(-1,), order='F')
-        y=np.empty(x.shape[:x_nd-img_nd]+(np.product(self.img_out_shape),), order='F', dtype=x.dtype)
-        for col,(start,end) in enumerate(zip(self.csc_indptr[:-1],self.csc_indptr[1:])):
-            indices=self.csc_indices[start-1:end-1]-1
-            y[...,col]=pooling_func(x[...,indices],keepdims=False,axis=-1)
-        y=y.reshape(self.output_shape, order='F')
+        img_dim = tuple_prod(self.input_shape[-img_nd:])
+
+        y=self._fforward(x.reshape([-1,img_dim], order='F'), csc_indptr=self.csc_indptr,\
+                csc_indices=self.csc_indices, mode=0 if self.mode=='max' else 1).reshape(self.output_shape, order='F')
         return y
 
     def backward(self, xy, dy, **kwargs):
         '''It will shed a mask on dy'''
         x, y = xy
         x_nd, img_nd = x.ndim, self.img_nd
-        xpre=x.shape[:x_nd-img_nd]
-        yshape=xpre[:-1]+(-1,np.prod(self.img_out_shape))
+        img_dim_in = tuple_prod(self.input_shape[-img_nd:])
+        img_dim_out = tuple_prod(self.output_shape[-img_nd:])
 
-        #flatten inputs/outputs
-        x_=x.reshape(xpre+(-1,), order='F')
-        dy=dy.reshape(yshape, order='F')
-
-        dx=np.zeros_like(x_)
-        preinds=np.indices(dx.shape[:x_nd-img_nd])
-        if self.mode == 'max':
-            for col,(start,end) in enumerate(zip(self.csc_indptr[:-1],self.csc_indptr[1:])):
-                indices=self.csc_indices[start-1:end-1]-1
-                maxind=indices[np.argmax(x_[...,indices],axis=-1)]
-                dx[tuple(preinds)+(maxind,)]=dy[...,col]
-        else:
-            kernel_size = np.prod(self.kernel_shape)
-            for col,(start,end) in enumerate(zip(self.csc_indptr[:-1],self.csc_indptr[1:])):
-                indices=self.csc_indices[start-1:end-1]-1
-                dy_=dy[...,col]/kernel_size
-                for index in indices:
-                    dx[tuple(preinds)+(index,)]=dy_
-        return EMPTY_VAR(x.dtype), dx.reshape(x.shape, order='F')
+        dx=self._fbackward(x=x.reshape([-1,img_dim_in], order='F'), dy=dy.reshape([-1,img_dim_out]),\
+                csc_indptr=self.csc_indptr,csc_indices=self.csc_indices, mode=0 if self.mode=='max' else 1).reshape(self.input_shape, order='F')
+        return EMPTY_VAR(self.dtype), dx
 
 class DropOut(Function):
     '''
@@ -225,7 +231,7 @@ class DropOut(Function):
         x, y = xy
         dy[(slice(None),)*self.axis+(self.mask,)]/=self.keep_rate
         dy[(slice(None),)*self.axis+(~self.mask,)]=0
-        return EMPTY_VAR(x.dtype), dy
+        return EMPTY_VAR(self.dtype), dy
 
 class SoftMax(Function):
     '''
@@ -242,7 +248,7 @@ class SoftMax(Function):
 
     def backward(self, xy, dy, **kwargs):
         x,y = xy
-        return EMPTY_VAR(x.dtype),dy*y-(dy*y).sum(axis=self.axis, keepdims=True)*y
+        return EMPTY_VAR(self.dtype),dy*y-(dy*y).sum(axis=self.axis, keepdims=True)*y
 
 class CrossEntropy(Function):
     '''
@@ -267,7 +273,7 @@ class CrossEntropy(Function):
 
     def backward(self, xy, dy, **kwargs):
         x,y = xy
-        return EMPTY_VAR(x.dtype),-dy[(slice(None),)*self.axis+(np.newaxis,)]*(self.y_true/np.maximum(x, self.ZERO_REF))
+        return EMPTY_VAR(self.dtype),-dy[(slice(None),)*self.axis+(np.newaxis,)]*(self.y_true/np.maximum(x, self.ZERO_REF))
 
 class SoftMaxCrossEntropy(Function):
     '''
@@ -299,7 +305,7 @@ class SoftMaxCrossEntropy(Function):
         rho=np.exp(x)
         Z=rho.sum(axis=self.axis, keepdims=True)
         y1=rho/Z
-        return EMPTY_VAR(x.dtype),dy[(slice(None),)*self.axis+(np.newaxis,)]*(y1-self.y_true)
+        return EMPTY_VAR(self.dtype),dy[(slice(None),)*self.axis+(np.newaxis,)]*(y1-self.y_true)
 
 class Exp(Function):
     '''
@@ -313,16 +319,15 @@ class Exp(Function):
 
     def backward(self,xy,dy, **kwargs):
         x, y = xy
-        return EMPTY_VAR(x.dtype),dy*y
+        return EMPTY_VAR(self.dtype),dy*y
 
 class Reshape(Function):
     def forward(self, x):
-        return x.reshape(self.output_shape)
+        return x.reshape(self.output_shape, order='F')
 
     def backward(self, xy, dy, **kwargs):
         x, y = xy
-        return EMPTY_VAR(x.dtype), dy.reshape(self.input_shape)
-
+        return EMPTY_VAR(self.dtype), dy.reshape(self.input_shape, order='F')
 
 class Transpose(Function):
     def __init__(self, input_shape, dtype, axes):
@@ -337,4 +342,4 @@ class Transpose(Function):
 
     def backward(self, xy, dy, **kwargs):
         x, y = xy
-        return EMPTY_VAR(x.dtype), dy.transpose(np.argsort(self.axes))
+        return EMPTY_VAR(self.dtype), dy.transpose(np.argsort(self.axes))

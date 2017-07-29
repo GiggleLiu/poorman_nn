@@ -13,3 +13,5 @@ def render_f90(template_folder, template_file,var_dict,out_file):
 if __name__=='__main__':
     render_f90('templates','spconv.template.f90',{'version_list':['general','contiguous'],'dtype_list':['complex*16','real*8','real*4']},out_file='spconv.f90')
     render_f90('templates','linear.template.f90',{'version_list':[''],'dtype_list':['complex*16','real*8','real*4']},out_file='linear.f90')
+    render_f90('templates','pooling.template.f90',{'version_list':[''],'dtype_list':['complex*16','real*8','real*4']},out_file='pooling.f90')
+    render_f90('templates','relu.template.f90',{'version_list':[''],'dtype_list':['complex*16','real*8','real*4']},out_file='relu.f90')

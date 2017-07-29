@@ -1,8 +1,9 @@
 #render templates
 import os
 
-template_list=['linear.template.f90', 'spconv.template.f90']
-source_list=['linear.f90', 'spconv.f90']
+template_list=['linear.template.f90', 'spconv.template.f90',\
+        'pooling.template.f90','relu.template.f90']
+source_list=['linear.f90', 'spconv.f90','pooling.f90', 'relu.f90']
 extension_list=[source[:-4] for source in source_list]
 
 libdir='poornn/lib'

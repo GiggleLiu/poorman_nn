@@ -37,8 +37,8 @@ def test_pooling():
         for mode in ['max', 'mean']:
             func=Pooling(input_shape=(-1,1,4,4), dtype='float32', kernel_shape=(2,2), mode=mode, boundary=b)
             print 'Test forward for %s - %sBC'%(func,b)
-            x=arange(16,dtype=func.dtype).reshape([1,1,4,4], order='F')
-            dy=arange(4, dtype='float32').reshape([1,1,2,2])
+            x=asfortranarray(arange(16,dtype=func.dtype).reshape([1,1,4,4]))
+            dy=asfortranarray(arange(4, dtype='float32').reshape([1,1,2,2]))
             y=func.forward(x)
             if mode=='max':
                 y_true_ravel=[5,13,7,15]
@@ -52,11 +52,11 @@ def test_pooling():
                     0,0,0.25,0.25,
                     0.5,0.5,0.75,0.75,
                     0.5,0.5,0.75,0.75]
-            assert_allclose(y.ravel(),y_true_ravel)
+            assert_allclose(y.ravel(order='F'),y_true_ravel)
             assert_allclose(y.shape,[1,1,2,2])
             print 'Test backward'
             dx=func.backward([x,y],dy)[1]
-            assert_allclose(dx.ravel(),dx_true_ravel)
+            assert_allclose(dx.ravel(order='F'),dx_true_ravel)
             assert_allclose(dx.shape,[1,1,4,4])
             assert_(all(check_numdiff(func, x)))
 
@@ -75,14 +75,15 @@ def test_exp():
 def test_reshape():
     oldshape=(3,4,2)
     newshape=(3,8)
-    func=Reshape(oldshape, newshape, 'float32')
-    xs=random.random(oldshape)
+    dtype='float32'
+    func=Reshape(oldshape, newshape, dtype)
+    xs=typed_randn(dtype, oldshape)
     print 'Test forward for %s'%func
     ys=func.forward(xs)
-    assert_allclose(ys,xs.reshape(newshape))
+    assert_allclose(ys,xs.reshape(newshape, order='F'))
     print 'Test backward'
-    dy=random.random(newshape)
-    assert_allclose(func.backward([xs,ys],dy)[1],dy.reshape(oldshape))
+    dy=typed_randn(dtype, newshape)
+    assert_allclose(func.backward([xs,ys],dy)[1],dy.reshape(oldshape,order='F'))
     assert_(all(check_numdiff(func, xs)))
 
 def test_transpose():
@@ -153,17 +154,6 @@ def test_summean():
     assert_(all(check_numdiff(func, x)))
     assert_(all(check_numdiff(func2, x)))
 
-def test_relu():
-    func=ReLU((4,2), 'float32',0.1)
-    print 'Test forward for %s'%func
-    x=arange(-3,5, dtype='float32').reshape([4,2], order='F')
-    y=func.forward(x)
-    assert_allclose(y,[[-0.3,1],[-0.2,2],[-0.1,3],[0,4]])
-    print 'Test backward'
-    dy=arange(-2,6,dtype='float32').reshape([4,2],order='F')
-    dx=func.backward([x,y],dy)[1]
-    assert_allclose(dx, [[-0.2,2],[-0.1,3],[0,4],[0.1,5]])
-
 def test_relu_per():
     N1,N2,N3=100,20,10
     x=torch.randn(N1,N2,N3)
@@ -173,7 +163,7 @@ def test_relu_per():
 
     func=ReLU(x.size(), 'float32', 0.)
     print 'Test forward for %s'%func
-    y=func.forward(x.numpy())
+    y=func.forward(asfortranarray(x.numpy()))
     assert_allclose(y0.data.numpy(),y)
     print 'Test backward'
     dy=torch.randn(N1,N2,N3)
@@ -235,7 +225,6 @@ def test_all():
     test_transpose()
     test_softmax_cross_per()
     test_relu_per()
-    test_relu()
     test_summean()
     test_softmax_cross()
     test_dropout()
