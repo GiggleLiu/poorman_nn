@@ -18,6 +18,7 @@ module lib
         do i=1,dim_in
             xi=x(i)
             if({%if is_complex%}aimag(xi)<0 .or. real(xi)<0{%else%}xi<0{%endif%}) then
+            !if({%if is_complex%}real(xi)<0{%else%}xi<0{%endif%}) then
                 y(i)=leak*xi
             else
                 y(i)=xi
@@ -39,6 +40,7 @@ module lib
         do i=1,dim_in
             xi=x(i)
             if({%if is_complex%}aimag(xi)<0 .or. real(xi)<0{%else%}xi<0{%endif%}) then
+            !if({%if is_complex%}real(xi)<0{%else%}xi<0{%endif%}) then
                 dx(i)=leak*dy(i)
             else
                 dx(i)=dy(i)

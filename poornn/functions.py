@@ -7,7 +7,7 @@ from lib.pooling import lib as fpooling
 from lib.relu import lib as frelu
 from utils import scan2csc, tuple_prod
 
-__all__=['Log2cosh','Sigmoid','Sum','Mean','ReLU','Pooling','DropOut',
+__all__=['Log2cosh','Sigmoid','Sum','Mean','ReLU','Pooling','DropOut','Sin',
         'SoftMax','CrossEntropy','SoftMaxCrossEntropy','Exp', 'Reshape','Transpose']
 
 class Log2cosh(Function):
@@ -62,7 +62,7 @@ class Sum(Function):
     def __init__(self, input_shape, dtype, axis):
         self.axis=axis%len(input_shape)
         output_shape = input_shape[:self.axis]+input_shape[self.axis+1:]
-        super(Sum,self).__init__(input_shape, output_shape, dtype=dtype)
+        super(Sum,self).__init__(input_shape, output_shape, dtype)
 
     def forward(self,x):
         return np.sum(x,axis=self.axis)
@@ -79,7 +79,7 @@ class Mean(Function):
     def __init__(self,input_shape, dtype, axis):
         self.axis=axis%len(input_shape)
         output_shape = input_shape[:self.axis]+input_shape[self.axis+1:]
-        super(Mean,self).__init__(input_shape, output_shape, dtype=dtype)
+        super(Mean,self).__init__(input_shape, output_shape, dtype)
 
     def forward(self,x):
         return np.mean(x,axis=self.axis)
@@ -95,7 +95,7 @@ class ReLU(Function):
     ReLU.
     '''
     def __init__(self, input_shape, dtype, leak = 0, is_inplace=False):
-        super(ReLU,self).__init__(input_shape, input_shape, dtype=dtype, tags=Tags(runtimes=[], is_inplace=is_inplace))
+        super(ReLU,self).__init__(input_shape, input_shape, dtype, tags=Tags(runtimes=[], is_inplace=is_inplace))
         if leak>1 or leak<0:
             raise ValueError('leak parameter should be 0-1!')
         self.leak = leak
@@ -110,7 +110,7 @@ class ReLU(Function):
         elif dtype=='float32':
             dtype_token = 's'
         else:
-            raise TypeError("dtype error!")
+            raise TypeError("data type error!")
 
         #use the correct function
         self._fforward=eval('frelu.forward_%s'%dtype_token)
@@ -131,18 +131,17 @@ class Pooling(Function):
     Note:
         for complex numbers, what does max pooling looks like?
     '''
-    mode_dict = {'max':np.max,
-            'mean':np.mean}
+    mode_list = ['max', 'max-abs', 'min', 'min-abs', 'mean']
 
     def __init__(self, input_shape, dtype, kernel_shape, mode, boundary='O'):
         self.kernel_shape = kernel_shape
         self.mode = mode
-        if not self.mode_dict.has_key(mode):
+        if mode not in self.mode_list:
             raise ValueError('mode %s not allowed!'%mode)
         img_in_shape = input_shape[-len(kernel_shape):]
         self.csc_indptr, self.csc_indices, self.img_out_shape = scan2csc(kernel_shape, img_in_shape, strides=kernel_shape, boundary=boundary)
         output_shape = input_shape[:-len(kernel_shape)]+self.img_out_shape
-        super(Pooling,self).__init__(input_shape, output_shape, dtype=dtype)
+        super(Pooling,self).__init__(input_shape, output_shape, dtype)
 
         #use the correct fortran subroutine.
         if dtype=='complex128':
@@ -154,7 +153,7 @@ class Pooling(Function):
         elif dtype=='float32':
             dtype_token = 's'
         else:
-            raise TypeError("dtype error!")
+            raise TypeError("data type error!")
 
         #use the correct function
         self._fforward=eval('fpooling.forward_%s'%dtype_token)
@@ -166,11 +165,6 @@ class Pooling(Function):
     @property
     def img_nd(self):
         return len(self.kernel_shape)
-
-    @property
-    def pooling_func(self):
-        '''Pooling Function.'''
-        return self.mode_dict[self.mode]
 
     def forward(self, x):
         '''
@@ -184,7 +178,7 @@ class Pooling(Function):
         img_dim = tuple_prod(self.input_shape[-img_nd:])
 
         y=self._fforward(x.reshape([-1,img_dim], order='F'), csc_indptr=self.csc_indptr,\
-                csc_indices=self.csc_indices, mode=0 if self.mode=='max' else 1).reshape(self.output_shape, order='F')
+                csc_indices=self.csc_indices, mode=self.mode_list.index(self.mode)).reshape(self.output_shape, order='F')
         return y
 
     def backward(self, xy, dy, **kwargs):
@@ -194,8 +188,8 @@ class Pooling(Function):
         img_dim_in = tuple_prod(self.input_shape[-img_nd:])
         img_dim_out = tuple_prod(self.output_shape[-img_nd:])
 
-        dx=self._fbackward(x=x.reshape([-1,img_dim_in], order='F'), dy=dy.reshape([-1,img_dim_out]),\
-                csc_indptr=self.csc_indptr,csc_indices=self.csc_indices, mode=0 if self.mode=='max' else 1).reshape(self.input_shape, order='F')
+        dx=self._fbackward(x=x.reshape([-1,img_dim_in], order='F'), dy=dy.reshape([-1,img_dim_out], order='F'),\
+                csc_indptr=self.csc_indptr,csc_indices=self.csc_indices, mode=self.mode_list.index(self.mode)).reshape(self.input_shape, order='F')
         return EMPTY_VAR(self.dtype), dx
 
 class DropOut(Function):
@@ -207,7 +201,7 @@ class DropOut(Function):
         self.keep_rate = keep_rate
         self.seed = None
         self.mask = None
-        super(DropOut, self).__init__(input_shape, input_shape, dtype=dtype, tags=Tags(runtimes=['seed'],is_inplace=is_inplace))
+        super(DropOut, self).__init__(input_shape, input_shape, dtype, tags=Tags(runtimes=['seed'],is_inplace=is_inplace))
 
     def set_runtime_vars(self, var_dict):
         '''Set the runtime variable by seed.'''
@@ -239,7 +233,7 @@ class SoftMax(Function):
     '''
     def __init__(self, input_shape, dtype, axis):
         self.axis=axis
-        super(SoftMax, self).__init__(input_shape, input_shape, dtype=dtype)
+        super(SoftMax, self).__init__(input_shape, input_shape, dtype)
 
     def forward(self, x):
         x=x-x.max(axis=self.axis, keepdims=True)
@@ -261,7 +255,7 @@ class CrossEntropy(Function):
         self.axis=axis%len(input_shape)
         self.y_true = None
         output_shape = input_shape[:self.axis]+input_shape[self.axis+1:]
-        super(CrossEntropy, self).__init__(input_shape, output_shape, dtype=dtype, tags=Tags(runtimes=['y_true'], is_inplace=False))
+        super(CrossEntropy, self).__init__(input_shape, output_shape, dtype, tags=Tags(runtimes=['y_true'], is_inplace=False))
 
     def forward(self, x):
         '''
@@ -284,7 +278,7 @@ class SoftMaxCrossEntropy(Function):
         self.axis=axis%len(input_shape)
         self.y_true = None
         output_shape = input_shape[:axis]+input_shape[self.axis+1:]
-        super(SoftMaxCrossEntropy, self).__init__(input_shape, output_shape, dtype=dtype, tags=Tags(runtimes=['y_true'], is_inplace=False))
+        super(SoftMaxCrossEntropy, self).__init__(input_shape, output_shape, dtype, tags=Tags(runtimes=['y_true'], is_inplace=False))
 
     def forward(self, x):
         '''
@@ -321,6 +315,20 @@ class Exp(Function):
         x, y = xy
         return EMPTY_VAR(self.dtype),dy*y
 
+class Sin(Function):
+    '''
+    Function sin(x)
+    '''
+    def __init__(self, input_shape, dtype):
+        super(Sin, self).__init__(input_shape, input_shape, dtype)
+
+    def forward(self,x):
+        return np.sin(x)
+
+    def backward(self,xy,dy, **kwargs):
+        x, y = xy
+        return EMPTY_VAR(self.dtype),dy*np.cos(x)
+
 class Reshape(Function):
     def forward(self, x):
         return x.reshape(self.output_shape, order='F')
@@ -335,7 +343,7 @@ class Transpose(Function):
         if len(axes)!=len(input_shape):
             raise ValueError('axes incorrect!')
         output_shape=tuple([input_shape[axis] for axis in self.axes])
-        super(Transpose, self).__init__(input_shape, output_shape, dtype=dtype)
+        super(Transpose, self).__init__(input_shape, output_shape, dtype)
 
     def forward(self, x):
         return x.transpose(self.axes)

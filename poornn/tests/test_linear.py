@@ -8,7 +8,7 @@ from numpy.testing import dec,assert_,assert_raises,assert_almost_equal,assert_a
 import sys,pdb,time
 sys.path.insert(0,'../')
 
-from linears import Linear
+from linears import Linear, Apdot
 from checks import check_numdiff
 from utils import typed_randn
 import torch.nn as nn
@@ -76,6 +76,7 @@ def test_linear_complex():
     weight=asfortranarray(typed_randn('complex128',[dim_out, dim_in]))
     bias=typed_randn('complex128',[dim_out])
     sv=Linear((num_batch, dim_in), 'complex128',weight, bias)
+    print "Testing numdiff for %s"%sv
     assert_(all(check_numdiff(sv, num_check=100)))
 
 def test_linear1():
@@ -130,10 +131,23 @@ def test_linear1():
     assert_allclose(cv.bias.grad.data.numpy()/bfactor,dbias/bfactor,atol=3e-3)
     assert_(all(check_numdiff(sv, xin_np[0])))
 
+def test_apdot_complex():
+    num_batch=3
+    dim_in=10
+    dim_out=4
+    xin_np=asfortranarray(typed_randn('complex128',[num_batch,dim_in]))
+    weight=asfortranarray(typed_randn('complex128',[dim_out, dim_in]))
+    bias=typed_randn('complex128',[dim_out])
+    sv=Apdot((num_batch, dim_in), 'complex128',weight, bias)
+    print "Testing numdiff for %s"%sv
+    assert_(all(check_numdiff(sv, num_check=100)))
+
 
 def test_all():
     random.seed(2)
     torch.manual_seed(2)
+
+    test_apdot_complex()
     test_linear_complex()
     test_linear()
     test_linear1()

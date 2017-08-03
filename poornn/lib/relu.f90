@@ -13,6 +13,7 @@ module lib
         do i=1,dim_in
             xi=x(i)
             if(aimag(xi)<0 .or. real(xi)<0) then
+            !if(real(xi)<0) then
                 y(i)=leak*xi
             else
                 y(i)=xi
@@ -34,6 +35,7 @@ module lib
         do i=1,dim_in
             xi=x(i)
             if(aimag(xi)<0 .or. real(xi)<0) then
+            !if(real(xi)<0) then
                 dx(i)=leak*dy(i)
             else
                 dx(i)=dy(i)
@@ -51,6 +53,7 @@ module lib
         do i=1,dim_in
             xi=x(i)
             if(xi<0) then
+            !if(xi<0) then
                 y(i)=leak*xi
             else
                 y(i)=xi
@@ -72,6 +75,7 @@ module lib
         do i=1,dim_in
             xi=x(i)
             if(xi<0) then
+            !if(xi<0) then
                 dx(i)=leak*dy(i)
             else
                 dx(i)=dy(i)
@@ -89,6 +93,7 @@ module lib
         do i=1,dim_in
             xi=x(i)
             if(xi<0) then
+            !if(xi<0) then
                 y(i)=leak*xi
             else
                 y(i)=xi
@@ -110,6 +115,7 @@ module lib
         do i=1,dim_in
             xi=x(i)
             if(xi<0) then
+            !if(xi<0) then
                 dx(i)=leak*dy(i)
             else
                 dx(i)=dy(i)

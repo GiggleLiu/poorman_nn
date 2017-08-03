@@ -2,14 +2,21 @@
 !orders: conv_dim_out/in, feature_dim_out/in, batch_dim
 module lib
     contains
+    !mode = 0: max real.
+    !mode = 1: max abs.
+    !mode = 2: min real.
+    !mode = 3: min abs.
+    !mode = 4: mean pooling.
     subroutine forward_z(x, y, csc_indptr, csc_indices, nnz, dim_in, dim_out, nfi, mode)
         implicit none
         integer,intent(in) :: nnz, dim_in, dim_out, nfi,mode
         complex*16,intent(in) :: x(nfi, dim_in)
-        integer,intent(in) :: csc_indices(nnz), csc_indptr(dim_out+1)
+        integer,intent(in),target :: csc_indices(nnz)
+        integer,intent(in) :: csc_indptr(dim_out+1)
         complex*16,intent(out) :: y(nfi, dim_out)
 
-        integer :: start_, end_, col
+        integer,pointer :: rows(:)
+        integer :: start_, end_, col, ib, irow
         !f2py intent(in) x, csc_indices, csc_indptr
         !f2py intent(in) nfi, nnz, dim_out, dim_in
         !f2py intent(out) y
@@ -19,11 +26,37 @@ module lib
             end_=csc_indptr(col+1)
 
             !prepair work space by taking rows in x.
-            if(mode==0) then
-                y(:,col)=maxval(abs(x(:,csc_indices(start_:end_-1))),2)
-            else
+            select case (mode)
+            case (0)
+                rows=>csc_indices(start_:end_-1)
+                do ib=1,nfi
+                    irow=maxloc(real(x(ib,rows)),1)
+                    y(ib,col)=x(ib,rows(irow))
+                enddo
+                case (1)
+                rows=>csc_indices(start_:end_-1)
+                do ib=1,nfi
+                    irow=maxloc(abs(x(ib,rows)),1)
+                    y(ib,col)=x(ib,rows(irow))
+                enddo
+            case (2)
+                rows=>csc_indices(start_:end_-1)
+                do ib=1,nfi
+                    irow=minloc(real(x(ib,rows)),1)
+                    y(ib,col)=x(ib,rows(irow))
+                enddo
+                case (3)
+                rows=>csc_indices(start_:end_-1)
+                do ib=1,nfi
+                    irow=minloc(abs(x(ib,rows)),1)
+                    y(ib,col)=x(ib,rows(irow))
+                enddo
+            case (4)
                 y(:,col)=sum(x(:,csc_indices(start_:end_-1)),2)/(end_-start_)
-            endif
+            case default
+                print*,'Error: Pooling mode not exist!'
+                stop 1
+            endselect
         enddo
     end subroutine forward_z
 
@@ -52,29 +85,58 @@ module lib
             start_=csc_indptr(col)
             end_=csc_indptr(col+1)
 
-            if(mode==0) then
+            select case (mode)
+            case (0)
                 !prepair work space by taking rows in x.
+                rows=>csc_indices(start_:end_-1)
+                do ib=1,nfi
+                    irow=maxloc(real(x(ib,rows)),1)
+                    dx(ib,rows(irow))=dy(ib,col)
+                enddo
+            case (1)
                 rows=>csc_indices(start_:end_-1)
                 do ib=1,nfi
                     irow=maxloc(abs(x(ib,rows)),1)
                     dx(ib,rows(irow))=dy(ib,col)
                 enddo
-            else
+            case (2)
+                rows=>csc_indices(start_:end_-1)
+                do ib=1,nfi
+                    irow=minloc(real(x(ib,rows)),1)
+                    dx(ib,rows(irow))=dy(ib,col)
+                enddo
+            case (3)
+                rows=>csc_indices(start_:end_-1)
+                do ib=1,nfi
+                    irow=minloc(abs(x(ib,rows)),1)
+                    dx(ib,rows(irow))=dy(ib,col)
+                enddo
+            case (4)
                 y_work=dy(:,col)/(end_-start_)
                 do irow=start_,end_-1
                     dx(:,csc_indices(irow))=y_work
                 enddo
-            endif
+            case default
+                print*,'Error: Pooling mode not exist!'
+                stop 1
+            endselect
         enddo
     end subroutine backward_z
+    !mode = 0: max real.
+    !mode = 1: max abs.
+    !mode = 2: min real.
+    !mode = 3: min abs.
+    !mode = 4: mean pooling.
     subroutine forward_d(x, y, csc_indptr, csc_indices, nnz, dim_in, dim_out, nfi, mode)
         implicit none
         integer,intent(in) :: nnz, dim_in, dim_out, nfi,mode
         real*8,intent(in) :: x(nfi, dim_in)
-        integer,intent(in) :: csc_indices(nnz), csc_indptr(dim_out+1)
+        integer,intent(in),target :: csc_indices(nnz)
+        integer,intent(in) :: csc_indptr(dim_out+1)
         real*8,intent(out) :: y(nfi, dim_out)
 
-        integer :: start_, end_, col
+        integer,pointer :: rows(:)
+        integer :: start_, end_, col, ib, irow
         !f2py intent(in) x, csc_indices, csc_indptr
         !f2py intent(in) nfi, nnz, dim_out, dim_in
         !f2py intent(out) y
@@ -84,11 +146,29 @@ module lib
             end_=csc_indptr(col+1)
 
             !prepair work space by taking rows in x.
-            if(mode==0) then
-                y(:,col)=maxval((x(:,csc_indices(start_:end_-1))),2)
-            else
+            select case (mode)
+            case (0)
+                y(:,col)=maxval(x(:,csc_indices(start_:end_-1)),2)
+                case (1)
+                rows=>csc_indices(start_:end_-1)
+                do ib=1,nfi
+                    irow=maxloc(abs(x(ib,rows)),1)
+                    y(ib,col)=x(ib,rows(irow))
+                enddo
+            case (2)
+                y(:,col)=minval(x(:,csc_indices(start_:end_-1)),2)
+                case (3)
+                rows=>csc_indices(start_:end_-1)
+                do ib=1,nfi
+                    irow=minloc(abs(x(ib,rows)),1)
+                    y(ib,col)=x(ib,rows(irow))
+                enddo
+            case (4)
                 y(:,col)=sum(x(:,csc_indices(start_:end_-1)),2)/(end_-start_)
-            endif
+            case default
+                print*,'Error: Pooling mode not exist!'
+                stop 1
+            endselect
         enddo
     end subroutine forward_d
 
@@ -117,29 +197,58 @@ module lib
             start_=csc_indptr(col)
             end_=csc_indptr(col+1)
 
-            if(mode==0) then
+            select case (mode)
+            case (0)
                 !prepair work space by taking rows in x.
                 rows=>csc_indices(start_:end_-1)
                 do ib=1,nfi
                     irow=maxloc((x(ib,rows)),1)
                     dx(ib,rows(irow))=dy(ib,col)
                 enddo
-            else
+            case (1)
+                rows=>csc_indices(start_:end_-1)
+                do ib=1,nfi
+                    irow=maxloc(abs(x(ib,rows)),1)
+                    dx(ib,rows(irow))=dy(ib,col)
+                enddo
+            case (2)
+                rows=>csc_indices(start_:end_-1)
+                do ib=1,nfi
+                    irow=minloc((x(ib,rows)),1)
+                    dx(ib,rows(irow))=dy(ib,col)
+                enddo
+            case (3)
+                rows=>csc_indices(start_:end_-1)
+                do ib=1,nfi
+                    irow=minloc(abs(x(ib,rows)),1)
+                    dx(ib,rows(irow))=dy(ib,col)
+                enddo
+            case (4)
                 y_work=dy(:,col)/(end_-start_)
                 do irow=start_,end_-1
                     dx(:,csc_indices(irow))=y_work
                 enddo
-            endif
+            case default
+                print*,'Error: Pooling mode not exist!'
+                stop 1
+            endselect
         enddo
     end subroutine backward_d
+    !mode = 0: max real.
+    !mode = 1: max abs.
+    !mode = 2: min real.
+    !mode = 3: min abs.
+    !mode = 4: mean pooling.
     subroutine forward_s(x, y, csc_indptr, csc_indices, nnz, dim_in, dim_out, nfi, mode)
         implicit none
         integer,intent(in) :: nnz, dim_in, dim_out, nfi,mode
         real*4,intent(in) :: x(nfi, dim_in)
-        integer,intent(in) :: csc_indices(nnz), csc_indptr(dim_out+1)
+        integer,intent(in),target :: csc_indices(nnz)
+        integer,intent(in) :: csc_indptr(dim_out+1)
         real*4,intent(out) :: y(nfi, dim_out)
 
-        integer :: start_, end_, col
+        integer,pointer :: rows(:)
+        integer :: start_, end_, col, ib, irow
         !f2py intent(in) x, csc_indices, csc_indptr
         !f2py intent(in) nfi, nnz, dim_out, dim_in
         !f2py intent(out) y
@@ -149,11 +258,29 @@ module lib
             end_=csc_indptr(col+1)
 
             !prepair work space by taking rows in x.
-            if(mode==0) then
-                y(:,col)=maxval((x(:,csc_indices(start_:end_-1))),2)
-            else
+            select case (mode)
+            case (0)
+                y(:,col)=maxval(x(:,csc_indices(start_:end_-1)),2)
+                case (1)
+                rows=>csc_indices(start_:end_-1)
+                do ib=1,nfi
+                    irow=maxloc(abs(x(ib,rows)),1)
+                    y(ib,col)=x(ib,rows(irow))
+                enddo
+            case (2)
+                y(:,col)=minval(x(:,csc_indices(start_:end_-1)),2)
+                case (3)
+                rows=>csc_indices(start_:end_-1)
+                do ib=1,nfi
+                    irow=minloc(abs(x(ib,rows)),1)
+                    y(ib,col)=x(ib,rows(irow))
+                enddo
+            case (4)
                 y(:,col)=sum(x(:,csc_indices(start_:end_-1)),2)/(end_-start_)
-            endif
+            case default
+                print*,'Error: Pooling mode not exist!'
+                stop 1
+            endselect
         enddo
     end subroutine forward_s
 
@@ -182,19 +309,41 @@ module lib
             start_=csc_indptr(col)
             end_=csc_indptr(col+1)
 
-            if(mode==0) then
+            select case (mode)
+            case (0)
                 !prepair work space by taking rows in x.
                 rows=>csc_indices(start_:end_-1)
                 do ib=1,nfi
                     irow=maxloc((x(ib,rows)),1)
                     dx(ib,rows(irow))=dy(ib,col)
                 enddo
-            else
+            case (1)
+                rows=>csc_indices(start_:end_-1)
+                do ib=1,nfi
+                    irow=maxloc(abs(x(ib,rows)),1)
+                    dx(ib,rows(irow))=dy(ib,col)
+                enddo
+            case (2)
+                rows=>csc_indices(start_:end_-1)
+                do ib=1,nfi
+                    irow=minloc((x(ib,rows)),1)
+                    dx(ib,rows(irow))=dy(ib,col)
+                enddo
+            case (3)
+                rows=>csc_indices(start_:end_-1)
+                do ib=1,nfi
+                    irow=minloc(abs(x(ib,rows)),1)
+                    dx(ib,rows(irow))=dy(ib,col)
+                enddo
+            case (4)
                 y_work=dy(:,col)/(end_-start_)
                 do irow=start_,end_-1
                     dx(:,csc_indices(irow))=y_work
                 enddo
-            endif
+            case default
+                print*,'Error: Pooling mode not exist!'
+                stop 1
+            endselect
         enddo
     end subroutine backward_s
     end module lib

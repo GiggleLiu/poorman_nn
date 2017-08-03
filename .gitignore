@@ -22,3 +22,5 @@ setting/local*.py
 tests/data/
 dist/
 poornn.egg-info/
+*.mod
+poornn/tests/MNIST-data/

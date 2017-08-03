@@ -35,7 +35,7 @@ def test_log2cosh():
 def test_pooling():
     for b in ['P','O']:
         for mode in ['max', 'mean']:
-            func=Pooling(input_shape=(-1,1,4,4), dtype='float32', kernel_shape=(2,2), mode=mode, boundary=b)
+            func=Pooling(input_shape=(-1,1,4,4), dtype='complex128', kernel_shape=(2,2), mode=mode, boundary=b)
             print 'Test forward for %s - %sBC'%(func,b)
             x=asfortranarray(arange(16,dtype=func.dtype).reshape([1,1,4,4]))
             dy=asfortranarray(arange(4, dtype='float32').reshape([1,1,2,2]))
@@ -56,9 +56,15 @@ def test_pooling():
             assert_allclose(y.shape,[1,1,2,2])
             print 'Test backward'
             dx=func.backward([x,y],dy)[1]
-            assert_allclose(dx.ravel(order='F'),dx_true_ravel)
+            assert_allclose(dx.ravel(),dx_true_ravel)
             assert_allclose(dx.shape,[1,1,4,4])
-            assert_(all(check_numdiff(func, x)))
+            assert_(all(check_numdiff(func, eta=1e-4)))
+
+def test_pooling_per():
+    for mode in ['max', 'max-abs','min','min-abs', 'mean']:
+        func=Pooling(input_shape=(10,3,40,40), dtype='complex128', kernel_shape=(2,2), mode=mode)
+        print "Num Diff test for %s"%func
+        assert_(all(check_numdiff(func, eta=1e-3)))
 
 def test_exp():
     oldshape=(3,4,2)
@@ -220,6 +226,7 @@ def test_softmax_cross_per():
 def test_all():
     random.seed(3)
     torch.manual_seed(3)
+    test_pooling_per()
     test_reshape()
     test_exp()
     test_transpose()

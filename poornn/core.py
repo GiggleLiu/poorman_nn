@@ -22,14 +22,22 @@ EMPTY_VAR = lambda dtype: np.zeros([0], dtype=dtype)
 class Layer(object):
     '''
     A single layer in Neural Network.
+
+    Attributes:
+        :input_shape: tuple,
+        :output_shape: tuple,
+        :dtype: str, input data type.
+        :otype: str, output data type.
+        :tags: named tuple, runtime variables, is inplace(change input) function or not.
     '''
 
     __metaclass__ = ABCMeta
 
-    def __init__(self, input_shape, output_shape, dtype, tags=Tags(runtimes = [], is_inplace = False)):
+    def __init__(self, input_shape, output_shape, dtype, otype=None, tags=Tags(runtimes = [], is_inplace = False)):
         self.input_shape = input_shape
         self.output_shape = output_shape
         self.dtype = dtype
+        self.otype = otype or dtype
         self.tags = tags
 
     def __str__(self):
