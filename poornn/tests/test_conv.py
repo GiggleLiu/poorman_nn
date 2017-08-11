@@ -3,9 +3,10 @@ Tests for MPS and MPO
 '''
 from numpy import *
 from numpy.testing import dec,assert_,assert_raises,assert_almost_equal,assert_allclose
+from scipy import sparse as sps
 import sys,pdb,time
 sys.path.insert(0,'../')
-from spconv import SPConv
+from spconv import SPConv, SPSP
 from checks import check_numdiff
 from utils import typed_randn
 import torch
@@ -233,6 +234,78 @@ def test_conv2d_complex():
     assert_(all(check_numdiff(sv, num_check=100)))
     assert_(all(check_numdiff(sv2, num_check=100)))
 
+def test_spsp_complex():
+    num_batch=1
+    dim_x=10
+    dim_y=20
+    K1=3
+    K2=4
+    nfin=4
+    nfout=6
+    dtype='complex128'
+    nsite=dim_x*dim_y
+    xin_np=asfortranarray(typed_randn(dtype,[num_batch,nfin,dim_x,dim_y]))
+    fltr=asfortranarray(typed_randn(dtype,[nfout,nfin,K1,K2]))
+    bias=typed_randn(dtype,[nfout])
+    sv=SPConv((-1,nfin,dim_x,dim_y), dtype, fltr, bias, strides=(1,1), boundary='P', w_contiguous=True)
+
+    # the corresponding SPSP matrix
+    dmat=zeros((nfin, dim_x, dim_y, nsite*nfout), dtype=dtype)
+
+    fltr_=transpose(fltr,(1,2,3,0))
+    for i in xrange(dim_x):
+        for j in xrange(dim_y):
+            k=i*dim_y+j
+            ox=max(0,i+K1-dim_x+1)
+            oy=max(0,j+K2-dim_y+1)
+            dmat[:,i:i+K1-ox,j:j+K2-oy,k*nfout:(k+1)*nfout]=fltr_[:,:K1-ox,:K2-oy]
+            dmat[:,:ox,:oy,k*nfout:(k+1)*nfout]=fltr_[:,K1-ox:,K2-oy:]
+    cscmat=sps.csc_matrix(dmat.reshape(nfin*nsite, nfout*nsite))
+    sv2=SPSP((-1,nfin,dim_x,dim_y), dtype, cscmat, bias, strides=(1,1))
+    print "Testing forward for %s"%sv
+    xin_np1=xin_np[0]
+    ntest=5
+    t1=time.time()
+    for i in xrange(ntest):
+        y2=sv.forward(xin_np)
+    t2=time.time()
+    for i in xrange(ntest):
+        y3=sv2.forward(xin_np1)
+    t3=time.time()
+    print "Elapse new = %s, new-sp = %s"%(t2-t1,t3-t2)
+    res2=y2
+    res3=y3[newaxis]
+    assert_allclose(res2,res2,atol=1e-4)
+
+    print "Testing backward"
+    dy_np=typed_randn(dtype, y2.shape)
+    dy_np1=dy_np[0]
+
+    t1=time.time()
+    for i in xrange(ntest):
+        dwb,dx=sv.backward([xin_np, y2], dy_np, mask=(1,1))
+    t2=time.time()
+    for i in xrange(ntest):
+        dwb1,dx1=sv2.backward([xin_np1, y3], dy_np1, mask=(1,1))
+    t3=time.time()
+    print "Elapse new = %s, new-sp = %s"%((t2-t1)/ntest,(t3-t2)/ntest)
+
+    #reshape back
+    dx1=dx1[newaxis]
+
+    dweight, dbias = dwb[:sv.fltr.size], dwb[sv.fltr.size:]
+    dweight1, dbias1 = dwb1[:sv2.fltr.size], dwb1[sv.fltr.size:]
+    dweight1=reshape(dweight1,dweight.shape,order='F')
+
+    assert_allclose(dbias,dbias1,atol=1e-3)
+    assert_allclose(dx,dx1,atol=1e-3)
+    assert_allclose(dweight1,dweight,atol=1e-3)
+
+    assert_(all(check_numdiff(sv, num_check=100)))
+    assert_(all(check_numdiff(sv2, num_check=100)))
+
+
+#test_spsp_complex()
 test_conv2d_complex()
 test_conv2d()
 test_conv2d_per()

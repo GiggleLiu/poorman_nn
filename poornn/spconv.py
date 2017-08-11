@@ -6,7 +6,8 @@ import numpy as np
 import pdb,time
 
 from lib.spconv import lib as fspconv
-from utils import scan2csc, tuple_prod
+from lib.spsp import lib as fspsp
+from utils import scan2csc, tuple_prod, scan2csc_sp
 from core import Layer
 
 class SPConv(Layer):
@@ -156,3 +157,106 @@ class SPConv(Layer):
     @property
     def num_variables(self):
         return self.fltr.size+self.bias.size
+
+class SPSP(SPConv):
+    '''
+    Attributes:
+        :input_shape: (batch, feature_in, img_x, img_y, ...), or (feature_in, img_x, img_y, ...)
+        :cscmat: csc_matrix, with row indices (feature_in, img_x, img_y, ...), and column indices (feature_out, img_x', img_y', ...)
+        :bias: 1darray, (feature_out), in fortran order.
+        :strides: tuple, displace for convolutions.
+
+    Attributes (Derived):
+        :csc_indptr: 1darray, column pointers for convolution matrix.
+        :csc_indices: 1darray, row indicator for input array.
+        :weight_indices: 1darray, row indicator for filter array (if not contiguous).
+    '''
+    def __init__(self, input_shape, dtype, cscmat, bias, strides=None):
+        self.cscmat = cscmat
+        self.bias = bias
+
+        self.strides = tuple(strides)
+        img_nd = len(self.strides)
+        if strides is None:
+            strides=(1,)*img_nd
+        self.boundary = 'P'
+
+        if tuple_prod(input_shape[1:]) != cscmat.shape[0]:
+            raise ValueError('csc matrix input shape mismatch! %s get, but %s desired.'%(cscmat.shape[1], tuple_prod(input_shape[1:])))
+
+        #self.csc_indptr, self.csc_indices, self.csc_data = scan2csc_sp(input_shape[1:], strides)
+        img_in_shape = input_shape[2:]
+        self.img_out_shape=(img_in_shape)
+        output_shape = input_shape[:1]+(self.num_feature_out,)+self.img_out_shape
+        super(SPSP, self).__init__(input_shape, output_shape, dtype=dtype)
+
+        if self.num_feature_out*tuple_prod(self.img_out_shape) != cscmat.shape[1]:
+            raise ValueError('csc matrix output shape mismatch! %s get, but %s desired.'%(cscmat.shape[1], self.num_feature_out*tuple_prod(self.img_out_shape)))
+
+        #use the correct fortran subroutine.
+        if dtype=='complex128':
+            dtype_token = 'z'
+        elif dtype=='complex64':
+            dtype_token = 'c'
+        elif dtype=='float64':
+            dtype_token = 'd'
+        elif dtype=='float32':
+            dtype_token = 's'
+        else:
+            raise TypeError("dtype error!")
+
+        #select function
+        self._fforward=eval('fspsp.forward%s'%dtype_token)
+        self._fbackward=eval('fspsp.backward%s'%dtype_token)
+
+    def __str__(self):
+        return self.__repr__()+'\n  dtype = %s\n  csc matrix => %s\n  bias => %s'%(self.dtype,self.cscmat.shape,self.bias.shape)
+
+    @property
+    def img_nd(self):
+        '''Dimension of input image.'''
+        return len(self.strides)
+
+    @property
+    def num_feature_in(self):
+        '''Dimension of input feature.'''
+        return self.input.shape[1]
+
+    @property
+    def num_feature_out(self):
+        '''Dimension of input feature.'''
+        return self.bias.shape[0]
+
+    def forward(self, x):
+        x=x.reshape(xpre+(-1,), order='F')
+        y=self._fforward(x,csc_indptr=self.csc_indptr,csc_indices=self.csc_indices,fltr_data=_fltr_flatten,
+                bias=self.bias, max_nnz_row=_fltr_flatten.shape[-1])
+        y=y.reshape(self.output_shape, order='F')
+        return y
+
+    def backward(self, xy, dy, **kwargs):
+        x=x.reshape(xpre+(-1,), order='F')
+        dy=dy.reshape(ypre+(-1,), order='F')
+
+        dx, dweight, dbias = self._fbackward(dy,x,self.csc_indptr,self.csc_indices,
+                fltr_data=_fltr_flatten,
+                do_xgrad=mask[1], do_wgrad=mask[0], do_bgrad=mask[0], max_nnz_row=_fltr_flatten.shape[-1])
+        dx=dx.reshape(self.input_shape, order='F')
+        return np.concatenate([dweight.ravel(order='F'), dbias]), dx
+
+    def get_variables(self):
+        return np.concatenate([self.fltr.ravel(order='F'),self.bias])
+
+    def set_variables(self, variables, mode='set'):
+        if mode=='set':
+            np.copyto(self.fltr, variables[:self.fltr.size].reshape(self.fltr.shape, order='F'))
+            np.copyto(self.bias, variables[self.fltr.size:].reshape(self.bias.shape, order='F'))
+        elif mode=='add':
+            self.fltr+=variables[0]
+            self.bias+=variables[1]
+
+    @property
+    def num_variables(self):
+        return self.fltr.size+self.bias.size
+
+

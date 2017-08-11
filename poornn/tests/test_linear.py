@@ -5,10 +5,11 @@ from numpy import *
 from numpy.linalg import norm,svd
 from copy import deepcopy
 from numpy.testing import dec,assert_,assert_raises,assert_almost_equal,assert_allclose
+from scipy import sparse as sps
 import sys,pdb,time
 sys.path.insert(0,'../')
 
-from linears import Linear, Apdot
+from linears import Linear, Apdot, SPLinear
 from checks import check_numdiff
 from utils import typed_randn
 import torch.nn as nn
@@ -79,6 +80,45 @@ def test_linear_complex():
     print "Testing numdiff for %s"%sv
     assert_(all(check_numdiff(sv, num_check=100)))
 
+def test_splinear():
+    num_batch=2
+    dim_in=30
+    dim_out=400
+    dtype='complex128'
+    x=asfortranarray(typed_randn(dtype,[num_batch,dim_in]))
+    weight=asfortranarray(typed_randn(dtype,[dim_out, dim_in]))
+    bias=typed_randn(dtype,[dim_out])
+    sv=Linear((num_batch, dim_in), dtype,weight, bias)
+    sv2=SPLinear((num_batch, dim_in), dtype, sps.csc_matrix(weight), bias)
+
+    print "Testing forward for %s"%sv2
+    ntest=5
+    t0=time.time()
+    for i in xrange(ntest):
+        y1=sv.forward(x)
+    t1=time.time()
+    for i in xrange(ntest):
+        y2=sv2.forward(x)
+    t2=time.time()
+    print "Elapse old = %s, new = %s"%(t1-t0,t2-t1)
+    assert_allclose(y1,y2,atol=1e-4)
+
+    print "Testing backward"
+    dy=typed_randn(dtype, y1.shape)
+    t0=time.time()
+    dwb0, dx0 = sv.backward([x, y1],dy)
+    t1=time.time()
+    dwb1, dx1=sv2.backward([x, y2], dy)
+    t2=time.time()
+    print "Elapse old = %s, new = %s"%(t1-t0,t2-t1)
+    assert_(all(check_numdiff(sv2, num_check=100)))
+    assert_(all(check_numdiff(sv, num_check=100)))
+    assert_allclose(dx0, dx1,atol=1e-4)
+    assert_allclose(dwb1, dwb0,atol=1e-4)
+
+    print "Testing numdiff for %s"%sv
+    assert_(all(check_numdiff(sv2, num_check=100)))
+
 def test_linear1():
     random.seed(2)
     nfi=1024
@@ -147,6 +187,7 @@ def test_all():
     random.seed(2)
     torch.manual_seed(2)
 
+    test_splinear()
     test_apdot_complex()
     test_linear_complex()
     test_linear()

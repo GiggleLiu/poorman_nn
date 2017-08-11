@@ -94,10 +94,12 @@ def check_numdiff(layer, x=None, num_check=10, eta=None, tol=1e-1, var_dict={}):
     ys=layer.forward(x)
     if is_net:
         y=ys[-1]
-        dv, dx=layer.backward(ys, dy=np.ones_like(y))
+        dy=typed_randn(layer.dtype, y.shape)
+        dv, dx=layer.backward(ys, dy=dy)
     else:
         y=ys
-        dv, dx=layer.backward([x,y], dy=np.ones_like(y))
+        dy=typed_randn(layer.dtype, y.shape)
+        dv, dx=layer.backward([x,y], dy=dy)
     dx_=np.ravel(dx, order='F')
     if eta is None:
         eta=0.003+0.004j if np.iscomplexobj(dv) else 0.005
@@ -112,9 +114,10 @@ def check_numdiff(layer, x=None, num_check=10, eta=None, tol=1e-1, var_dict={}):
         y1=layer.forward(x_new)
         if is_net: y1=y1[-1]
 
-        diff=abs(dx_[pos]-np.sum(y1-y)/eta)
+        ngrad_x=np.sum((y1-y)*dy)/eta
+        diff=abs(dx_[pos]-ngrad_x)
         if diff/max(1,abs(dx_[pos]))>tol:
-            print 'XBP Diff = %s, Num Diff = %s'%(dx_[pos], np.sum(y1-y)/eta)
+            print 'XBP Diff = %s, Num Diff = %s'%(dx_[pos], ngrad_x)
             print 'Num Diff Test Fail! @x_[%s] = %s'%(pos, x.ravel()[pos])
             res_x.append(False)
         else:
@@ -135,9 +138,10 @@ def check_numdiff(layer, x=None, num_check=10, eta=None, tol=1e-1, var_dict={}):
         y1=layer.forward(x)
         if is_net: y1=y1[-1]
 
-        diff=abs(dv[pos]-np.sum(y1-y)/eta)
+        ngrad_w=np.sum((y1-y)*dy)/eta
+        diff=abs(dv[pos]-ngrad_w)
         if diff/max(1, abs(dv[pos]))>tol:
-            print 'WBP Diff = %s, Num Diff = %s'%(dv[pos], np.sum(y1-y)/eta)
+            print 'WBP Diff = %s, Num Diff = %s'%(dv[pos], ngrad_w)
             print 'Num Diff Test Fail! @var[%s] = %s'%(pos,var[pos])
             res_w.append(False)
         else:

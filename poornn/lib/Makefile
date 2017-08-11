@@ -9,8 +9,8 @@ F90 = gfortran
 
 F90FLAGS = -O3
 
-SOURCES = templates/spconv.template.f90 templates/linear.template.f90 templates/pooling.template.f90 templates/relu.template.f90
-TARGETS_F90 = spconv.f90 linear.f90 pooling.f90 relu.f90
+SOURCES = templates/spconv.template.f90 templates/linear.template.f90 templates/pooling.template.f90 templates/relu.template.f90 templates/spsp.template.f90
+TARGETS_F90 = spconv.f90 linear.f90 pooling.f90 relu.f90 spsp.f90
 OBJS = $(TARGETS_F90:.f90=.o)
 TARGETS = $(TARGETS_F90:.f90=.so)
 
@@ -28,6 +28,8 @@ pooling.so: %: pooling.f90
 	f2py -m pooling -c pooling.f90 --fcompiler=gfortran -DF2PY_REPORT_ON_ARRAY_COPY=1
 relu.so: %: relu.f90
 	f2py -m relu -c relu.f90 --fcompiler=gfortran -DF2PY_REPORT_ON_ARRAY_COPY=1
+spsp.so: %: spsp.f90
+	f2py -m spsp -c spsp.f90 --fcompiler=gfortran -DF2PY_REPORT_ON_ARRAY_COPY=1
 spconv.o: spconv.f90
 	$(F90) -c spconv.f90
 linear.o: linear.f90

@@ -42,13 +42,13 @@ module lib
         if(do_wgrad) then
             !call {{dtype_token}}gemm('T', 'N', nfo, nfi, num_batch, one, dy, num_batch,&
             !    {%if is_complex%}conjg(x){%else%}x{%endif%}, num_batch, zero, dweight, nfo)
-            call {{dtype_token}}gemm({%if is_complex%}'C'{%else%}'T'{%endif%}, 'N', nfo, nfi, num_batch, one, dy, num_batch,&
+            call {{dtype_token}}gemm('T', 'N', nfo, nfi, num_batch, one, dy, num_batch,&
                 x, num_batch, zero, dweight, nfo)
         endif
         if(do_xgrad) then
             !call {{dtype_token}}gemm('N', 'N', num_batch, nfi, nfo, one, dy, num_batch,&
             !    {%if is_complex%}conjg(weight){%else%}weight{%endif%}, nfo, zero, dx, num_batch)
-            call {{dtype_token}}gemm('N', 'N', num_batch, nfi, nfo, one, {%if is_complex%}conjg(dy){%else%}dy{%endif%}, num_batch,&
+            call {{dtype_token}}gemm('N', 'N', num_batch, nfi, nfo, one, dy, num_batch,&
                 weight, nfo, zero, dx, num_batch)
         endif
         if(do_bgrad) then

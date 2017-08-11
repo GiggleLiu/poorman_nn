@@ -36,13 +36,13 @@ module lib
         if(do_wgrad) then
             !call zgemm('T', 'N', nfo, nfi, num_batch, one, dy, num_batch,&
             !    conjg(x), num_batch, zero, dweight, nfo)
-            call zgemm('C', 'N', nfo, nfi, num_batch, one, dy, num_batch,&
+            call zgemm('T', 'N', nfo, nfi, num_batch, one, dy, num_batch,&
                 x, num_batch, zero, dweight, nfo)
         endif
         if(do_xgrad) then
             !call zgemm('N', 'N', num_batch, nfi, nfo, one, dy, num_batch,&
             !    conjg(weight), nfo, zero, dx, num_batch)
-            call zgemm('N', 'N', num_batch, nfi, nfo, one, conjg(dy), num_batch,&
+            call zgemm('N', 'N', num_batch, nfi, nfo, one, dy, num_batch,&
                 weight, nfo, zero, dx, num_batch)
         endif
         if(do_bgrad) then

@@ -11,7 +11,7 @@ import functions
 from spconv import SPConv
 from linears import Linear
 
-__class__=['ANN']
+__all__=['ANN']
 
 class ANN(object):
     '''
