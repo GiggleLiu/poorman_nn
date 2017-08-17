@@ -27,18 +27,18 @@ def build_dnn():
     dtype = 'float32'
     eta=0.1
 
-    ann=ANN(input_shape=(-1,1,I1,I2), dtype=dtype, do_shape_check=True)
+    ann=ANN(dtype=dtype, do_shape_check=True)
 
     W_conv1 = eta*typed_randn(dtype, (F1, 1, K1, K1))  #fout, fin, K1, K2
     b_conv1 = eta*typed_randn(dtype, (F1,))
-    ann.add_layer(SPConv, fltr=W_conv1, bias=b_conv1, strides=(1,1), boundary='P')
+    ann.layers.append(SPConv(input_shape=(-1,1,I1,I2), dtype=dtype, weight=W_conv1, bias=b_conv1, strides=(1,1), boundary='P'))
     ann.add_layer(functions.ReLU)
     ann.add_layer(functions.Pooling, mode='max', kernel_shape=(2,2), boundary='O')
 
     #second convolution layer
     W_conv2 = eta*typed_randn(dtype, (F2, F1, K1, K1))  #fout, fin, K1, K2
     b_conv2 = eta*typed_randn(dtype, (F2,))
-    ann.add_layer(SPConv, fltr=W_conv2, bias=b_conv2, strides=(1,1), boundary='P')
+    ann.add_layer(SPConv, weight=W_conv2, bias=b_conv2, strides=(1,1), boundary='P')
     ann.add_layer(functions.ReLU)
     ann.add_layer(functions.Pooling, mode='max', kernel_shape=(2,2), boundary='O')
 

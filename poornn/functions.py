@@ -7,8 +7,9 @@ from lib.pooling import lib as fpooling
 from lib.relu import lib as frelu
 from utils import scan2csc, tuple_prod
 
-__all__=['Log2cosh','Sigmoid','Sum','Mean','ReLU','Pooling','DropOut','Sin',
-        'SoftMax','CrossEntropy','SoftMaxCrossEntropy','Exp', 'Reshape','Transpose']
+__all__=['Log2cosh','Sigmoid','Sum','Mul','Mod','Mean','ReLU','Pooling','DropOut','Sin','Cos',
+        'SoftMax','CrossEntropy','SoftMaxCrossEntropy','SquareLoss','Exp', 'Reshape','Transpose',
+        'TypeCast', 'Print']
 
 class Log2cosh(Function):
     '''
@@ -301,6 +302,31 @@ class SoftMaxCrossEntropy(Function):
         y1=rho/Z
         return EMPTY_VAR(self.dtype),dy[(slice(None),)*self.axis+(np.newaxis,)]*(y1-self.y_true)
 
+class SquareLoss(Function):
+    '''
+    Square Loss (p-q)**2. With p the true labels.
+    '''
+    def __init__(self, input_shape, dtype):
+        self.y_true = None
+        super(SquareLoss, self).__init__(input_shape, input_shape, dtype, tags=Tags(runtimes=['y_true'], is_inplace=False))
+
+    def forward(self, x):
+        '''
+        Parameters:
+            :x: ndarray, note 0 < x <= 1.
+            :y_true: ndarray, correct one-hot y.
+        '''
+        if self.y_true is None:
+            raise AttributeError('Please initialize variable `y_true`(use @set_runtime_vars) before using a runtime layer %s!'%self)
+        diff=x-self.y_true
+        return diff.conj()*diff
+
+    def backward(self, xy, dy, **kwargs):
+        xt=self.y_true
+        is_complex = self.dtype[:7]=='complex'
+        #return EMPTY_VAR(self.dtype),((xy[0]-xt).conj()*dy) if self.dtype[:7]=='complex' else (2*(xy[0]-xt)*dy)
+        return EMPTY_VAR(self.dtype),((xy[0]-xt)*dy) if self.dtype[:7]=='complex' else (2*(xy[0]-xt)*dy)  #paritial x.conj() for complex
+
 class Exp(Function):
     '''
     Function exp(x)
@@ -329,6 +355,20 @@ class Sin(Function):
         x, y = xy
         return EMPTY_VAR(self.dtype),dy*np.cos(x)
 
+class Cos(Function):
+    '''
+    Function cos(x)
+    '''
+    def __init__(self, input_shape, dtype):
+        super(Cos, self).__init__(input_shape, input_shape, dtype)
+
+    def forward(self,x):
+        return np.cos(x)
+
+    def backward(self,xy,dy, **kwargs):
+        x, y = xy
+        return EMPTY_VAR(self.dtype),-dy*np.sin(x)
+
 class Reshape(Function):
     def forward(self, x):
         return x.reshape(self.output_shape, order='F')
@@ -336,6 +376,17 @@ class Reshape(Function):
     def backward(self, xy, dy, **kwargs):
         x, y = xy
         return EMPTY_VAR(self.dtype), dy.reshape(self.input_shape, order='F')
+
+class TypeCast(Function):
+    def __init__(self, input_shape, dtype, otype):
+        super(TypeCast, self).__init__(input_shape, input_shape, dtype, otype=otype)
+
+    def forward(self, x):
+        return x.astype(self.otype)
+
+    def backward(self, xy, dy, **kwargs):
+        x, y = xy
+        return EMPTY_VAR(self.dtype), dy.astype(self.dtype)
 
 class Transpose(Function):
     def __init__(self, input_shape, dtype, axes):
@@ -351,3 +402,35 @@ class Transpose(Function):
     def backward(self, xy, dy, **kwargs):
         x, y = xy
         return EMPTY_VAR(self.dtype), dy.transpose(np.argsort(self.axes))
+
+class Mul(Function):
+    '''Multiply by a constant'''
+    def __init__(self, input_shape, dtype, alpha):
+        self.alpha = alpha
+        super(Mul, self).__init__(input_shape, input_shape, dtype)
+
+    def forward(self, x): return self.alpha*x
+    def backward(self,xy, dy, **kwargs): return EMPTY_VAR(self.dtype), self.alpha*dy
+
+class Mod(Function):
+    '''Mod by a constant'''
+    def __init__(self, input_shape, dtype, n):
+        self.n = n
+        super(Mod, self).__init__(input_shape, input_shape, dtype)
+
+    def forward(self, x): return x%self.n
+    def backward(self,xy, dy, **kwargs): return EMPTY_VAR(self.dtype), dy
+
+class Print(Function):
+    '''Print data without changing anything.'''
+    def __init__(self, input_shape, dtype):
+        super(Print, self).__init__(input_shape, input_shape, dtype)
+
+    def forward(self, x):
+        print 'Forward\n -  x = %s'%x
+        return x
+    
+    def backward(self, xy, dy, **kwargs):
+        x,y=xy
+        print 'Backward\n -  x = %s\n -  y = %s\n -  dy = %s'%(x,y,dy)
+        return EMPTY_VAR(self.dtype), dy

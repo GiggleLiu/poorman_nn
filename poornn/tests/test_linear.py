@@ -53,7 +53,7 @@ def test_linear():
     y1.backward(dy)
     t1=time.time()
     for i in xrange(ntest):
-        dwb, dx=sv.backward([xin_np, y2], dy_np, mask=(1,1))
+        dwb, dx=sv.backward([xin_np, y2], dy_np)
     t2=time.time()
     print "Elapse old = %s, new = %s"%(t1-t0,(t2-t1)/ntest)
 
@@ -108,13 +108,15 @@ def test_splinear():
     t0=time.time()
     dwb0, dx0 = sv.backward([x, y1],dy)
     t1=time.time()
-    dwb1, dx1=sv2.backward([x, y2], dy)
+    dwb1, dx1=sv2.backward([x, y1], dy)
+    mat0 = dwb0[:dim_in*dim_out].reshape([dim_out, dim_in], order='F')
+    mat1 = sps.csr_matrix((dwb1[:-dim_out], sv2.weight.indices, sv2.weight.indptr)).toarray()
     t2=time.time()
     print "Elapse old = %s, new = %s"%(t1-t0,t2-t1)
-    assert_(all(check_numdiff(sv2, num_check=100)))
     assert_(all(check_numdiff(sv, num_check=100)))
+    assert_(all(check_numdiff(sv2, num_check=100)))
     assert_allclose(dx0, dx1,atol=1e-4)
-    assert_allclose(dwb1, dwb0,atol=1e-4)
+    assert_allclose(mat1, mat0,atol=1e-4)
 
     print "Testing numdiff for %s"%sv
     assert_(all(check_numdiff(sv2, num_check=100)))
@@ -155,7 +157,7 @@ def test_linear1():
     y1.backward(dy)
     t1=time.time()
     for i in xrange(ntest):
-        dwb, dx=sv.backward([xin_np[0], y2], dy_np, mask=(1,1))
+        dwb, dx=sv.backward([xin_np[0], y2], dy_np)
     t2=time.time()
     print "Elapse old = %s, new = %s"%(t1-t0,(t2-t1)/ntest)
 

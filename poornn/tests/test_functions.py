@@ -129,6 +129,30 @@ def test_softmax_cross():
     assert_(all(check_numdiff(f2, y1, var_dict=rd)))
     assert_(all(check_numdiff(f3, x, var_dict=rd)))
 
+def test_square_loss():
+    dtype='float64'
+    f3=SquareLoss(input_shape=(-1,4), dtype=dtype)
+    print 'Test numdiff for %s.'%(f3,)
+    x=typed_randn(dtype, [3,4])  #3 batches, 4 logits.
+    y_true=array([[0.,1.,0.,0.], [0,0,1.,0],[1,0,0,0]],order='F')
+    rd={'y_true':y_true}
+    assert_(all(check_numdiff(f3, x, var_dict=rd)))
+ 
+    dtype='complex128'
+    f3=SquareLoss(input_shape=(-1,4), dtype=dtype)
+    print 'Test numdiff for complex %s.'%(f3,)
+    x=typed_randn(dtype, [3,4])  #3 batches, 4 logits.
+    y_true=array([[0.,1.,0.,0.], [0,0,1.,0],[1,0,0,0]],order='F')
+    rd={'y_true':y_true}
+    print check_numdiff(f3, x, var_dict=rd)
+
+def test_mul():
+    dtype='complex128'
+    f3=Mul(input_shape=(-1,4), dtype=dtype, alpha=0.3j)
+    print 'Test numdiff for %s.'%(f3,)
+    x=typed_randn(dtype, [3,4])  #3 batches, 4 logits.
+    assert_(all(check_numdiff(f3, x)))
+
 def test_dropout():
     func=DropOut(input_shape=(4,2), dtype='float32', axis=0, keep_rate=0.5)
     func.set_runtime_vars({'seed':2})
@@ -227,6 +251,8 @@ def test_all():
     random.seed(3)
     torch.manual_seed(3)
     test_pooling_per()
+    test_square_loss()
+    test_mul()
     test_reshape()
     test_exp()
     test_transpose()

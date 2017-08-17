@@ -2,24 +2,32 @@
 import os
 
 template_list=['linear.template.f90', 'spconv.template.f90',\
-        'pooling.template.f90','relu.template.f90','spsp.template.f90']
+        'pooling.template.f90','relu.template.f90', 'spsp.template.f90']
 source_list=[tmplt[:-12]+'f90' for tmplt in template_list]
 extension_list=[source[:-4] for source in source_list]
 
 libdir='poornn/lib'
+version_dict={
+        'spconv.f90':['general','contiguous'],
+        'spsp.f90':['','_conv'],
+        }
 #libdir='.'
-def render_f90s(template=None):
+def render_f90s(templates=None):
     from frender import render_f90
-    if template is None:
+    if templates is None:
         templates = template_list
     else:
-        templates = [template]
+        templates = templates
     for template in templates:
         source=template[:-12]+'f90'
-        render_f90(libdir, os.path.join('templates', template),{
-            'version_list':['general','contiguous'] if source=='spconv.f90' else [''],
-            'dtype_list':['complex*16','real*8','real*4']
-            }, out_file=os.path.join(libdir, source))
+        pytime = os.path.getmtime(os.path.join(libdir, 'templates', template))
+        source_file = os.path.join(libdir, source)
+        if not os.path.isfile(source_file) or os.path.getmtime(source_file) < pytime:
+            render_f90(libdir, os.path.join('templates', template),{
+                'version_list': version_dict.get(source,['']),
+                'dtype_list':['complex*16','real*8','real*4']
+                }, out_file=os.path.join(libdir, source))
+
 def configuration(parent_package='',top_path=None):
     from numpy.distutils.misc_util import Configuration
     from numpy.distutils.system_info import get_info, NotFoundError, numpy_info
@@ -41,13 +49,7 @@ def configuration(parent_package='',top_path=None):
     #libraries=['mkl_intel_lp64','mkl_sequential','mkl_core', 'm', 'pthread']
 
     # render f90 files if templates changed
-    for template in template_list:
-        source=template[:-12]+'f90'
-        pytime = os.path.getmtime(os.path.join(libdir, 'templates', template))
-        txttime = os.path.getmtime(os.path.join(libdir, source))
-        if (txttime < pytime):
-            print 'generating %s'%source
-            render_f90s(template)
+    render_f90s()
 
     for extension, source in zip(extension_list, source_list):
         #config.add_extension(extension, [os.path.join(libdir, source)], libraries=libraries,

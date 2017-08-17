@@ -32,7 +32,7 @@ def test_conv2d():
     assert_allclose(res.data.numpy(),[[[[40,48],[72,80]],[[21,25],[37,41]]],[[[48,56],[80,88]],[[25,29],[41,45]]]])
 
     #new
-    sv=SPConv((2,1,4,4), 'complex128',fltr=cv.weight.data.numpy(), bias=cv.bias.data.numpy(),strides=(1,1),boundary='O')
+    sv=SPConv((2,1,4,4), 'complex128',weight=cv.weight.data.numpy(), bias=cv.bias.data.numpy(),strides=(1,1),boundary='O')
     x=asfortranarray(ts.data.numpy(), dtype='complex128')
     res2=sv.forward(x)
     assert_allclose(res2,[[[[40,48],[72,80]],[[21,25],[37,41]]],[[[48,56],[80,88]],[[25,29],[41,45]]]])
@@ -49,9 +49,9 @@ def test_conv2d_per():
     ts=autograd.Variable(torch.Tensor(ts),requires_grad=True)
     #2 features, kernel size 3x3
     cv=Conv2d(nfin,nfout,kernel_size=(K1,K2),stride=(1,1),padding=(0,0))
-    fltr=cv.weight.data.numpy()
-    sv=SPConv((-1,nfin,dim_x,dim_y), 'float32', float32(fltr),float32(cv.bias.data.numpy()),strides=(1,1),boundary='O', w_contiguous=True)
-    sv2=SPConv((nfin,dim_x,dim_y), 'float32', float32(fltr),float32(cv.bias.data.numpy()),strides=(1,1),boundary='O', w_contiguous=True)
+    weight=cv.weight.data.numpy()
+    sv=SPConv((-1,nfin,dim_x,dim_y), 'float32', float32(weight),float32(cv.bias.data.numpy()),strides=(1,1),boundary='O', w_contiguous=True)
+    sv2=SPConv((nfin,dim_x,dim_y), 'float32', float32(weight),float32(cv.bias.data.numpy()),strides=(1,1),boundary='O', w_contiguous=True)
     print "Testing forward for %s, 2D"%sv
     xin_np=ts.data.numpy()
     xin_np1=xin_np[0]
@@ -82,10 +82,10 @@ def test_conv2d_per():
     y1.backward(dy)
     t1=time.time()
     for i in xrange(ntest):
-        dwb,dx=sv.backward([xin_np, y2], dy_np, mask=(1,1))
+        dwb,dx=sv.backward([xin_np, y2], dy_np)
     t2=time.time()
     for i in xrange(ntest):
-        dwb1,dx1=sv2.backward([xin_np1, y3], dy_np1, mask=(1,1))
+        dwb1,dx1=sv2.backward([xin_np1, y3], dy_np1)
     t3=time.time()
     print "Elapse old = %s, new = %s, new-1 = %s"%(t1-t0,(t2-t1)/ntest,(t3-t2)/ntest)
 
@@ -93,8 +93,8 @@ def test_conv2d_per():
     dx0=ts.grad.data.numpy()
     dx1=dx1[newaxis]
 
-    dweight, dbias = dwb[:sv.fltr.size], dwb[sv.fltr.size:]
-    dweight1, dbias1 = dwb1[:sv2.fltr.size], dwb1[sv.fltr.size:]
+    dweight, dbias = dwb[:sv.weight.size], dwb[sv.weight.size:]
+    dweight1, dbias1 = dwb1[:sv2.weight.size], dwb1[sv.weight.size:]
     wfactor=dweight.mean()
     bfactor=dbias.mean()
     dweight=reshape(dweight,cv.weight.size(),order='F')/wfactor
@@ -119,9 +119,9 @@ def test_conv1d_per():
     ts=autograd.Variable(torch.Tensor(ts),requires_grad=True)
     #2 features, kernel size 3x3
     cv=Conv2d(nfin,nfout,kernel_size=(K1,),stride=(1,),padding=(0,))
-    fltr=cv.weight.data.numpy()
-    sv=SPConv((-1,nfin,dim_x), 'float32', float32(fltr),float32(cv.bias.data.numpy()),strides=(1,),boundary='O', w_contiguous=True)
-    sv2=SPConv((nfin,dim_x), 'float32', float32(fltr),float32(cv.bias.data.numpy()),strides=(1,),boundary='O', w_contiguous=True)
+    weight=cv.weight.data.numpy()
+    sv=SPConv((-1,nfin,dim_x), 'float32', float32(weight),float32(cv.bias.data.numpy()),strides=(1,),boundary='O', w_contiguous=True)
+    sv2=SPConv((nfin,dim_x), 'float32', float32(weight),float32(cv.bias.data.numpy()),strides=(1,),boundary='O', w_contiguous=True)
     print "Testing forward for %s, 1D"%sv
     xin_np=asfortranarray(ts.data.numpy())
     xin_np1=xin_np[0]
@@ -152,10 +152,10 @@ def test_conv1d_per():
     y1.backward(dy)
     t1=time.time()
     for i in xrange(ntest):
-        dwb,dx=sv.backward([xin_np, y2], dy_np, mask=(1,1))
+        dwb,dx=sv.backward([xin_np, y2], dy_np)
     t2=time.time()
     for i in xrange(ntest):
-        dwb1,dx1=sv2.backward([xin_np1, y3], dy_np1, mask=(1,1))
+        dwb1,dx1=sv2.backward([xin_np1, y3], dy_np1)
     t3=time.time()
     print "Elapse old = %s, new = %s, new-1 = %s"%(t1-t0,(t2-t1)/ntest,(t3-t2)/ntest)
 
@@ -163,8 +163,8 @@ def test_conv1d_per():
     dx0=ts.grad.data.numpy()
     dx1=dx1[newaxis]
 
-    dweight, dbias = dwb[:sv.fltr.size], dwb[sv.fltr.size:]
-    dweight1, dbias1 = dwb1[:sv2.fltr.size], dwb1[sv.fltr.size:]
+    dweight, dbias = dwb[:sv.weight.size], dwb[sv.weight.size:]
+    dweight1, dbias1 = dwb1[:sv2.weight.size], dwb1[sv.weight.size:]
     wfactor=dweight.mean()
     bfactor=dbias.mean()
     dweight=reshape(dweight,cv.weight.size(), order='F')/wfactor
@@ -188,10 +188,10 @@ def test_conv2d_complex():
     nfin=4
     nfout=6
     xin_np=asfortranarray(typed_randn('complex128',[num_batch,nfin,dim_x,dim_y]))
-    fltr=asfortranarray(typed_randn('complex128',[nfout,nfin,K1,K2]))
+    weight=asfortranarray(typed_randn('complex128',[nfout,nfin,K1,K2]))
     bias=typed_randn('complex128',[nfout])
-    sv=SPConv((-1,nfin,dim_x,dim_y), 'complex128', fltr, bias, strides=(1,1), boundary='O', w_contiguous=True)
-    sv2=SPConv((nfin,dim_x,dim_y), 'complex128', fltr, bias, strides=(1,1), boundary='O', w_contiguous=True)
+    sv=SPConv((-1,nfin,dim_x,dim_y), 'complex128', weight, bias, strides=(1,1), boundary='O', w_contiguous=True)
+    sv2=SPConv((nfin,dim_x,dim_y), 'complex128', weight, bias, strides=(1,1), boundary='O', w_contiguous=True)
     print "Testing forward for %s"%sv
     xin_np1=xin_np[0]
     ntest=5
@@ -213,18 +213,18 @@ def test_conv2d_complex():
 
     t1=time.time()
     for i in xrange(ntest):
-        dwb,dx=sv.backward([xin_np, y2], dy_np, mask=(1,1))
+        dwb,dx=sv.backward([xin_np, y2], dy_np)
     t2=time.time()
     for i in xrange(ntest):
-        dwb1,dx1=sv2.backward([xin_np1, y3], dy_np1, mask=(1,1))
+        dwb1,dx1=sv2.backward([xin_np1, y3], dy_np1)
     t3=time.time()
     print "Elapse new = %s, new-1 = %s"%((t2-t1)/ntest,(t3-t2)/ntest)
 
     #reshape back
     dx1=dx1[newaxis]
 
-    dweight, dbias = dwb[:sv.fltr.size], dwb[sv.fltr.size:]
-    dweight1, dbias1 = dwb1[:sv2.fltr.size], dwb1[sv.fltr.size:]
+    dweight, dbias = dwb[:sv.weight.size], dwb[sv.weight.size:]
+    dweight1, dbias1 = dwb1[:sv2.weight.size], dwb1[sv.weight.size:]
     dweight1=reshape(dweight1,dweight.shape,order='F')
 
     assert_allclose(dbias,dbias1,atol=1e-3)
@@ -245,14 +245,14 @@ def test_spsp_complex():
     dtype='complex128'
     nsite=dim_x*dim_y
     xin_np=asfortranarray(typed_randn(dtype,[num_batch,nfin,dim_x,dim_y]))
-    fltr=asfortranarray(typed_randn(dtype,[nfout,nfin,K1,K2]))
+    weight=asfortranarray(typed_randn(dtype,[nfout,nfin,K1,K2]))
     bias=typed_randn(dtype,[nfout])
-    sv=SPConv((-1,nfin,dim_x,dim_y), dtype, fltr, bias, strides=(1,1), boundary='P', w_contiguous=True)
+    sv=SPConv((-1,nfin,dim_x,dim_y), dtype, weight, bias, strides=(1,1), boundary='P', w_contiguous=True)
 
     # the corresponding SPSP matrix
     dmat=zeros((nfin, dim_x, dim_y, nsite*nfout), dtype=dtype)
 
-    fltr_=transpose(fltr,(1,2,3,0))
+    fltr_=transpose(weight,(1,2,3,0))
     for i in xrange(dim_x):
         for j in xrange(dim_y):
             k=i*dim_y+j
@@ -283,18 +283,18 @@ def test_spsp_complex():
 
     t1=time.time()
     for i in xrange(ntest):
-        dwb,dx=sv.backward([xin_np, y2], dy_np, mask=(1,1))
+        dwb,dx=sv.backward([xin_np, y2], dy_np)
     t2=time.time()
     for i in xrange(ntest):
-        dwb1,dx1=sv2.backward([xin_np1, y3], dy_np1, mask=(1,1))
+        dwb1,dx1=sv2.backward([xin_np1, y3], dy_np1)
     t3=time.time()
     print "Elapse new = %s, new-sp = %s"%((t2-t1)/ntest,(t3-t2)/ntest)
 
     #reshape back
     dx1=dx1[newaxis]
 
-    dweight, dbias = dwb[:sv.fltr.size], dwb[sv.fltr.size:]
-    dweight1, dbias1 = dwb1[:sv2.fltr.size], dwb1[sv.fltr.size:]
+    dweight, dbias = dwb[:sv.weight.size], dwb[sv.weight.size:]
+    dweight1, dbias1 = dwb1[:sv2.weight.size], dwb1[sv.weight.size:]
     dweight1=reshape(dweight1,dweight.shape,order='F')
 
     assert_allclose(dbias,dbias1,atol=1e-3)

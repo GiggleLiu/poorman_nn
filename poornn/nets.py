@@ -16,12 +16,16 @@ __all__=['ANN']
 class ANN(object):
     '''
     Artificial Neural network state.
+
+    Attributes:
+        :dtype: str, the most `advanced` data type used, like 'complex128' if both 'complex128' and 'float32' are used.
+        :layers: list,
+        :do_shape_check: bool,
     '''
-    def __init__(self, input_shape, dtype, layers=[], do_shape_check=False):
+    def __init__(self, dtype, layers=[], do_shape_check=False):
         self.layers=layers
         self.do_shape_check = do_shape_check
         self.dtype = dtype
-        self.input_shape = input_shape
 
         #check connections
         if len(layers)<2: return
@@ -40,6 +44,18 @@ class ANN(object):
                         sb=sa
                     else:
                         raise Exception('Shape between layers(%s,%s) mismatch! in%s, out%s'%(la,lb, la.output_shape, lb.input_shape))
+
+    def __str__(self):
+        s='<%s>, layers ='%self.__class__.__name__
+        for layer in self.layers:
+            s+='\n  '+layer.__str__()
+        return s
+
+    @property
+    def input_shape(self):
+        if self.num_layers==0:
+            raise AttributeError('Can not infer input_shape from empty network.')
+        return self.layers[0].input_shape
 
     @property
     def num_layers(self):
@@ -85,9 +101,9 @@ class ANN(object):
             x, y = xy[-i-1], xy[-i]
             layer = self.layers[-i]
             if self.do_shape_check:
-                dv, dy=check_shape_backward(layer.backward)(layer, [x, y], dy, mask=(1,1))
+                dv, dy=check_shape_backward(layer.backward)(layer, [x, y], dy)
             else:
-                dv, dy=layer.backward([x, y], dy, mask=(1,1))
+                dv, dy=layer.backward([x, y], dy)
             dvs.append(dv)
             x_broaken = layer.tags.is_inplace
         return np.concatenate(dvs[::-1]), dy
@@ -107,7 +123,7 @@ class ANN(object):
         start=0
         for layer in self.layers:
             stop=start+layer.num_variables
-            layer.set_variables(v[start:stop], mode=mode)
+            layer.set_variables(np.asarray(v[start:stop],dtype=layer.dtype), mode=mode)
             start=stop
 
     def get_runtimes(self):
@@ -127,8 +143,8 @@ class ANN(object):
         input_shape inherit the output_shape of last layer, and dtype inherit dtype of last layer(network with mixed dtype?).
         '''
         if len(self.layers)==0:
-            input_shape, dtype = self.input_shape, self.dtype
+            raise AttributeError('Please make sure this network is non-empty before using @add_layer.')
         else:
-            input_shape, dtype = self.layers[-1].output_shape, self.layers[-1].dtype
+            input_shape, dtype = self.layers[-1].output_shape, self.layers[-1].otype
         obj=cls(input_shape=input_shape, dtype=dtype, **kwargs)
         self.layers.append(obj)

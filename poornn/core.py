@@ -37,7 +37,8 @@ class Layer(object):
         self.input_shape = input_shape
         self.output_shape = output_shape
         self.dtype = dtype
-        self.otype = otype or dtype
+        if otype is None: otype = dtype
+        self.otype=otype
         self.tags = tags
 
     def __str__(self):
@@ -125,5 +126,4 @@ class Function(Layer):
     @property
     def num_variables(self):
         return 0
-
 

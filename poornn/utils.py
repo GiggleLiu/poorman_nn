@@ -2,7 +2,7 @@ from operator import mul
 import numpy as np
 import pdb
 
-__all__=['take_slice', 'scan2csc', 'typed_random', 'typed_randn', 'tuple_prod']
+__all__=['take_slice', 'scan2csc', 'typed_random', 'typed_randn', 'tuple_prod', 'masked_concatenate']
 
 def take_slice(arr,sls,axis):
     '''take using slices.'''
@@ -53,7 +53,7 @@ def scan2csc(kernel_shape, img_in_shape, strides, boundary):
     csc_indices=np.int32(csc_indices)
     return csc_indptr, csc_indices, img_out_shape
 
-def scan2csc_sp(cscmat, strides):
+def spscan2csc(cscmat, strides):
     if len(img_in_shape)!=len(strides):
         raise ValueError("Dimension Error! (%d, %d)"%(len(strides),len(img_in_shape)))
 
@@ -69,7 +69,7 @@ def scan2csc_sp(cscmat, strides):
     dim_out = tuple_prod(img_out_shape)
 
     # create a sparse csc_matrix(dim_in, dim_out), used in fortran and start from 1!.
-    csc_indptr=np.arange(1,dim_kernel*dim_out+2, dim_kernel, dtype='int32')
+    csc_indptr=np.arange(1,cscmat.nnz*dim_out+2, cscmat.nnz, dtype='int32')
     csc_indices=[]   #pointer to rows in x
     for ind_out in xrange(dim_out):
         ijk_out = np.unravel_index(ind_out, img_out_shape, order='F')
@@ -124,3 +124,9 @@ def typed_randn(dtype, shape):
         return np.transpose(np.random.randn(*shape[::-1])).astype(np.dtype(dtype))
 
 tuple_prod = lambda tp: reduce(mul,tp,1)
+
+def masked_concatenate(vl, mask):
+    '''concatenate multiple arrays only with those masked.'''
+    vl_ = [item for item,maski in zip(vl, mask) if maski]
+    dvar=np.concatenate(vl_) if len(vl_)!=0 else np.zeros([0], dtype=vl[0].dtype)
+    return dvar

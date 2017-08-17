@@ -7,14 +7,14 @@ import pdb,time
 
 from lib.spconv import lib as fspconv
 from lib.spsp import lib as fspsp
-from utils import scan2csc, tuple_prod, scan2csc_sp
-from core import Layer
+from utils import scan2csc, tuple_prod, spscan2csc, masked_concatenate
+from linears import LinearBase
 
-class SPConv(Layer):
+class SPConv(LinearBase):
     '''
     Attributes:
         :input_shape: (batch, feature_in, img_x, img_y ...), or (feature_in, img_x, img_y ...)
-        :fltr: ndarray, (feature_out, feature_in, kernel_x, ...), in fortran order.
+        :weight: ndarray, (feature_out, feature_in, kernel_x, ...), in fortran order.
         :bias: 1darray, (feature_out), in fortran order.
         :strides: tuple, displace for convolutions.
         :boudnary: choice('P', 'O').
@@ -26,21 +26,19 @@ class SPConv(Layer):
         :csc_indices: 1darray, row indicator for input array.
         :weight_indices: 1darray, row indicator for filter array (if not contiguous).
     '''
-    def __init__(self, input_shape, dtype, fltr, bias, strides=None, boundary = "P", w_contiguous = True):
-        self.fltr = np.asarray(fltr, dtype = dtype, order='F')
-        self.bias = np.asarray(bias, order = 'F', dtype = dtype)
+    def __init__(self, input_shape, dtype, weight, bias, strides=None, boundary = "P", w_contiguous = True, var_mask=(1,1)):
+        super(SPConv, self).__init__(input_shape, dtype=dtype, weight=weight, bias=bias, var_mask=var_mask)
 
-        img_nd = self.fltr.ndim-2
+        img_nd = self.weight.ndim-2
         if strides is None:
             strides=(1,)*img_nd
         self.strides = tuple(strides)
         self.boundary = boundary
         self.w_contiguous = w_contiguous
 
-        kernel_shape = self.fltr.shape[2:]
+        kernel_shape = self.weight.shape[2:]
         self.csc_indptr, self.csc_indices, self.img_out_shape = scan2csc(kernel_shape, input_shape[-img_nd:], strides, boundary)
-        output_shape = input_shape[:-img_nd-1]+(self.num_feature_out,)+self.img_out_shape
-        super(SPConv, self).__init__(input_shape, output_shape, dtype=dtype)
+        self.output_shape = input_shape[:-img_nd-1]+(self.num_feature_out,)+self.img_out_shape
 
         #use the correct fortran subroutine.
         if dtype=='complex128':
@@ -71,7 +69,7 @@ class SPConv(Layer):
             self._fbackward1=eval('fspconv.backward1_contiguous%s'%dtype_token)
 
     def __str__(self):
-        return self.__repr__()+'\n  dtype = %s\n  filter => %s\n  bias => %s'%(self.dtype,self.fltr.shape,self.bias.shape)
+        return self.__repr__()+'\n  - dtype = %s\n  - filter => %s\n  - strides => %s\n  - bias => %s'%(self.dtype,self.weight.shape,self.strides,self.bias.shape)
 
     @property
     def img_nd(self):
@@ -81,12 +79,12 @@ class SPConv(Layer):
     @property
     def num_feature_in(self):
         '''Dimension of input feature.'''
-        return self.fltr.shape[1]
+        return self.weight.shape[1]
 
     @property
     def num_feature_out(self):
         '''Dimension of input feature.'''
-        return self.fltr.shape[0]
+        return self.weight.shape[0]
 
     def forward(self, x):
         '''
@@ -99,7 +97,7 @@ class SPConv(Layer):
 
         #flatten inputs/outputs
         x=x.reshape(x.shape[:x_nd-img_nd]+(-1,),order='F')
-        _fltr_flatten = self.fltr.reshape(self.fltr.shape[:2]+(-1,), order='F')
+        _fltr_flatten = self.weight.reshape(self.weight.shape[:2]+(-1,), order='F')
 
         if x_nd == img_nd + 1:  #single batch wise
             y=self._fforward1(x,csc_indptr=self.csc_indptr,csc_indices=self.csc_indices,fltr_data=_fltr_flatten,
@@ -110,7 +108,7 @@ class SPConv(Layer):
         y=y.reshape(self.output_shape, order='F')
         return y
 
-    def backward(self, xy, dy, mask=(1,)*2):
+    def backward(self, xy, dy):
         '''
         Parameters:
             :xy: (ndarray, ndarray),
@@ -126,37 +124,24 @@ class SPConv(Layer):
         x_nd, img_nd = x.ndim, self.img_nd
         xpre=x.shape[:x_nd-img_nd]
         ypre=xpre[:-1]+(self.num_feature_out,)
+        do_xgrad=True
+        mask=self.var_mask
 
         #flatten inputs/outputs
         x=x.reshape(xpre+(-1,), order='F')
         dy=dy.reshape(ypre+(-1,), order='F')
-        _fltr_flatten = self.fltr.reshape(self.fltr.shape[:2]+(-1,), order='F')
+        _fltr_flatten = self.weight.reshape(self.weight.shape[:2]+(-1,), order='F')
 
         if x_nd == img_nd + 1:  #single batch wise
             dx, dweight, dbias = self._fbackward1(dy,x,self.csc_indptr,self.csc_indices,
                     fltr_data=_fltr_flatten,
-                    do_xgrad=mask[1], do_wgrad=mask[0], do_bgrad=mask[0], max_nnz_row=_fltr_flatten.shape[-1])
+                    do_xgrad=do_xgrad, do_wgrad=mask[0], do_bgrad=mask[1], max_nnz_row=_fltr_flatten.shape[-1])
         else:
             dx, dweight, dbias = self._fbackward(dy,x,self.csc_indptr,self.csc_indices,
                     fltr_data=_fltr_flatten,
-                    do_xgrad=mask[1], do_wgrad=mask[0], do_bgrad=mask[0], max_nnz_row=_fltr_flatten.shape[-1])
-        dx=dx.reshape(self.input_shape, order='F')
-        return np.concatenate([dweight.ravel(order='F'), dbias]), dx
+                    do_xgrad=do_xgrad, do_wgrad=mask[0], do_bgrad=mask[1], max_nnz_row=_fltr_flatten.shape[-1])
+        return masked_concatenate([dweight.ravel(order='F'), dbias], mask), dx.reshape(self.input_shape, order='F')
 
-    def get_variables(self):
-        return np.concatenate([self.fltr.ravel(order='F'),self.bias])
-
-    def set_variables(self, variables, mode='set'):
-        if mode=='set':
-            np.copyto(self.fltr, variables[:self.fltr.size].reshape(self.fltr.shape, order='F'))
-            np.copyto(self.bias, variables[self.fltr.size:].reshape(self.bias.shape, order='F'))
-        elif mode=='add':
-            self.fltr+=variables[0]
-            self.bias+=variables[1]
-
-    @property
-    def num_variables(self):
-        return self.fltr.size+self.bias.size
 
 class SPSP(SPConv):
     '''
@@ -171,9 +156,10 @@ class SPSP(SPConv):
         :csc_indices: 1darray, row indicator for input array.
         :weight_indices: 1darray, row indicator for filter array (if not contiguous).
     '''
-    def __init__(self, input_shape, dtype, cscmat, bias, strides=None):
+    def __init__(self, input_shape, dtype, cscmat, bias, strides=None, var_mask=(1,1)):
         self.cscmat = cscmat
         self.bias = bias
+        self.var_mask = var_mask
 
         self.strides = tuple(strides)
         img_nd = len(self.strides)
@@ -184,16 +170,19 @@ class SPSP(SPConv):
         if tuple_prod(input_shape[1:]) != cscmat.shape[0]:
             raise ValueError('csc matrix input shape mismatch! %s get, but %s desired.'%(cscmat.shape[1], tuple_prod(input_shape[1:])))
 
-        #self.csc_indptr, self.csc_indices, self.csc_data = scan2csc_sp(input_shape[1:], strides)
+        # self.csc_indptr, self.csc_indices, self.csc_data = scan2csc_sp(input_shape[1:], strides)
         img_in_shape = input_shape[2:]
-        self.img_out_shape=(img_in_shape)
+        self.csc_indptr, self.csc_indices, self.img_out_shape = spscan2csc(kernel_shape, input_shape[-img_nd:], strides, boundary)
+        self.img_out_shape=tuple([img_is/stride for img_is,stride in zip(img_in_shape, strides)])
         output_shape = input_shape[:1]+(self.num_feature_out,)+self.img_out_shape
         super(SPSP, self).__init__(input_shape, output_shape, dtype=dtype)
 
         if self.num_feature_out*tuple_prod(self.img_out_shape) != cscmat.shape[1]:
             raise ValueError('csc matrix output shape mismatch! %s get, but %s desired.'%(cscmat.shape[1], self.num_feature_out*tuple_prod(self.img_out_shape)))
 
-        #use the correct fortran subroutine.
+        # generate a larger csc_indptr, csc_indices by convolution.
+
+        # use the correct fortran subroutine.
         if dtype=='complex128':
             dtype_token = 'z'
         elif dtype=='complex64':
@@ -205,9 +194,9 @@ class SPSP(SPConv):
         else:
             raise TypeError("dtype error!")
 
-        #select function
-        self._fforward=eval('fspsp.forward%s'%dtype_token)
-        self._fbackward=eval('fspsp.backward%s'%dtype_token)
+        # select function
+        self._fforward=eval('fspsp.forward_conv%s'%dtype_token)
+        self._fbackward=eval('fspsp.backward_conv%s'%dtype_token)
 
     def __str__(self):
         return self.__repr__()+'\n  dtype = %s\n  csc matrix => %s\n  bias => %s'%(self.dtype,self.cscmat.shape,self.bias.shape)
@@ -237,26 +226,10 @@ class SPSP(SPConv):
     def backward(self, xy, dy, **kwargs):
         x=x.reshape(xpre+(-1,), order='F')
         dy=dy.reshape(ypre+(-1,), order='F')
+        mask=self.var_mask
 
         dx, dweight, dbias = self._fbackward(dy,x,self.csc_indptr,self.csc_indices,
                 fltr_data=_fltr_flatten,
-                do_xgrad=mask[1], do_wgrad=mask[0], do_bgrad=mask[0], max_nnz_row=_fltr_flatten.shape[-1])
-        dx=dx.reshape(self.input_shape, order='F')
-        return np.concatenate([dweight.ravel(order='F'), dbias]), dx
-
-    def get_variables(self):
-        return np.concatenate([self.fltr.ravel(order='F'),self.bias])
-
-    def set_variables(self, variables, mode='set'):
-        if mode=='set':
-            np.copyto(self.fltr, variables[:self.fltr.size].reshape(self.fltr.shape, order='F'))
-            np.copyto(self.bias, variables[self.fltr.size:].reshape(self.bias.shape, order='F'))
-        elif mode=='add':
-            self.fltr+=variables[0]
-            self.bias+=variables[1]
-
-    @property
-    def num_variables(self):
-        return self.fltr.size+self.bias.size
-
+                do_xgrad=True, do_wgrad=mask[0], do_bgrad=mask[1], max_nnz_row=_fltr_flatten.shape[-1])
+        return masked_concatenate([dweight.ravel(order='F'), dbias], mask), dx.reshape(self.input_shape, order='F')
 
