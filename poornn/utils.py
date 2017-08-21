@@ -130,3 +130,6 @@ def masked_concatenate(vl, mask):
     vl_ = [item for item,maski in zip(vl, mask) if maski]
     dvar=np.concatenate(vl_) if len(vl_)!=0 else np.zeros([0], dtype=vl[0].dtype)
     return dvar
+
+if __name__ == '__main__':
+    typed_randn('float64',(2,2))

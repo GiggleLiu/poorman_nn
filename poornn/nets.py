@@ -22,8 +22,9 @@ class ANN(object):
         :layers: list,
         :do_shape_check: bool,
     '''
-    def __init__(self, dtype, layers=[], do_shape_check=False):
-        self.layers=layers
+    def __init__(self, dtype, layers=None, do_shape_check=False):
+        if layers is None: layers = []
+        self.layers = layers
         self.do_shape_check = do_shape_check
         self.dtype = dtype
 
@@ -105,7 +106,6 @@ class ANN(object):
             else:
                 dv, dy=layer.backward([x, y], dy)
             dvs.append(dv)
-            x_broaken = layer.tags.is_inplace
         return np.concatenate(dvs[::-1]), dy
 
     def get_variables(self):
@@ -125,6 +125,10 @@ class ANN(object):
             stop=start+layer.num_variables
             layer.set_variables(np.asarray(v[start:stop],dtype=layer.dtype), mode=mode)
             start=stop
+
+    @property
+    def num_variables(self):
+        return np.sum([layer.num_variables for layer in self.layers])
 
     def get_runtimes(self):
         '''Show requested runtime variables'''

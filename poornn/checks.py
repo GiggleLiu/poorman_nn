@@ -87,7 +87,7 @@ def check_numdiff(layer, x=None, num_check=10, eta=None, tol=1e-1, var_dict={}):
     if x is None:
         x=generate_randx(layer)
     else:
-        x=np.asfortranarray(x, dtype=layer.dtype)
+        x=np.asarray(x, dtype=layer.dtype, order='F')
     is_net = hasattr(layer, 'num_layers')
 
     layer.set_runtime_vars(var_dict)
@@ -163,10 +163,10 @@ def _check_input(layer, x):
     if layer.input_shape is None or x is None:
         return
     if x.ndim!=len(layer.input_shape):
-        raise ValueError('Dimension mismatch! x %s, desire %s'%(x.ndim, len(layer.input_shape)))
+        raise ValueError('Dimension mismatch! layer %s, x %s, desire %s'%(layer, x.ndim, len(layer.input_shape)))
     for shape_i, xshape_i in zip(layer.input_shape, x.shape):
         if shape_i!=-1 and shape_i!=xshape_i:
-            raise ValueError('Illegal Input shape! x %s, desire %s'%(x.shape, layer.input_shape))
+            raise ValueError('Illegal Input shape! layer %s, x %s, desire %s'%(layer, x.shape, layer.input_shape))
 
 def _check_output(layer, y):
     if layer.output_shape is None or y is None:

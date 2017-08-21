@@ -26,7 +26,7 @@ class LinearBase(Layer):
         if sps.issparse(weight):
             self.weight = weight.tocsr()
         else:
-            self.weight = np.asfortranarray(weight, dtype=dtype)
+            self.weight = np.asarray(weight, dtype=dtype, order='F')
         self.bias = np.asarray(bias,dtype=dtype)
         output_shape = input_shape[:-1]+(weight.shape[0],)
         self.var_mask = var_mask

@@ -61,6 +61,7 @@ class Sum(Function):
     Sum along specific axis.
     '''
     def __init__(self, input_shape, dtype, axis):
+        if axis > len(input_shape)-1: raise ValueError('invalid axis')
         self.axis=axis%len(input_shape)
         output_shape = input_shape[:self.axis]+input_shape[self.axis+1:]
         super(Sum,self).__init__(input_shape, output_shape, dtype)
@@ -68,16 +69,21 @@ class Sum(Function):
     def forward(self,x):
         return np.sum(x,axis=self.axis)
     
-    def backward(self,xy,dy, **kwargs):
+    def backward(self, xy, dy, **kwargs):
         x, y = xy
-        dy_=np.asfortranarray(dy)[(slice(None),)*self.axis+(np.newaxis,)]
-        return EMPTY_VAR(self.dtype),np.repeat(dy_,x.shape[self.axis],axis=self.axis)
+        if np.ndim(dy)==0:
+            dy_ = np.asarray(dy, order='F')[np.newaxis]
+        else:
+            dy_ = np.asarray(dy, order='F')[(slice(None),)*self.axis+(np.newaxis,)]
+        dx = np.repeat(dy_,x.shape[self.axis],axis=self.axis)
+        return EMPTY_VAR(self.dtype), dx
 
 class Mean(Function):
     '''
     Mean along specific axis.
     '''
     def __init__(self,input_shape, dtype, axis):
+        if axis > len(input_shape)-1: raise ValueError('invalid axis')
         self.axis=axis%len(input_shape)
         output_shape = input_shape[:self.axis]+input_shape[self.axis+1:]
         super(Mean,self).__init__(input_shape, output_shape, dtype)
@@ -85,10 +91,14 @@ class Mean(Function):
     def forward(self,x):
         return np.mean(x,axis=self.axis)
     
-    def backward(self,xy,dy, **kwargs):
+    def backward(self, xy, dy, **kwargs):
         x, y = xy
-        dy_=dy[(slice(None),)*self.axis+(np.newaxis,)]
-        return EMPTY_VAR(self.dtype),np.repeat(dy_,x.shape[self.axis],axis=self.axis)/x.shape[self.axis]
+        if np.ndim(dy)==0:
+            dy_ = np.asarray(dy, order='F')[np.newaxis]
+        else:
+            dy_ = np.asarray(dy, order='F')[(slice(None),)*self.axis+(np.newaxis,)]
+        dx = np.repeat(dy_,x.shape[self.axis],axis=self.axis)/x.shape[self.axis]
+        return EMPTY_VAR(self.dtype), dx
 
 
 class ReLU(Function):
@@ -198,6 +208,7 @@ class DropOut(Function):
     DropOut inplace.
     '''
     def __init__(self, input_shape, dtype, keep_rate, axis, is_inplace=False):
+        if axis > len(input_shape)-1: raise ValueError('invalid axis')
         self.axis=axis%len(input_shape)
         self.keep_rate = keep_rate
         self.seed = None
@@ -253,6 +264,7 @@ class CrossEntropy(Function):
     ZERO_REF=1e-15
 
     def __init__(self, input_shape, dtype, axis):
+        if axis > len(input_shape)-1: raise ValueError('invalid axis')
         self.axis=axis%len(input_shape)
         self.y_true = None
         output_shape = input_shape[:self.axis]+input_shape[self.axis+1:]
@@ -276,6 +288,7 @@ class SoftMaxCrossEntropy(Function):
         q = exp(x)/sum(exp(x))
     '''
     def __init__(self, input_shape, dtype, axis):
+        if axis > len(input_shape)-1: raise ValueError('invalid axis')
         self.axis=axis%len(input_shape)
         self.y_true = None
         output_shape = input_shape[:axis]+input_shape[self.axis+1:]

@@ -53,7 +53,7 @@ class SPConv(LinearBase):
             raise TypeError("dtype error!")
 
         if not w_contiguous:
-            self.weight_indices = np.asfortranarray(np.tile(np.arange(tuple_prod(kernel_shape),dtype='int32'),tuple_prod(img_out_shape)))+1  #pointer to filter data
+            self.weight_indices = np.asarray(np.tile(np.arange(tuple_prod(kernel_shape),dtype='int32'),tuple_prod(img_out_shape)), order='F')+1  #pointer to filter data
             func_f=eval('fspconv.forward_general%s'%dtype_token)
             func_b=eval('fspconv.backward_general%s'%dtype_token)
             func1_f=eval('fspconv.forward1_general%s'%dtype_token)

@@ -80,6 +80,12 @@ def test_linear_complex():
     print "Testing numdiff for %s"%sv
     assert_(all(check_numdiff(sv, num_check=100)))
 
+    print('Testing var_mask')
+    sv.var_mask=(False,False)
+    assert_allclose(sv.get_variables(),zeros(0))
+    sv=Linear((num_batch, dim_in), 'complex128',weight, bias, var_mask=(False,False))
+    assert_allclose(sv.get_variables(),zeros(0))
+
 def test_splinear():
     num_batch=2
     dim_in=30
