@@ -33,7 +33,7 @@ class LinearBase(Layer):
         super(LinearBase, self).__init__(input_shape, output_shape, dtype=dtype)
 
     def __str__(self):
-        return self.__repr__()+'\n  dtype = %s\n  weight => %s\n  bias => %s'%(self.dtype,self.weight.shape,self.bias.shape)
+        return self.__repr__()+'\n  - dtype = %s\n  - weight => %s\n  - bias => %s'%(self.dtype,self.weight.shape,self.bias.shape)
 
     def get_variables(self):
         dvar=masked_concatenate([self.weight.ravel(order='F') if not sps.issparse(self.weight) else self.weight.data, self.bias], self.var_mask)
@@ -58,7 +58,7 @@ class Linear(LinearBase):
     '''
     Dense Linear Layer.
     '''
-    def __init__(self, input_shape, dtype, weight, bias, var_mask=(1,1)):
+    def __init__(self, input_shape, dtype, weight, bias, var_mask=(1,1), **kwargs):
         if input_shape[-1] != weight.shape[1]:
             raise ValueError('Shape Mismatch!')
         super(Linear, self).__init__(input_shape, dtype=dtype, weight=weight, bias=bias, var_mask=var_mask)
@@ -117,7 +117,7 @@ class SPLinear(LinearBase):
         :bias: 1darray, (feature_out), in fortran order.
         :strides: tuple, displace for convolutions.
     '''
-    def __init__(self, input_shape, dtype, weight, bias, strides=None, var_mask=(1,1)):
+    def __init__(self, input_shape, dtype, weight, bias, strides=None, var_mask=(1,1), **kwargs):
         if input_shape[-1] != weight.shape[1]:
             raise ValueError('Shape Mismatch!')
         super(SPLinear, self).__init__(input_shape, dtype=dtype, weight=weight, bias=bias, var_mask=var_mask)

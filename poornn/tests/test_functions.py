@@ -150,8 +150,26 @@ def test_mul():
     dtype='complex128'
     f3=Mul(input_shape=(-1,4), dtype=dtype, alpha=0.3j)
     print 'Test numdiff for %s.'%(f3,)
-    x=typed_randn(dtype, [3,4])  #3 batches, 4 logits.
-    assert_(all(check_numdiff(f3, x)))
+    #x=typed_randn(dtype, [3,4])  #3 batches, 4 logits.
+    assert_(all(check_numdiff(f3)))
+
+def test_power():
+    dtype='complex128'
+    f3=Power(input_shape=(-1,4), dtype=dtype, order=3.3)
+    print 'Test numdiff for %s.'%(f3,)
+    assert_(all(check_numdiff(f3)))
+
+def test_convprod():
+    dtype='complex128'
+    dtype='float32'
+    func=ConvProd(input_shape=(3,3), dtype=dtype, kernel_shape=(2,2), boundary='P')
+    print 'Test forward for %s.'%(func,)
+    x = arange(1,10, dtype='float64').reshape([3,3])
+    yt = [[40,180,72],[1120,2160,24*63],[112,432,189]]
+    y = func.forward(x)
+    assert_allclose(yt,y)
+    print 'Test numdiff for %s.'%(func,)
+    assert_(all(check_numdiff(func)))
 
 def test_dropout():
     func=DropOut(input_shape=(4,2), dtype='float32', axis=0, keep_rate=0.5)
@@ -250,9 +268,11 @@ def test_softmax_cross_per():
 def test_all():
     random.seed(3)
     torch.manual_seed(3)
+    test_convprod()
     test_pooling_per()
     test_square_loss()
     test_mul()
+    test_power()
     test_reshape()
     test_exp()
     test_transpose()

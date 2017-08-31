@@ -37,17 +37,6 @@ def dec_check_shape(pos):
         return wrapper
     return real_decorator
 
-def generate_randx(layer):
-    '''Generate random input tensor.'''
-    max_dim=3
-    max_size=20
-    input_shape = layer.input_shape
-    dtype = layer.dtype
-    if input_shape is None:
-        return typed_randn(dtype, np.random.randint(1, max_size+1, np.random.randint(1,max_dim+1)))
-    input_shape = [n if n>=0 else np.random.randint(1, max_size+1) for n in input_shape]
-    return typed_randn(dtype, input_shape)
-
 def check_shape_forward(f):
     '''
     Check the shape of layer's method.
@@ -84,25 +73,29 @@ def check_shape_backward(f):
 
 def check_numdiff(layer, x=None, num_check=10, eta=None, tol=1e-1, var_dict={}):
     '''Random Numerical Differential check.'''
+    from nets import ANN
+    is_net = isinstance(layer, ANN)
+    input_dtype = layer.layers[0].dtype if is_net else layer.dtype
     if x is None:
         x=generate_randx(layer)
     else:
-        x=np.asarray(x, dtype=layer.dtype, order='F')
-    is_net = hasattr(layer, 'num_layers')
+        x=np.asarray(x, dtype=input_dtype, order='F')
 
     layer.set_runtime_vars(var_dict)
     ys=layer.forward(x)
     if is_net:
         y=ys[-1]
-        dy=typed_randn(layer.dtype, y.shape)
+        output_dtype = layer.layers[-1].otype
+        dy=typed_randn(output_dtype, y.shape)
         dv, dx=layer.backward(ys, dy=dy)
     else:
         y=ys
-        dy=typed_randn(layer.dtype, y.shape)
+        output_dtype = layer.otype
+        dy=typed_randn(output_dtype, y.shape)
         dv, dx=layer.backward([x,y], dy=dy)
     dx_=np.ravel(dx, order='F')
     if eta is None:
-        eta=0.003+0.004j if np.iscomplexobj(dv) else 0.005
+        eta=0.003+0.004j if np.iscomplexobj(dx) else 0.005
 
     res_x=[]
     #check dy/dx
@@ -126,6 +119,8 @@ def check_numdiff(layer, x=None, num_check=10, eta=None, tol=1e-1, var_dict={}):
     if not is_net and layer.num_variables==0:
         return res_x
 
+    if eta is None:
+        eta=0.003+0.004j if np.iscomplexobj(dw) else 0.005
     #check dy/dw
     res_w=[]
     var0 = layer.get_variables()
@@ -153,11 +148,11 @@ def generate_randx(layer):
     max_dim=3
     max_size=20
     input_shape = layer.input_shape
-    dtype = layer.dtype
+    input_dtype = layer.layers[0].dtype if hasattr(layer,'layers') else layer.dtype
     if input_shape is None:
-        return typed_randn(dtype, np.random.randint(1, max_size+1, np.random.randint(1,max_dim+1)))
+        return typed_randn(input_dtype, np.random.randint(1, max_size+1, np.random.randint(1,max_dim+1)))
     input_shape = [n if n>=0 else np.random.randint(1, max_size+1) for n in input_shape]
-    return typed_randn(dtype, input_shape)
+    return typed_randn(input_dtype, input_shape)
 
 def _check_input(layer, x):
     if layer.input_shape is None or x is None:

@@ -33,12 +33,13 @@ class Layer(object):
 
     __metaclass__ = ABCMeta
 
-    def __init__(self, input_shape, output_shape, dtype, otype=None, tags=Tags(runtimes = [], is_inplace = False)):
+    def __init__(self, input_shape, output_shape, dtype, otype=None, tags=None):
         self.input_shape = input_shape
         self.output_shape = output_shape
         self.dtype = dtype
         if otype is None: otype = dtype
         self.otype=otype
+        if tags is None: tags = Tags(runtimes = [], is_inplace = False)
         self.tags = tags
 
     def __str__(self):

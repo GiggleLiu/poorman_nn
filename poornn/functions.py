@@ -4,10 +4,11 @@ import pdb
 
 from core import Layer,Function, Tags, EXP_OVERFLOW, EMPTY_VAR
 from lib.pooling import lib as fpooling
+from lib.convprod import lib as fconvprod
 from lib.relu import lib as frelu
 from utils import scan2csc, tuple_prod
 
-__all__=['Log2cosh','Sigmoid','Sum','Mul','Mod','Mean','ReLU','Pooling','DropOut','Sin','Cos',
+__all__=['Log2cosh','Sigmoid','Sum','Mul','Mod','Mean','ReLU','ConvProd','Pooling','DropOut','Sin','Cos','Power',
         'SoftMax','CrossEntropy','SoftMaxCrossEntropy','SquareLoss','Exp', 'Reshape','Transpose',
         'TypeCast', 'Print']
 
@@ -15,7 +16,7 @@ class Log2cosh(Function):
     '''
     Function log(2*cosh(theta)).
     '''
-    def __init__(self, input_shape, dtype):
+    def __init__(self, input_shape, dtype, **kwargs):
         super(Log2cosh, self).__init__(input_shape, input_shape, dtype)
 
     def forward(self,x):
@@ -39,7 +40,7 @@ class Sigmoid(Function):
     '''
     Function log(2*cosh(theta)).
     '''
-    def __init__(self, input_shape, dtype):
+    def __init__(self, input_shape, dtype, **kwargs):
         super(Sigmoid, self).__init__(input_shape, input_shape, dtype)
 
     def forward(self,x):
@@ -60,7 +61,7 @@ class Sum(Function):
     '''
     Sum along specific axis.
     '''
-    def __init__(self, input_shape, dtype, axis):
+    def __init__(self, input_shape, dtype, axis, **kwargs):
         if axis > len(input_shape)-1: raise ValueError('invalid axis')
         self.axis=axis%len(input_shape)
         output_shape = input_shape[:self.axis]+input_shape[self.axis+1:]
@@ -82,7 +83,7 @@ class Mean(Function):
     '''
     Mean along specific axis.
     '''
-    def __init__(self,input_shape, dtype, axis):
+    def __init__(self,input_shape, dtype, axis, **kwargs):
         if axis > len(input_shape)-1: raise ValueError('invalid axis')
         self.axis=axis%len(input_shape)
         output_shape = input_shape[:self.axis]+input_shape[self.axis+1:]
@@ -105,7 +106,7 @@ class ReLU(Function):
     '''
     ReLU.
     '''
-    def __init__(self, input_shape, dtype, leak = 0, is_inplace=False):
+    def __init__(self, input_shape, dtype, leak = 0, is_inplace=False, **kwargs):
         super(ReLU,self).__init__(input_shape, input_shape, dtype, tags=Tags(runtimes=[], is_inplace=is_inplace))
         if leak>1 or leak<0:
             raise ValueError('leak parameter should be 0-1!')
@@ -144,7 +145,7 @@ class Pooling(Function):
     '''
     mode_list = ['max', 'max-abs', 'min', 'min-abs', 'mean']
 
-    def __init__(self, input_shape, dtype, kernel_shape, mode, boundary='O'):
+    def __init__(self, input_shape, dtype, kernel_shape, mode, boundary='O', **kwargs):
         self.kernel_shape = kernel_shape
         self.mode = mode
         if mode not in self.mode_list:
@@ -203,11 +204,78 @@ class Pooling(Function):
                 csc_indptr=self.csc_indptr,csc_indices=self.csc_indices, mode=self.mode_list.index(self.mode)).reshape(self.input_shape, order='F')
         return EMPTY_VAR(self.dtype), dx
 
+class ConvProd(Function):
+    '''
+    Convolutional product layer.
+    '''
+    def __init__(self, input_shape, dtype, kernel_shape, strides=None, boundary='O', **kwargs):
+        self.boundary = boundary
+        self.kernel_shape = kernel_shape
+
+        img_nd = len(kernel_shape)
+        if strides is None:
+            strides=(1,)*img_nd
+        self.strides = strides
+
+        img_in_shape = input_shape[-img_nd:]
+        self.csc_indptr, self.csc_indices, self.img_out_shape = scan2csc(kernel_shape, img_in_shape, strides=strides, boundary=boundary)
+        output_shape = input_shape[:-len(kernel_shape)]+self.img_out_shape
+        super(ConvProd,self).__init__(input_shape, output_shape, dtype)
+
+        #use the correct fortran subroutine.
+        if dtype=='complex128':
+            dtype_token = 'z'
+        elif dtype=='complex64':
+            dtype_token = 'c'
+        elif dtype=='float64':
+            dtype_token = 'd'
+        elif dtype=='float32':
+            dtype_token = 's'
+        else:
+            raise TypeError("data type error!")
+
+        #use the correct function
+        self._fforward=eval('fconvprod.forward_%s'%dtype_token)
+        self._fbackward=eval('fconvprod.backward_%s'%dtype_token)
+
+    def __repr__(self):
+        return '<%s>: %s -> %s\n - strides = %s\n - filter = %s'%(self.__class__.__name__, self.input_shape,self.output_shape,self.strides,self.kernel_shape)
+
+    @property
+    def img_nd(self):
+        return len(self.kernel_shape)
+
+    def forward(self, x):
+        '''
+        Parameters:
+            :x: ndarray, (num_batch, nfi, img_in_dims), input in 'F' order.
+
+        Return:
+            ndarray, (num_batch, nfo, img_out_dims), output in 'F' order.
+        '''
+        x_nd, img_nd = x.ndim, self.img_nd
+        img_dim = tuple_prod(self.input_shape[-img_nd:])
+        y=self._fforward(x.reshape([-1,img_dim], order='F'), csc_indptr=self.csc_indptr,\
+                csc_indices=self.csc_indices).reshape(self.output_shape, order='F')
+        return y
+
+    def backward(self, xy, dy, **kwargs):
+        '''It will shed a mask on dy'''
+        x, y = xy
+        x_nd, img_nd = x.ndim, self.img_nd
+        img_dim_in = tuple_prod(self.input_shape[-img_nd:])
+        img_dim_out = tuple_prod(self.output_shape[-img_nd:])
+
+
+        dx=self._fbackward(x=x.reshape([-1,img_dim_in], order='F'), dy=dy.reshape([-1,img_dim_out], order='F'), y=y.reshape([-1,img_dim_out], order='F'),\
+                csc_indptr=self.csc_indptr,csc_indices=self.csc_indices).reshape(self.input_shape, order='F')
+        return EMPTY_VAR(self.dtype), dx
+
 class DropOut(Function):
     '''
     DropOut inplace.
     '''
-    def __init__(self, input_shape, dtype, keep_rate, axis, is_inplace=False):
+    def __init__(self, input_shape, dtype, keep_rate, axis, is_inplace=False, **kwargs):
         if axis > len(input_shape)-1: raise ValueError('invalid axis')
         self.axis=axis%len(input_shape)
         self.keep_rate = keep_rate
@@ -243,7 +311,7 @@ class SoftMax(Function):
     '''
     Soft max function applied on the last axis.
     '''
-    def __init__(self, input_shape, dtype, axis):
+    def __init__(self, input_shape, dtype, axis, **kwargs):
         self.axis=axis
         super(SoftMax, self).__init__(input_shape, input_shape, dtype)
 
@@ -263,7 +331,7 @@ class CrossEntropy(Function):
     '''
     ZERO_REF=1e-15
 
-    def __init__(self, input_shape, dtype, axis):
+    def __init__(self, input_shape, dtype, axis, **kwargs):
         if axis > len(input_shape)-1: raise ValueError('invalid axis')
         self.axis=axis%len(input_shape)
         self.y_true = None
@@ -287,7 +355,7 @@ class SoftMaxCrossEntropy(Function):
     Cross Entropy sum(p*log(q)). With p the true labels.
         q = exp(x)/sum(exp(x))
     '''
-    def __init__(self, input_shape, dtype, axis):
+    def __init__(self, input_shape, dtype, axis, **kwargs):
         if axis > len(input_shape)-1: raise ValueError('invalid axis')
         self.axis=axis%len(input_shape)
         self.y_true = None
@@ -319,7 +387,7 @@ class SquareLoss(Function):
     '''
     Square Loss (p-q)**2. With p the true labels.
     '''
-    def __init__(self, input_shape, dtype):
+    def __init__(self, input_shape, dtype, **kwargs):
         self.y_true = None
         super(SquareLoss, self).__init__(input_shape, input_shape, dtype, tags=Tags(runtimes=['y_true'], is_inplace=False))
 
@@ -344,7 +412,7 @@ class Exp(Function):
     '''
     Function exp(x)
     '''
-    def __init__(self, input_shape, dtype):
+    def __init__(self, input_shape, dtype, **kwargs):
         super(Exp, self).__init__(input_shape, input_shape, dtype)
 
     def forward(self,x):
@@ -358,7 +426,7 @@ class Sin(Function):
     '''
     Function sin(x)
     '''
-    def __init__(self, input_shape, dtype):
+    def __init__(self, input_shape, dtype, **kwargs):
         super(Sin, self).__init__(input_shape, input_shape, dtype)
 
     def forward(self,x):
@@ -372,7 +440,7 @@ class Cos(Function):
     '''
     Function cos(x)
     '''
-    def __init__(self, input_shape, dtype):
+    def __init__(self, input_shape, dtype, **kwargs):
         super(Cos, self).__init__(input_shape, input_shape, dtype)
 
     def forward(self,x):
@@ -391,18 +459,18 @@ class Reshape(Function):
         return EMPTY_VAR(self.dtype), dy.reshape(self.input_shape, order='F')
 
 class TypeCast(Function):
-    def __init__(self, input_shape, dtype, otype):
+    def __init__(self, input_shape, dtype, otype, **kwargs):
         super(TypeCast, self).__init__(input_shape, input_shape, dtype, otype=otype)
 
     def forward(self, x):
-        return x.astype(self.otype)
+        return np.asarray(x, dtype=self.otype, order='F')
 
     def backward(self, xy, dy, **kwargs):
         x, y = xy
-        return EMPTY_VAR(self.dtype), dy.astype(self.dtype)
+        return EMPTY_VAR(self.dtype), np.asarray(dy, dtype=self.dtype, order='F')
 
 class Transpose(Function):
-    def __init__(self, input_shape, dtype, axes):
+    def __init__(self, input_shape, dtype, axes, **kwargs):
         self.axes=axes
         if len(axes)!=len(input_shape):
             raise ValueError('axes incorrect!')
@@ -418,7 +486,7 @@ class Transpose(Function):
 
 class Mul(Function):
     '''Multiply by a constant'''
-    def __init__(self, input_shape, dtype, alpha):
+    def __init__(self, input_shape, dtype, alpha, **kwargs):
         self.alpha = alpha
         super(Mul, self).__init__(input_shape, input_shape, dtype)
 
@@ -427,7 +495,7 @@ class Mul(Function):
 
 class Mod(Function):
     '''Mod by a constant'''
-    def __init__(self, input_shape, dtype, n):
+    def __init__(self, input_shape, dtype, n, **kwargs):
         self.n = n
         super(Mod, self).__init__(input_shape, input_shape, dtype)
 
@@ -436,7 +504,7 @@ class Mod(Function):
 
 class Print(Function):
     '''Print data without changing anything.'''
-    def __init__(self, input_shape, dtype):
+    def __init__(self, input_shape, dtype, **kwargs):
         super(Print, self).__init__(input_shape, input_shape, dtype)
 
     def forward(self, x):
@@ -447,3 +515,19 @@ class Print(Function):
         x,y=xy
         print 'Backward\n -  x = %s\n -  y = %s\n -  dy = %s'%(x,y,dy)
         return EMPTY_VAR(self.dtype), dy
+
+class Power(Function):
+    '''
+    Function x**order
+    '''
+    def __init__(self, input_shape, dtype, order, **kwargs):
+        super(Power, self).__init__(input_shape, input_shape, dtype)
+        self.order = order
+
+    def forward(self,x):
+        return x**self.order
+
+    def backward(self,xy,dy, **kwargs):
+        x, y = xy
+        return EMPTY_VAR(self.dtype), self.order*x**(self.order-1)*dy
+

@@ -2,7 +2,8 @@
 import os
 
 template_list=['linear.template.f90', 'spconv.template.f90',\
-        'pooling.template.f90','relu.template.f90', 'spsp.template.f90']
+        'pooling.template.f90','relu.template.f90', 'spsp.template.f90',\
+        'convprod.template.f90']
 source_list=[tmplt[:-12]+'f90' for tmplt in template_list]
 extension_list=[source[:-4] for source in source_list]
 

@@ -26,7 +26,7 @@ class SPConv(LinearBase):
         :csc_indices: 1darray, row indicator for input array.
         :weight_indices: 1darray, row indicator for filter array (if not contiguous).
     '''
-    def __init__(self, input_shape, dtype, weight, bias, strides=None, boundary = "P", w_contiguous = True, var_mask=(1,1)):
+    def __init__(self, input_shape, dtype, weight, bias, strides=None, boundary = "P", w_contiguous = True, var_mask=(1,1), **kwargs):
         super(SPConv, self).__init__(input_shape, dtype=dtype, weight=weight, bias=bias, var_mask=var_mask)
 
         img_nd = self.weight.ndim-2
