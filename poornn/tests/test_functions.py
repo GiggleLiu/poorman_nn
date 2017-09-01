@@ -162,10 +162,11 @@ def test_power():
 def test_convprod():
     dtype='complex128'
     dtype='float32'
-    func=ConvProd(input_shape=(3,3), dtype=dtype, kernel_shape=(2,2), boundary='P')
+    func=ConvProd(input_shape=(3,3), dtype=dtype, powers=[[2,0],[1,0]], boundary='P')
     print 'Test forward for %s.'%(func,)
     x = arange(1,10, dtype='float64').reshape([3,3])
-    yt = [[40,180,72],[1120,2160,24*63],[112,432,189]]
+    #yt = [[40,180,72],[1120,2160,24*63],[112,432,189]]
+    yt = [[4,20,54],[28*4,200,36*9],[49,128,243]]
     y = func.forward(x)
     assert_allclose(yt,y)
     print 'Test numdiff for %s.'%(func,)

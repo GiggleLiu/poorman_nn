@@ -208,18 +208,18 @@ class ConvProd(Function):
     '''
     Convolutional product layer.
     '''
-    def __init__(self, input_shape, dtype, kernel_shape, strides=None, boundary='O', **kwargs):
+    def __init__(self, input_shape, dtype, powers, strides=None, boundary='O', **kwargs):
         self.boundary = boundary
-        self.kernel_shape = kernel_shape
+        self.powers = np.asarray(powers, order='F', dtype=dtype)
 
-        img_nd = len(kernel_shape)
+        img_nd = self.powers.ndim
         if strides is None:
             strides=(1,)*img_nd
         self.strides = strides
 
         img_in_shape = input_shape[-img_nd:]
-        self.csc_indptr, self.csc_indices, self.img_out_shape = scan2csc(kernel_shape, img_in_shape, strides=strides, boundary=boundary)
-        output_shape = input_shape[:-len(kernel_shape)]+self.img_out_shape
+        self.csc_indptr, self.csc_indices, self.img_out_shape = scan2csc(self.powers.shape, img_in_shape, strides=strides, boundary=boundary)
+        output_shape = input_shape[:-img_nd]+self.img_out_shape
         super(ConvProd,self).__init__(input_shape, output_shape, dtype)
 
         #use the correct fortran subroutine.
@@ -239,11 +239,11 @@ class ConvProd(Function):
         self._fbackward=eval('fconvprod.backward_%s'%dtype_token)
 
     def __repr__(self):
-        return '<%s>: %s -> %s\n - strides = %s\n - filter = %s'%(self.__class__.__name__, self.input_shape,self.output_shape,self.strides,self.kernel_shape)
+        return '<%s>: %s -> %s\n - strides = %s\n - filter = %s'%(self.__class__.__name__, self.input_shape,self.output_shape,self.strides,self.powers)
 
     @property
     def img_nd(self):
-        return len(self.kernel_shape)
+        return self.powers.ndim
 
     def forward(self, x):
         '''
@@ -256,7 +256,7 @@ class ConvProd(Function):
         x_nd, img_nd = x.ndim, self.img_nd
         img_dim = tuple_prod(self.input_shape[-img_nd:])
         y=self._fforward(x.reshape([-1,img_dim], order='F'), csc_indptr=self.csc_indptr,\
-                csc_indices=self.csc_indices).reshape(self.output_shape, order='F')
+                powers=self.powers, csc_indices=self.csc_indices).reshape(self.output_shape, order='F')
         return y
 
     def backward(self, xy, dy, **kwargs):
@@ -268,7 +268,7 @@ class ConvProd(Function):
 
 
         dx=self._fbackward(x=x.reshape([-1,img_dim_in], order='F'), dy=dy.reshape([-1,img_dim_out], order='F'), y=y.reshape([-1,img_dim_out], order='F'),\
-                csc_indptr=self.csc_indptr,csc_indices=self.csc_indices).reshape(self.input_shape, order='F')
+                powers=self.powers, csc_indptr=self.csc_indptr,csc_indices=self.csc_indices).reshape(self.input_shape, order='F')
         return EMPTY_VAR(self.dtype), dx
 
 class DropOut(Function):
