@@ -5,6 +5,7 @@ ABC of neural network.
 import numpy as np
 from abc import ABCMeta, abstractmethod
 from collections import namedtuple
+from utils import _connect
 import pdb
 
 __all__=['Layer','Function', 'Tags', 'EXP_OVERFLOW', 'EMPTY_VAR']
@@ -49,7 +50,7 @@ class Layer(object):
         return '<%s>: %s -> %s'%(self.__class__.__name__,self.input_shape,self.output_shape)
 
     def __graphviz__(self, g, father=None):
-        node = '%s'%id(self)
+        node_token = '%s'%id(self)
         label = '<%s<br/>'%(self.__class__.__name__)
         attrs = ['dtype']
         if hasattr(self, '__graphviz_attrs__'):
@@ -57,9 +58,9 @@ class Layer(object):
         for attr in attrs:
             label+='<font color="#225566" point-size="10px"> %s = %s</font><br align="left"/>'%(attr, getattr(self,attr))
         label+='>'
-        g.node(node, label=label, shape='box')
-        if father is not None:
-            g.edge(father,node, label='<<font point-size="10px">%s</font><br align="center"/><font point-size="10px">%s</font><br align="center"/>>'%(self.input_shape, self.dtype))
+        g.add_node(node_token, label=label, shape='box')
+        node = g.get_node(node_token)
+        _connect(g, father, node, self.input_shape, self.dtype)
         return node
 
     def set_runtime_vars(self, var_dict={}):

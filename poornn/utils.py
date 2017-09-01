@@ -131,5 +131,30 @@ def masked_concatenate(vl, mask):
     dvar=np.concatenate(vl_) if len(vl_)!=0 else np.zeros([0], dtype=vl[0].dtype)
     return dvar
 
+def _connect(g, start, end, arr_shape, dtype, pos='mid'):
+    '''Utility for Connecting two nodes'''
+    if start is None or end is None: return
+    kwargs = {}
+    def get_node(nodes):
+        if pos=='first':
+            return nodes[0]
+        elif pos=='last':
+            return nodes[-1]
+        elif pos=='mid':
+            return nodes[len(nodes)/2]
+        else:
+            raise ValueError()
+
+    if not hasattr(start, 'attr'):
+        kwargs['ltail'] = start.name
+        nodes = start.nodes()
+        start = get_node(nodes)
+    if not hasattr(end, 'attr'):
+        kwargs['lhead'] = end.name
+        nodes = end.nodes()
+        end = get_node(nodes)
+    g.add_edge(start, end, label='<<font point-size="10px">%s</font><br align="center"/>\
+<font point-size="10px">%s</font><br align="center"/>>'%(arr_shape, dtype), **kwargs)
+
 if __name__ == '__main__':
     typed_randn('float64',(2,2))

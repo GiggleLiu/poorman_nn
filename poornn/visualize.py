@@ -1,6 +1,7 @@
 '''
 Visualization for neural networks.
 '''
+from utils import _connect
 
 __all__ = ['viznn']
 
@@ -12,14 +13,11 @@ def viznn(nn, filename=None):
         :nn: <NN>,
         :filename: str, to filename to save, default is "G.sv"
     '''
-    from graphviz import Digraph
-    g=Digraph('G',filename=filename)
-    g.node('x')
-    father = nn.__graphviz__(g, father='x')
-    g.node('y')
-    g.edge(father, 'y', label='<<font point-size="10px">%s</font><br align="left"/>\
-<font point-size="10px">%s</font><br align="left"/>>'%(nn.output_shape, nn.otype))
-    if filename is None:
-        g.view()
-    else:
-        g.render(view=False)
+    from pygraphviz import AGraph
+    g=AGraph(directed=True, rankdir='TD', compound=True)
+    g.add_node('x')
+    father = nn.__graphviz__(g, father=g.get_node('x'))
+    g.add_node('y')
+    _connect(g, father, g.get_node('y'), nn.output_shape, nn.otype, pos='last')
+    g.layout('dot')
+    g.draw(filename)

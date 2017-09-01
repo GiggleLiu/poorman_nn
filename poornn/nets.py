@@ -10,6 +10,7 @@ from core import Layer, Function
 import functions
 from spconv import SPConv
 from linears import Linear
+from utils import _connect
 
 __all__=['ANN', 'ParallelNN']
 
@@ -58,18 +59,14 @@ class ANN(Layer):
         label='<%s<br align="left"/><font color="#225566">dtype = %s</font><br align="l"/>>'%(self.__class__.__name__, self.dtype)
 
         # as a container, add contents
-        with g.subgraph(name=node) as c:
-            c.attr(label=label)
-            c.attr(labeljust='l')
-            c.attr(shape='box')
-            c.attr(style='filled')
-            c.attr(color='#FFCCAA')
-            father_ = None
-            for i,layer in enumerate(self.layers):
-                father_ = layer.__graphviz__(c, father=father_)
-                if i==0:
-                    g.edge(father, father_, label='<<font point-size="10px">%s</font><br align="center"/><font point-size="10px">%s</font><br align="center"/>>'%(self.input_shape, self.dtype))
-        return father_
+        c = g.add_subgraph(name=node, shape='box', color='#FFCCAA',
+                label=label, labeljust='l', penwidth="5pt")
+
+        father_ = None
+        for i,layer in enumerate(self.layers):
+            father_ = layer.__graphviz__(c, father=father_)
+        _connect(g, father, c, self.input_shape, self.dtype, pos='first')
+        return c
 
     @property
     def input_shape(self):
@@ -219,6 +216,19 @@ class ParallelNN(Layer):
         for layer in self.layers:
             s+='\n  '+layer.__str__()
         return s
+
+    def __graphviz__(self, g, father=None):
+        node = 'cluster-%s'%id(self)
+        label='<%s<br align="left"/><font color="#225566">dtype = %s</font><br align="l"/>>'%(self.__class__.__name__, self.dtype)
+
+        # as a container, add contents
+        c = g.add_subgraph(name=node, shape='box', color='#AACCFF',
+                label=label, labeljust='l', penwidth="5pt")
+
+        for i,layer in enumerate(self.layers):
+            father_ = layer.__graphviz__(c, father=None)
+        _connect(g, father, c, self.input_shape, self.dtype, pos='mid')
+        return c
 
     @property
     def num_layers(self):

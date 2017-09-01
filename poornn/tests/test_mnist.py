@@ -65,7 +65,7 @@ def build_dnn():
     #random num-diff check
     y_true=zeros(F4); y_true[3]=1
     assert(all(check_numdiff(ann, var_dict={'y_true':y_true, 'seed':2}, eta=1e-3)))
-    viznn(ann, filename='data/test_mnist.gv')
+    viznn(ann, filename='data/test_mnist.pdf')
     pdb.set_trace()
     return ann
 
