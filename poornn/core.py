@@ -48,6 +48,20 @@ class Layer(object):
     def __repr__(self):
         return '<%s>: %s -> %s'%(self.__class__.__name__,self.input_shape,self.output_shape)
 
+    def __graphviz__(self, g, father=None):
+        node = '%s'%id(self)
+        label = '<%s<br/>'%(self.__class__.__name__)
+        attrs = ['dtype']
+        if hasattr(self, '__graphviz_attrs__'):
+            attrs.extend(self.__graphviz_attrs__)
+        for attr in attrs:
+            label+='<font color="#225566" point-size="10px"> %s = %s</font><br align="left"/>'%(attr, getattr(self,attr))
+        label+='>'
+        g.node(node, label=label, shape='box')
+        if father is not None:
+            g.edge(father,node, label='<<font point-size="10px">%s</font><br align="center"/><font point-size="10px">%s</font><br align="center"/>>'%(self.input_shape, self.dtype))
+        return node
+
     def set_runtime_vars(self, var_dict={}):
         '''
         Set runtime variables for layers.

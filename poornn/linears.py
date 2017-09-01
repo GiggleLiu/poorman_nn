@@ -22,6 +22,7 @@ class LinearBase(Layer):
         :weight: 2darray, (fout, fin), in fortran order.
         :bias: 1darray, (fout,)
     '''
+    __graphviz_attrs__ = ['var_mask']
     def __init__(self, input_shape, dtype, weight, bias, var_mask=(1,1)):
         if sps.issparse(weight):
             self.weight = weight.tocsr()

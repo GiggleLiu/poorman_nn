@@ -14,7 +14,9 @@ from spconv import SPConv
 from linears import Linear
 from checks import check_numdiff
 from utils import typed_randn
+from visualize import viznn
 
+random.seed(2)
 FLAGS = None
 
 def build_dnn():
@@ -63,6 +65,8 @@ def build_dnn():
     #random num-diff check
     y_true=zeros(F4); y_true[3]=1
     assert(all(check_numdiff(ann, var_dict={'y_true':y_true, 'seed':2}, eta=1e-3)))
+    viznn(ann, filename='data/test_mnist.gv')
+    pdb.set_trace()
     return ann
 
 def compute_gradient(weight_vec, info_dict):

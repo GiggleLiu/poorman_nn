@@ -19,7 +19,7 @@ setting/local*.py
 *.log
 *data/
 *build/
-tests/data/
+poornn/tests/data/
 dist/
 poornn.egg-info/
 *.mod

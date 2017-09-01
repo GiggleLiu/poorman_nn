@@ -61,6 +61,7 @@ class Sum(Function):
     '''
     Sum along specific axis.
     '''
+    __graphviz_attrs__ = ['axis']
     def __init__(self, input_shape, dtype, axis, **kwargs):
         if axis > len(input_shape)-1: raise ValueError('invalid axis')
         self.axis=axis%len(input_shape)
@@ -83,6 +84,7 @@ class Mean(Function):
     '''
     Mean along specific axis.
     '''
+    __graphviz_attrs__ = ['axis']
     def __init__(self,input_shape, dtype, axis, **kwargs):
         if axis > len(input_shape)-1: raise ValueError('invalid axis')
         self.axis=axis%len(input_shape)
@@ -106,6 +108,7 @@ class ReLU(Function):
     '''
     ReLU.
     '''
+    __graphviz_attrs__ = ['leak']
     def __init__(self, input_shape, dtype, leak = 0, is_inplace=False, **kwargs):
         super(ReLU,self).__init__(input_shape, input_shape, dtype, tags=Tags(runtimes=[], is_inplace=is_inplace))
         if leak>1 or leak<0:
@@ -143,15 +146,16 @@ class Pooling(Function):
     Note:
         for complex numbers, what does max pooling looks like?
     '''
+    __graphviz_attrs__ = ['mode', 'kernel_shape']
     mode_list = ['max', 'max-abs', 'min', 'min-abs', 'mean']
 
-    def __init__(self, input_shape, dtype, kernel_shape, mode, boundary='O', **kwargs):
+    def __init__(self, input_shape, dtype, kernel_shape, mode, **kwargs):
         self.kernel_shape = kernel_shape
         self.mode = mode
         if mode not in self.mode_list:
             raise ValueError('mode %s not allowed!'%mode)
         img_in_shape = input_shape[-len(kernel_shape):]
-        self.csc_indptr, self.csc_indices, self.img_out_shape = scan2csc(kernel_shape, img_in_shape, strides=kernel_shape, boundary=boundary)
+        self.csc_indptr, self.csc_indices, self.img_out_shape = scan2csc(kernel_shape, img_in_shape, strides=kernel_shape, boundary='O')
         output_shape = input_shape[:-len(kernel_shape)]+self.img_out_shape
         super(Pooling,self).__init__(input_shape, output_shape, dtype)
 
@@ -208,6 +212,7 @@ class ConvProd(Function):
     '''
     Convolutional product layer.
     '''
+    __graphviz_attrs__ = ['powers', 'strides', 'boundary']
     def __init__(self, input_shape, dtype, powers, strides=None, boundary='O', **kwargs):
         self.boundary = boundary
         self.powers = np.asarray(powers, order='F', dtype=dtype)
@@ -275,6 +280,8 @@ class DropOut(Function):
     '''
     DropOut inplace.
     '''
+    __graphviz_attrs__ = ['axis', 'keep_rate']
+
     def __init__(self, input_shape, dtype, keep_rate, axis, is_inplace=False, **kwargs):
         if axis > len(input_shape)-1: raise ValueError('invalid axis')
         self.axis=axis%len(input_shape)
@@ -311,6 +318,8 @@ class SoftMax(Function):
     '''
     Soft max function applied on the last axis.
     '''
+    __graphviz_attrs__ = ['axis']
+
     def __init__(self, input_shape, dtype, axis, **kwargs):
         self.axis=axis
         super(SoftMax, self).__init__(input_shape, input_shape, dtype)
@@ -355,6 +364,8 @@ class SoftMaxCrossEntropy(Function):
     Cross Entropy sum(p*log(q)). With p the true labels.
         q = exp(x)/sum(exp(x))
     '''
+    __graphviz_attrs__ = ['axis']
+
     def __init__(self, input_shape, dtype, axis, **kwargs):
         if axis > len(input_shape)-1: raise ValueError('invalid axis')
         self.axis=axis%len(input_shape)
@@ -470,6 +481,7 @@ class TypeCast(Function):
         return EMPTY_VAR(self.dtype), np.asarray(dy, dtype=self.dtype, order='F')
 
 class Transpose(Function):
+    __graphviz_attrs__ = ['axes']
     def __init__(self, input_shape, dtype, axes, **kwargs):
         self.axes=axes
         if len(axes)!=len(input_shape):
@@ -486,6 +498,8 @@ class Transpose(Function):
 
 class Mul(Function):
     '''Multiply by a constant'''
+    __graphviz_attrs__ = ['alpha']
+
     def __init__(self, input_shape, dtype, alpha, **kwargs):
         self.alpha = alpha
         super(Mul, self).__init__(input_shape, input_shape, dtype)
@@ -495,6 +509,8 @@ class Mul(Function):
 
 class Mod(Function):
     '''Mod by a constant'''
+    __graphviz_attrs__ = ['n']
+
     def __init__(self, input_shape, dtype, n, **kwargs):
         self.n = n
         super(Mod, self).__init__(input_shape, input_shape, dtype)
@@ -520,6 +536,7 @@ class Power(Function):
     '''
     Function x**order
     '''
+    __graphviz_attrs__ = ['order']
     def __init__(self, input_shape, dtype, order, **kwargs):
         super(Power, self).__init__(input_shape, input_shape, dtype)
         self.order = order
