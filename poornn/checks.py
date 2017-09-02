@@ -110,8 +110,8 @@ def check_numdiff(layer, x=None, num_check=10, eta=None, tol=1e-1, var_dict={}):
         ngrad_x=np.sum((y1-y)*dy)/eta
         diff=abs(dx_[pos]-ngrad_x)
         if diff/max(1,abs(dx_[pos]))>tol:
-            print 'XBP Diff = %s, Num Diff = %s'%(dx_[pos], ngrad_x)
-            print 'Num Diff Test Fail! @x_[%s] = %s'%(pos, x.ravel()[pos])
+            print('XBP Diff = %s, Num Diff = %s'%(dx_[pos], ngrad_x))
+            print('Num Diff Test Fail! @x_[%s] = %s'%(pos, x.ravel()[pos]))
             res_x.append(False)
         else:
             res_x.append(True)
@@ -136,8 +136,8 @@ def check_numdiff(layer, x=None, num_check=10, eta=None, tol=1e-1, var_dict={}):
         ngrad_w=np.sum((y1-y)*dy)/eta
         diff=abs(dv[pos]-ngrad_w)
         if diff/max(1, abs(dv[pos]))>tol:
-            print 'WBP Diff = %s, Num Diff = %s'%(dv[pos], ngrad_w)
-            print 'Num Diff Test Fail! @var[%s] = %s'%(pos,var[pos])
+            print('WBP Diff = %s, Num Diff = %s'%(dv[pos], ngrad_w))
+            print('Num Diff Test Fail! @var[%s] = %s'%(pos,var[pos]))
             res_w.append(False)
         else:
             res_w.append(True)

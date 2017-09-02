@@ -1,6 +1,7 @@
 '''
 Convolution using sparse matrix.
 '''
+from __future__ import division
 
 import numpy as np
 import pdb,time
@@ -10,7 +11,7 @@ from lib.spsp import lib as fspsp
 from utils import scan2csc, tuple_prod, spscan2csc, masked_concatenate
 from linears import LinearBase
 
-__all__ = ['SPConv', 'ConvProd']
+__all__ = ['SPConv']
 
 class SPConv(LinearBase):
     '''
@@ -181,7 +182,7 @@ class SPSP(SPConv):
         # self.csc_indptr, self.csc_indices, self.csc_data = scan2csc_sp(input_shape[1:], strides)
         img_in_shape = input_shape[2:]
         self.csc_indptr, self.csc_indices, self.img_out_shape = spscan2csc(kernel_shape, input_shape[-img_nd:], strides, boundary)
-        self.img_out_shape=tuple([img_is/stride for img_is,stride in zip(img_in_shape, strides)])
+        self.img_out_shape=tuple([img_is//stride for img_is,stride in zip(img_in_shape, strides)])
         output_shape = input_shape[:1]+(self.num_feature_out,)+self.img_out_shape
         super(SPSP, self).__init__(input_shape, output_shape, dtype=dtype)
 

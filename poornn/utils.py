@@ -1,4 +1,4 @@
-from operator import mul
+from __future__ import division
 import numpy as np
 import pdb
 
@@ -25,7 +25,7 @@ def scan2csc(kernel_shape, img_in_shape, strides, boundary):
     # get output image shape
     dimension = len(strides)
     img_out_shape=[]
-    for i in xrange(dimension):
+    for i in range(dimension):
         dim_scan=img_in_shape[i]
         if boundary=='P':
             pass
@@ -34,7 +34,7 @@ def scan2csc(kernel_shape, img_in_shape, strides, boundary):
         else:
             raise ValueError("Type of boundary Error!")
         if dim_scan%strides[i]!=0: raise ValueError("Stride and Shape not match!")
-        num_sweep_i=dim_scan/strides[i]
+        num_sweep_i=dim_scan//strides[i]
         img_out_shape.append(num_sweep_i)
     img_out_shape = tuple(img_out_shape)
     dim_out = tuple_prod(img_out_shape)
@@ -42,10 +42,10 @@ def scan2csc(kernel_shape, img_in_shape, strides, boundary):
     # create a sparse csc_matrix(dim_in, dim_out), used in fortran and start from 1!.
     csc_indptr=np.arange(1,dim_kernel*dim_out+2, dim_kernel, dtype='int32')
     csc_indices=[]   #pointer to rows in x
-    for ind_out in xrange(dim_out):
+    for ind_out in range(dim_out):
         ijk_out = np.unravel_index(ind_out, img_out_shape, order='F')
         ijk_in0 = np.asarray(ijk_out)*strides
-        for ind_offset in xrange(tuple_prod(kernel_shape)):
+        for ind_offset in range(tuple_prod(kernel_shape)):
             ijk_in = ijk_in0 + np.unravel_index(ind_offset, kernel_shape, order='F')
             ind_in = np.ravel_multi_index(ijk_in, img_in_shape, mode='wrap' if boundary=='P' else 'raise', order='F')
             csc_indices.append(ind_in+1)
@@ -60,10 +60,10 @@ def spscan2csc(cscmat, strides):
     # get output image shape
     dimension = len(strides)
     img_out_shape=[]
-    for i in xrange(dimension):
+    for i in range(dimension):
         dim_scan=img_in_shape[i]
         if dim_scan%strides[i]!=0: raise ValueError("Stride and Shape not match!")
-        num_sweep_i=dim_scan/strides[i]
+        num_sweep_i=dim_scan//strides[i]
         img_out_shape.append(num_sweep_i)
     img_out_shape = tuple(img_out_shape)
     dim_out = tuple_prod(img_out_shape)
@@ -71,10 +71,10 @@ def spscan2csc(cscmat, strides):
     # create a sparse csc_matrix(dim_in, dim_out), used in fortran and start from 1!.
     csc_indptr=np.arange(1,cscmat.nnz*dim_out+2, cscmat.nnz, dtype='int32')
     csc_indices=[]   #pointer to rows in x
-    for ind_out in xrange(dim_out):
+    for ind_out in range(dim_out):
         ijk_out = np.unravel_index(ind_out, img_out_shape, order='F')
         ijk_in0 = np.asarray(ijk_out)*strides
-        for ind_offset in xrange(tuple_prod(kernel_shape)):
+        for ind_offset in range(tuple_prod(kernel_shape)):
             ijk_in = ijk_in0 + np.unravel_index(ind_offset, kernel_shape, order='F')
             ind_in = np.ravel_multi_index(ijk_in, img_in_shape, mode='wrap' if boundary=='P' else 'raise', order='F')
             csc_indices.append(ind_in+1)
@@ -123,7 +123,20 @@ def typed_randn(dtype, shape):
     else:
         return np.transpose(np.random.randn(*shape[::-1])).astype(np.dtype(dtype))
 
-tuple_prod = lambda tp: reduce(mul,tp,1)
+def tuple_prod(tp):
+    '''
+    Product of a tuple of numbers.
+
+    Parameters:
+        :tp: tuple,
+
+    Return:
+        number,
+    '''
+    res = 1
+    for item in tp:
+        res*=item
+    return res
 
 def masked_concatenate(vl, mask):
     '''concatenate multiple arrays only with those masked.'''
@@ -141,7 +154,7 @@ def _connect(g, start, end, arr_shape, dtype, pos='mid'):
         elif pos=='last':
             return nodes[-1]
         elif pos=='mid':
-            return nodes[len(nodes)/2]
+            return nodes[len(nodes)//2]
         else:
             raise ValueError()
 

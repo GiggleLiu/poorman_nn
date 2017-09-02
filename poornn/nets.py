@@ -126,7 +126,7 @@ class ANN(Layer):
         '''
         dvs=[]
         x_broken = False
-        for i in xrange(1,len(xy)):
+        for i in range(1,len(xy)):
             x, y = xy[-i-1], xy[-i]
             layer = self.layers[-i]
             if self.do_shape_check:

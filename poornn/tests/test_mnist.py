@@ -66,7 +66,6 @@ def build_dnn():
     y_true=zeros(F4); y_true[3]=1
     assert(all(check_numdiff(ann, var_dict={'y_true':y_true, 'seed':2}, eta=1e-3)))
     viznn(ann, filename='data/test_mnist.pdf')
-    pdb.set_trace()
     return ann
 
 def compute_gradient(weight_vec, info_dict):
@@ -109,7 +108,7 @@ def main(_):
             t1=time.time()
             print(t1-t0)
             t0=time.time()
-            print 'Analyse Step = %s'%k
+            print('Analyse Step = %s'%k)
             analyse_result(info_dict['ys'], info_dict['y_true'])
         batch = mnist.train.next_batch(50)
         #info_dict['x_batch'] = asfortranarray(batch[0]).reshape([batch[0].shape[0],-1],order='F')   #add feature axis.

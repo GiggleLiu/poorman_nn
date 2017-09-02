@@ -68,7 +68,7 @@ class Layer(object):
         Set runtime variables for layers.
         '''
         for key in self.tags.runtimes:
-            if not var_dict.has_key(key):
+            if not key in var_dict:
                 raise KeyError('Variable `%s` not found, which is required by %s'%(key, self))
             self.__setattr__(key, var_dict[key])
 

@@ -28,10 +28,9 @@ EXTRA_INFO = dict(
         'Operating System :: MacOS',
         'Programming Language :: Fortran',
         'Programming Language :: Python :: 2',
-        'Programming Language :: Python :: 2.6',
         'Programming Language :: Python :: 2.7',
         'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.3',
+        'Programming Language :: Python :: 3.6',
     ]
 )
 
@@ -90,6 +89,7 @@ def setup_package():
             'jinja2',
             #'mpi4py',   #recommended
             #'mkl-service'
+            #'pygraphviz'
         ],
         #test_suite="nose.collector",
         **EXTRA_INFO

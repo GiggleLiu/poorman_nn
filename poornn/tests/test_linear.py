@@ -27,22 +27,22 @@ def test_linear():
     cv=nn.Linear(nfi,nfo)
     weight=cv.weight.data.numpy()
     sv=Linear((num_batch, nfi), 'float32', float32(weight),float32(cv.bias.data.numpy()))
-    print "Testing forward for %s"%sv
+    print("Testing forward for %s"%sv)
     xin_np=asfortranarray(ts.data.numpy())
     ntest=5
     t0=time.time()
-    for i in xrange(ntest):
+    for i in range(ntest):
         y1=cv(ts)
     t1=time.time()
-    for i in xrange(ntest):
+    for i in range(ntest):
         y2=sv.forward(xin_np)
     t2=time.time()
-    print "Elapse old = %s, new = %s"%(t1-t0,t2-t1)
+    print( "Elapse old = %s, new = %s"%(t1-t0,t2-t1))
     res1=y1.data.numpy()
     res2=y2
     assert_allclose(res1,res2,atol=1e-4)
 
-    print "Testing backward"
+    print( "Testing backward")
     dy=torch.randn(*y1.size())
     dy_np=asfortranarray(dy.numpy())
     dweight=zeros_like(sv.weight)
@@ -52,10 +52,10 @@ def test_linear():
     t0=time.time()
     y1.backward(dy)
     t1=time.time()
-    for i in xrange(ntest):
+    for i in range(ntest):
         dwb, dx=sv.backward([xin_np, y2], dy_np)
     t2=time.time()
-    print "Elapse old = %s, new = %s"%(t1-t0,(t2-t1)/ntest)
+    print( "Elapse old = %s, new = %s"%(t1-t0,(t2-t1)/ntest))
 
     #reshape back
     dx0=ts.grad.data.numpy()
@@ -77,7 +77,7 @@ def test_linear_complex():
     weight=asfortranarray(typed_randn('complex128',[dim_out, dim_in]))
     bias=typed_randn('complex128',[dim_out])
     sv=Linear((num_batch, dim_in), 'complex128',weight, bias)
-    print "Testing numdiff for %s"%sv
+    print( "Testing numdiff for %s"%sv)
     assert_(all(check_numdiff(sv, num_check=100)))
 
     print('Testing var_mask')
@@ -97,19 +97,19 @@ def test_splinear():
     sv=Linear((num_batch, dim_in), dtype,weight, bias)
     sv2=SPLinear((num_batch, dim_in), dtype, sps.csc_matrix(weight), bias)
 
-    print "Testing forward for %s"%sv2
+    print( "Testing forward for %s"%sv2)
     ntest=5
     t0=time.time()
-    for i in xrange(ntest):
+    for i in range(ntest):
         y1=sv.forward(x)
     t1=time.time()
-    for i in xrange(ntest):
+    for i in range(ntest):
         y2=sv2.forward(x)
     t2=time.time()
-    print "Elapse old = %s, new = %s"%(t1-t0,t2-t1)
+    print( "Elapse old = %s, new = %s"%(t1-t0,t2-t1))
     assert_allclose(y1,y2,atol=1e-4)
 
-    print "Testing backward"
+    print( "Testing backward")
     dy=typed_randn(dtype, y1.shape)
     t0=time.time()
     dwb0, dx0 = sv.backward([x, y1],dy)
@@ -118,13 +118,13 @@ def test_splinear():
     mat0 = dwb0[:dim_in*dim_out].reshape([dim_out, dim_in], order='F')
     mat1 = sps.csr_matrix((dwb1[:-dim_out], sv2.weight.indices, sv2.weight.indptr)).toarray()
     t2=time.time()
-    print "Elapse old = %s, new = %s"%(t1-t0,t2-t1)
+    print( "Elapse old = %s, new = %s"%(t1-t0,t2-t1))
     assert_(all(check_numdiff(sv, num_check=100)))
     assert_(all(check_numdiff(sv2, num_check=100)))
     assert_allclose(dx0, dx1,atol=1e-4)
     assert_allclose(mat1, mat0,atol=1e-4)
 
-    print "Testing numdiff for %s"%sv
+    print( "Testing numdiff for %s"%sv)
     assert_(all(check_numdiff(sv2, num_check=100)))
 
 def test_linear1():
@@ -137,22 +137,22 @@ def test_linear1():
     cv=nn.Linear(nfi,nfo)
     weight=cv.weight.data.numpy()
     sv=Linear(input_shape=(nfi,), dtype='float32', weight=float32(weight),bias=float32(cv.bias.data.numpy()))
-    print "Testing forward for %s"%sv
+    print( "Testing forward for %s"%sv)
     xin_np=asfortranarray(ts.data.numpy())
     ntest=5
     t0=time.time()
-    for i in xrange(ntest):
+    for i in range(ntest):
         y1=cv(ts)
     t1=time.time()
-    for i in xrange(ntest):
+    for i in range(ntest):
         y2=sv.forward(xin_np[0])
     t2=time.time()
-    print "Elapse old = %s, new = %s"%(t1-t0,t2-t1)
+    print( "Elapse old = %s, new = %s"%(t1-t0,t2-t1))
     res1=y1.data.numpy()
     res2=y2
     assert_allclose(res1[0],res2,atol=1e-4)
 
-    print "Testing backward"
+    print( "Testing backward")
     dy=torch.randn(*y1.size())
     dy_np=asfortranarray(dy.numpy())
     dweight=zeros_like(sv.weight)
@@ -162,10 +162,10 @@ def test_linear1():
     t0=time.time()
     y1.backward(dy)
     t1=time.time()
-    for i in xrange(ntest):
+    for i in range(ntest):
         dwb, dx=sv.backward([xin_np[0], y2], dy_np)
     t2=time.time()
-    print "Elapse old = %s, new = %s"%(t1-t0,(t2-t1)/ntest)
+    print( "Elapse old = %s, new = %s"%(t1-t0,(t2-t1)/ntest))
 
     #reshape back
     dx0=ts.grad.data.numpy()
@@ -187,7 +187,7 @@ def test_apdot_complex():
     weight=asfortranarray(typed_randn('complex128',[dim_out, dim_in]))
     bias=typed_randn('complex128',[dim_out])
     sv=Apdot((num_batch, dim_in), 'complex128',weight, bias)
-    print "Testing numdiff for %s"%sv
+    print( "Testing numdiff for %s"%sv)
     assert_(all(check_numdiff(sv, num_check=100)))
 
 

@@ -33,7 +33,7 @@ def test_pa():
     assert_allclose(y[:,0,:], x.dot(ll.weight.T)+ll.bias)
     assert_allclose(y[:,1,:], x**2)
     assert_allclose(y[:,2,:], x)
-    print "Testing numdiff for %s"%pnet
+    print("Testing numdiff for %s"%pnet)
     assert_(all(check_numdiff(pnet, num_check=100)))
 
 if __name__ == '__main__':

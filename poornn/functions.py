@@ -539,12 +539,12 @@ class Print(Function):
         super(Print, self).__init__(input_shape, input_shape, dtype)
 
     def forward(self, x):
-        print 'Forward\n -  x = %s'%x
+        print('Forward\n -  x = %s'%x)
         return x
     
     def backward(self, xy, dy, **kwargs):
         x,y=xy
-        print 'Backward\n -  x = %s\n -  y = %s\n -  dy = %s'%(x,y,dy)
+        print('Backward\n -  x = %s\n -  y = %s\n -  dy = %s'%(x,y,dy))
         return EMPTY_VAR(self.dtype), dy
 
 class Power(Function):

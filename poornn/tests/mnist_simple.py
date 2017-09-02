@@ -86,8 +86,8 @@ def main(_):
 
     for k,info in enumerate(optimizer):
         if k % 100 == 0:
-            print 'Analyse Step = %s'%k
-            print 'Cost = %s'%info_dict['ys'][-1]
+            print('Analyse Step = %s'%k)
+            print('Cost = %s'%info_dict['ys'][-1])
             analyse_result(info_dict['ys'], info_dict['y_true'])
         batch = mnist.train.next_batch(100)
         info_dict['x_batch'] = asfortranarray(batch[0], dtype='float32').reshape([batch[0].shape[0],-1],order='F')   #add feature axis.
