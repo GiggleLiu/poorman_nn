@@ -1,20 +1,19 @@
 from numpy import *
 from numpy.testing import dec,assert_,assert_raises,assert_almost_equal,assert_allclose
-import sys,pdb,time
+import sys,pdb,time,os
 import argparse
-sys.path.insert(0,'../')
 
 from tensorflow.examples.tutorials.mnist import input_data
 import tensorflow as tf
-
 from climin import RmsProp,GradientDescent,Adam
-from nets import ANN
-import functions
-from spconv import SPConv
-from linears import Linear
-from checks import check_numdiff
-from utils import typed_randn
-from visualize import viznn
+
+from ..nets import ANN
+from .. import functions
+from ..spconv import SPConv
+from ..linears import Linear
+from ..checks import check_numdiff
+from ..utils import typed_randn
+from ..visualize import viznn
 
 random.seed(2)
 FLAGS = None
@@ -65,7 +64,7 @@ def build_dnn():
     #random num-diff check
     y_true=zeros(F4); y_true[3]=1
     assert(all(check_numdiff(ann, var_dict={'y_true':y_true, 'seed':2}, eta=1e-3)))
-    viznn(ann, filename='data/test_mnist.pdf')
+    viznn(ann, filename='%s/data/test_mnist.pdf'%os.path.dirname(__file__))
     return ann
 
 def compute_gradient(weight_vec, info_dict):

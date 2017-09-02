@@ -4,15 +4,15 @@ Tests for MPS and MPO
 from numpy import *
 from numpy.testing import dec,assert_,assert_raises,assert_almost_equal,assert_allclose
 from scipy import sparse as sps
-import sys,pdb,time
-sys.path.insert(0,'../')
-from spconv import SPConv, SPSP
-from checks import check_numdiff
-from utils import typed_randn
 import torch
 import torch.nn.functional as F
 from torch.nn import Conv1d,Conv2d
 from torch import autograd
+import pdb,time
+
+from ..spconv import SPConv, SPSP
+from ..checks import check_numdiff
+from ..utils import typed_randn
 
 random.seed(2)
 torch.manual_seed(2)

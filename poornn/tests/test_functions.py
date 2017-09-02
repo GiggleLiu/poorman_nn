@@ -1,13 +1,12 @@
 from numpy import *
 from numpy.testing import dec,assert_,assert_raises,assert_almost_equal,assert_allclose
-import sys,pdb,time
-sys.path.insert(0,'../')
-
-from functions import *
 from torch.nn import functional as F
 import torch
-from checks import check_numdiff
-from utils import typed_randn
+import pdb,time
+
+from ..functions import *
+from ..checks import check_numdiff
+from ..utils import typed_randn
 
 def test_sigmoid():
     func=Sigmoid((-1,),dtype='complex128')

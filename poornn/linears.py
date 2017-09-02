@@ -6,10 +6,10 @@ import numpy as np
 import scipy.sparse as sps
 import pdb
 
-from core import Layer, EMPTY_VAR
-from lib.spsp import lib as fspsp
-from lib.linear import lib as flinear
-from utils import masked_concatenate
+from .core import Layer, EMPTY_VAR
+from .lib.spsp import lib as fspsp
+from .lib.linear import lib as flinear
+from .utils import masked_concatenate
 
 __all__=['LinearBase', 'Linear', 'SPLinear', 'Apdot']
 

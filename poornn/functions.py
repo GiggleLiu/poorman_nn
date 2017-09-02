@@ -2,11 +2,11 @@ import numpy as np
 from numbers import Number
 import pdb
 
-from core import Layer,Function, Tags, EXP_OVERFLOW, EMPTY_VAR
-from lib.pooling import lib as fpooling
-from lib.convprod import lib as fconvprod
-from lib.relu import lib as frelu
-from utils import scan2csc, tuple_prod
+from .core import Layer,Function, Tags, EXP_OVERFLOW, EMPTY_VAR
+from .lib.pooling import lib as fpooling
+from .lib.convprod import lib as fconvprod
+from .lib.relu import lib as frelu
+from .utils import scan2csc, tuple_prod
 
 __all__=['Log2cosh','Sigmoid','Sum','Mul','Mod','Mean','ReLU','ConvProd','Pooling','DropOut','Sin','Cos','Exp','Log','Power',
         'SoftMax','CrossEntropy','SoftMaxCrossEntropy','SquareLoss', 'Reshape','Transpose',

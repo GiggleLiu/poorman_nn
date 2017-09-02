@@ -1,7 +1,7 @@
 import numpy as np
 import pdb
 
-from core import Layer
+from .core import Layer
 
 __all__=['PReLU']
 

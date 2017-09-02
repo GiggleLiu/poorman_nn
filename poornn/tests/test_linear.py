@@ -6,15 +6,14 @@ from numpy.linalg import norm,svd
 from copy import deepcopy
 from numpy.testing import dec,assert_,assert_raises,assert_almost_equal,assert_allclose
 from scipy import sparse as sps
-import sys,pdb,time
-sys.path.insert(0,'../')
-
-from linears import Linear, Apdot, SPLinear
-from checks import check_numdiff
-from utils import typed_randn
+import pdb,time
 import torch.nn as nn
 from torch import autograd
 import torch
+
+from ..linears import Linear, Apdot, SPLinear
+from ..checks import check_numdiff
+from ..utils import typed_randn
 
 def test_linear():
     random.seed(2)

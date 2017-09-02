@@ -5,8 +5,9 @@ ABC of neural network.
 import numpy as np
 from abc import ABCMeta, abstractmethod
 from collections import namedtuple
-from utils import _connect
 import pdb
+
+from .utils import _connect
 
 __all__=['Layer','Function', 'Tags', 'EXP_OVERFLOW', 'EMPTY_VAR']
 

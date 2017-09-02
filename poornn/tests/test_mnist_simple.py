@@ -3,18 +3,17 @@ from numpy.testing import dec,assert_,assert_raises,assert_almost_equal,assert_a
 import sys,pdb,time
 from copy import deepcopy
 import argparse
-sys.path.insert(0,'../')
 
 from tensorflow.examples.tutorials.mnist import input_data
 import tensorflow as tf
-
 from climin import RmsProp,GradientDescent,Adam
-from nets import ANN
-from checks import check_numdiff
-import functions
-from utils import typed_randn
-from spconv import SPConv
-from linears import Linear
+
+from ..nets import ANN
+from ..checks import check_numdiff
+from .. import functions
+from ..utils import typed_randn
+from ..spconv import SPConv
+from ..linears import Linear
 
 FLAGS = None
 

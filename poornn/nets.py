@@ -5,12 +5,12 @@ ABC of neural network.
 import numpy as np
 import pdb
 
-from checks import check_shape_forward, check_shape_backward
-from core import Layer, Function
-import functions
-from spconv import SPConv
-from linears import Linear
-from utils import _connect
+from .checks import check_shape_forward, check_shape_backward
+from .core import Layer, Function
+from . import functions
+from .spconv import SPConv
+from .linears import Linear
+from .utils import _connect
 
 __all__=['ANN', 'ParallelNN']
 

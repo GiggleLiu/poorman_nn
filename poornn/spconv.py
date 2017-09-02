@@ -6,10 +6,10 @@ from __future__ import division
 import numpy as np
 import pdb,time
 
-from lib.spconv import lib as fspconv
-from lib.spsp import lib as fspsp
-from utils import scan2csc, tuple_prod, spscan2csc, masked_concatenate
-from linears import LinearBase
+from .lib.spconv import lib as fspconv
+from .lib.spsp import lib as fspsp
+from .utils import scan2csc, tuple_prod, spscan2csc, masked_concatenate
+from .linears import LinearBase
 
 __all__ = ['SPConv']
 

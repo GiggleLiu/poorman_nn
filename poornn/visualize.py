@@ -1,7 +1,7 @@
 '''
 Visualization for neural networks.
 '''
-from utils import _connect
+from .utils import _connect
 
 __all__ = ['viznn']
 

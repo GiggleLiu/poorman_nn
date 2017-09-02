@@ -4,13 +4,13 @@ Tests for MPS and MPO
 from numpy import *
 from numpy.testing import dec,assert_,assert_raises,assert_almost_equal,assert_allclose
 from scipy import sparse as sps
-import sys,pdb,time
-sys.path.insert(0,'../')
-from checks import check_numdiff
-from utils import typed_randn
-from linears import Linear
-from nets import ParallelNN
-import functions
+import pdb,time
+
+from ..checks import check_numdiff
+from ..utils import typed_randn
+from ..linears import Linear
+from ..nets import ParallelNN
+from .. import functions
 
 random.seed(2)
 

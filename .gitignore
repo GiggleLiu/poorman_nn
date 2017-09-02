@@ -23,4 +23,4 @@ poornn/tests/data/
 dist/
 poornn.egg-info/
 *.mod
-poornn/tests/MNIST-data/
+*MNIST-data/

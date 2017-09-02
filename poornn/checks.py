@@ -1,7 +1,7 @@
 import numpy as np
 import pdb
 
-from utils import typed_randn
+from .utils import typed_randn
 
 
 __all__=['dec_check_shape', 'check_numdiff', 'generate_randx',
@@ -73,7 +73,7 @@ def check_shape_backward(f):
 
 def check_numdiff(layer, x=None, num_check=10, eta=None, tol=1e-1, var_dict={}):
     '''Random Numerical Differential check.'''
-    from nets import ANN
+    from .nets import ANN
     is_net = isinstance(layer, ANN)
     input_dtype = layer.layers[0].dtype if is_net else layer.dtype
     if x is None:
