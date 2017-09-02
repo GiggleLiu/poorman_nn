@@ -180,6 +180,7 @@ class ANN(Layer):
             input_shape, dtype = self.layers[-1].output_shape, self.layers[-1].otype
         obj=cls(input_shape=input_shape, dtype=dtype, **kwargs)
         self.layers.append(obj)
+        return obj
 
 
 class ParallelNN(Layer):
@@ -330,3 +331,4 @@ class ParallelNN(Layer):
         '''
         obj=cls(input_shape=self.input_shape, output_shape=self.output_shape1, dtype=self.dtype, otype=self.otype, **kwargs)
         self.layers.append(obj)
+        return obj

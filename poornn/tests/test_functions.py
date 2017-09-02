@@ -78,6 +78,17 @@ def test_exp():
     assert_allclose(func.backward([xs,ys],1.)[1],ys)
     assert_(all(check_numdiff(func, xs)))
 
+def test_log():
+    oldshape=(3,4,2)
+    dtype='complex128'
+    func=Log(oldshape, dtype)
+    xs=typed_randn(dtype, oldshape)
+    print 'Test forward for %s'%func
+    ys=func.forward(xs)
+    assert_allclose(ys,log(xs))
+    print 'Test backward'
+    assert_(all(check_numdiff(func, xs)))
+
 def test_reshape():
     oldshape=(3,4,2)
     newshape=(3,8)
@@ -269,6 +280,7 @@ def test_softmax_cross_per():
 def test_all():
     random.seed(3)
     torch.manual_seed(3)
+    test_log()
     test_convprod()
     test_pooling_per()
     test_square_loss()

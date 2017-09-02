@@ -10,6 +10,8 @@ from lib.spsp import lib as fspsp
 from utils import scan2csc, tuple_prod, spscan2csc, masked_concatenate
 from linears import LinearBase
 
+__all__ = ['SPConv', 'ConvProd']
+
 class SPConv(LinearBase):
     '''
     Attributes:
@@ -238,4 +240,74 @@ class SPSP(SPConv):
                 fltr_data=_fltr_flatten,
                 do_xgrad=True, do_wgrad=mask[0], do_bgrad=mask[1], max_nnz_row=_fltr_flatten.shape[-1])
         return masked_concatenate([dweight.ravel(order='F'), dbias], mask), dx.reshape(self.input_shape, order='F')
+
+class SPConvProd(LinearBase):
+    '''
+    Convolutional product layer, the version with variables.
+    '''
+    __graphviz_attrs__ = ['strides', 'boundary', 'kernel_shape', 'var_mask']
+
+    def __init__(self, input_shape, dtype, weight, bias, strides=None, boundary='O', var_mask=(1,1), **kwargs):
+        super(SPConvProd, self).__init__(input_shape, dtype=dtype, weight=weight, bias=bias, var_mask=var_mask)
+        self.boundary = boundary
+
+        img_nd = self.weight.ndim-2
+        if strides is None:
+            strides=(1,)*img_nd
+        self.strides = strides
+
+        kernel_shape = self.weight.shape[2:]
+        img_in_shape = input_shape[-img_nd:]
+        self.csc_indptr, self.csc_indices, self.img_out_shape = scan2csc(kernel_shape, img_in_shape, strides=strides, boundary=boundary)
+        output_shape = input_shape[:-img_nd]+self.img_out_shape
+
+        #use the correct fortran subroutine.
+        if dtype=='complex128':
+            dtype_token = 'z'
+        elif dtype=='complex64':
+            dtype_token = 'c'
+        elif dtype=='float64':
+            dtype_token = 'd'
+        elif dtype=='float32':
+            dtype_token = 's'
+        else:
+            raise TypeError("data type error!")
+
+        #use the correct function
+        self._fforward=eval('fspconvprod.forward_%s'%dtype_token)
+        self._fbackward=eval('fspconvprod.backward_%s'%dtype_token)
+
+    def __str__(self):
+        return self.__repr__()+'\n  - dtype = %s\n  - filter => %s\n  - strides => %s\n  - bias => %s'%(self.dtype,self.weight.shape,self.strides,self.bias.shape)
+
+    @property
+    def img_nd(self):
+        return len(self.strides)
+
+    def forward(self, x):
+        '''
+        Parameters:
+            :x: ndarray, (num_batch, nfi, img_in_dims), input in 'F' order.
+
+        Return:
+            ndarray, (num_batch, nfo, img_out_dims), output in 'F' order.
+        '''
+        x_nd, img_nd = x.ndim, self.img_nd
+        img_dim = tuple_prod(self.input_shape[-img_nd:])
+        y=self._fforward(x.reshape([-1,img_dim], order='F'), csc_indptr=self.csc_indptr,\
+                weight=self.weight, csc_indices=self.csc_indices).reshape(self.output_shape, order='F')
+        return y
+
+    def backward(self, xy, dy, **kwargs):
+        '''It will shed a mask on dy'''
+        x, y = xy
+        x_nd, img_nd = x.ndim, self.img_nd
+        img_dim_in = tuple_prod(self.input_shape[-img_nd:])
+        img_dim_out = tuple_prod(self.output_shape[-img_nd:])
+
+
+        dx=self._fbackward(x=x.reshape([-1,img_dim_in], order='F'), dy=dy.reshape([-1,img_dim_out], order='F'), y=y.reshape([-1,img_dim_out], order='F'),\
+                weight=self.weight, csc_indptr=self.csc_indptr,csc_indices=self.csc_indices).reshape(self.input_shape, order='F')
+        return EMPTY_VAR(self.dtype), dx
+
 

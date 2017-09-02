@@ -8,8 +8,8 @@ from lib.convprod import lib as fconvprod
 from lib.relu import lib as frelu
 from utils import scan2csc, tuple_prod
 
-__all__=['Log2cosh','Sigmoid','Sum','Mul','Mod','Mean','ReLU','ConvProd','Pooling','DropOut','Sin','Cos','Power',
-        'SoftMax','CrossEntropy','SoftMaxCrossEntropy','SquareLoss','Exp', 'Reshape','Transpose',
+__all__=['Log2cosh','Sigmoid','Sum','Mul','Mod','Mean','ReLU','ConvProd','Pooling','DropOut','Sin','Cos','Exp','Log','Power',
+        'SoftMax','CrossEntropy','SoftMaxCrossEntropy','SquareLoss', 'Reshape','Transpose',
         'TypeCast', 'Print']
 
 class Log2cosh(Function):
@@ -432,6 +432,21 @@ class Exp(Function):
     def backward(self,xy,dy, **kwargs):
         x, y = xy
         return EMPTY_VAR(self.dtype),dy*y
+
+class Log(Function):
+    '''
+    Function log(x)
+    '''
+    def __init__(self, input_shape, dtype, **kwargs):
+        super(Log, self).__init__(input_shape, input_shape, dtype)
+
+    def forward(self,x):
+        return np.log(x.astype(self.dtype))
+
+    def backward(self,xy,dy, **kwargs):
+        x, y = xy
+        return EMPTY_VAR(self.dtype),dy/x
+
 
 class Sin(Function):
     '''
