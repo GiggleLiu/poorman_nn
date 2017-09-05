@@ -21,7 +21,7 @@ def test_pa():
 
     input_shape = (-1, dim_in)
     output_shape = (-1, -1, dim_in)
-    pnet = ParallelNN(input_shape, output_shape, dtype=dtype, otype=dtype, axis=1)
+    pnet = ParallelNN(input_shape, output_shape, itype=dtype, otype=dtype, axis=1)
     x=asfortranarray(typed_randn(dtype, [num_batch,dim_in]))
     weight=asfortranarray(typed_randn(dtype, [dim_in, dim_in]))
     bias=typed_randn(dtype, [dim_in])

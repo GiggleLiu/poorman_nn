@@ -39,9 +39,9 @@ def build_dnn():
         costfunc = functions.SoftMaxCrossEntropy((-1,F1), dtype, axis=1)
 
         meanfunc = functions.Mean((-1,), dtype, axis=0)
-        ann=ANN(dtype=dtype, layers=[linear1, costfunc, meanfunc] ,do_shape_check=True)
+        ann=ANN(itype=dtype, layers=[linear1, costfunc, meanfunc] ,do_shape_check=True)
     else:
-        ann=ANN(dtype=dtype, do_shape_check=True)  #do not specify layers.
+        ann=ANN(itype=dtype, do_shape_check=True)  #do not specify layers.
         linear1 = Linear((-1, I1*I2), dtype, W_fc1, b_fc1)
         ann.layers.append(linear1)
         ann.add_layer(functions.SoftMaxCrossEntropy, axis=1)

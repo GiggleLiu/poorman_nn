@@ -9,9 +9,9 @@ class PReLU(Layer):
     '''
     Parametric ReLU.
     '''
-    def __init__(self, leak = 0, dtype='float32'):
+    def __init__(self, leak = 0, itype='float32'):
         self.leak = leak
-        self.dtype=dtype
+        self.itype=itype
         if leak>1 or leak<0:
             raise ValueError('leak parameter should be 0-1!')
 
@@ -32,16 +32,13 @@ class PReLU(Layer):
         else:
             dx[xmask]=leak*dy
         da = np.sum(dy[xmask]*x[xmask].conj())
-        return np.array([da], dtype=self.dtype), dx
+        return np.array([da], dtype=self.itype), dx
 
     def get_variables(self):
-        return np.array([self.leak], dtype=self.dtype)
+        return np.array([self.leak], dtype=self.itype)
 
-    def set_variables(self, a, mode='set'):
-        if mode=='set':
-            self.leak=a[0]
-        elif mode=='add':
-            self.leak+=a[0]
+    def set_variables(self, a):
+        self.leak=a[0]
 
     @property
     def num_variables(self):

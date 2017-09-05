@@ -75,7 +75,7 @@ def check_numdiff(layer, x=None, num_check=10, eta=None, tol=1e-1, var_dict={}):
     '''Random Numerical Differential check.'''
     from .nets import ANN
     is_net = isinstance(layer, ANN)
-    input_dtype = layer.layers[0].dtype if is_net else layer.dtype
+    input_dtype = layer.itype
     if x is None:
         x=generate_randx(layer)
     else:
@@ -148,7 +148,7 @@ def generate_randx(layer):
     max_dim=3
     max_size=20
     input_shape = layer.input_shape
-    input_dtype = layer.layers[0].dtype if hasattr(layer,'layers') else layer.dtype
+    input_dtype = layer.itype
     if input_shape is None:
         return typed_randn(input_dtype, np.random.randint(1, max_size+1, np.random.randint(1,max_dim+1)))
     input_shape = [n if n>=0 else np.random.randint(1, max_size+1) for n in input_shape]

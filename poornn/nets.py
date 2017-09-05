@@ -19,15 +19,15 @@ class ANN(Layer):
     Sequential Artificial Neural network, is a special Layer.
 
     Attributes:
-        :dtype: str, the most `advanced` data type used, like 'complex128' if both 'complex128' and 'float32' are used.
+        :itype: str, the most `advanced` data type used, like 'complex128' if both 'complex128' and 'float32' are used.
         :layers: list,
         :do_shape_check: bool,
     '''
-    def __init__(self, dtype, layers=None, do_shape_check=False):
+    def __init__(self, itype, layers=None, do_shape_check=False):
         if layers is None: layers = []
         self.layers = layers
         self.do_shape_check = do_shape_check
-        self.dtype = dtype
+        self.itype = itype
         self.tags = None
 
         #check connections
@@ -56,7 +56,7 @@ class ANN(Layer):
 
     def __graphviz__(self, g, father=None):
         node = 'cluster-%s'%id(self)
-        label='<%s<br align="left"/><font color="#225566">dtype = %s</font><br align="l"/>>'%(self.__class__.__name__, self.dtype)
+        label='<%s<br align="left"/><font color="#225566">itype = %s</font><br align="l"/>>'%(self.__class__.__name__, self.itype)
 
         # as a container, add contents
         c = g.add_subgraph(name=node, shape='box', color='#FFCCAA',
@@ -65,7 +65,7 @@ class ANN(Layer):
         father_ = None
         for i,layer in enumerate(self.layers):
             father_ = layer.__graphviz__(c, father=father_)
-        _connect(g, father, c, self.input_shape, self.dtype, pos='first')
+        _connect(g, father, c, self.input_shape, self.itype, pos='first')
         return c
 
     @property
@@ -140,18 +140,17 @@ class ANN(Layer):
         '''Dump values to an array.'''
         return np.concatenate([layer.get_variables() for layer in self.layers])
 
-    def set_variables(self,v, mode='set'):
+    def set_variables(self,v):
         '''
         Load data from an array.
         
         Parameters:
             :v: 1darray, variables.
-            :mode: choice('set', 'add').
         '''
         start=0
         for layer in self.layers:
             stop=start+layer.num_variables
-            layer.set_variables(np.asarray(v[start:stop],dtype=layer.dtype), mode=mode)
+            layer.set_variables(np.asarray(v[start:stop]))
             start=stop
 
     @property
@@ -162,7 +161,7 @@ class ANN(Layer):
         '''Show requested runtime variables'''
         rd = {}
         for layer in layers:
-            for key in layer.tags.runtimes:
+            for key in layer.tags['runtimes']:
                 value=layer.__getattribute__(key)
                 if hasattr(rd, key) and (value is not rd[var]):
                     raise Exception('runtime variables conflicts %s and %s not same'%(rd[var], value))
@@ -171,14 +170,14 @@ class ANN(Layer):
 
     def add_layer(self, cls, **kwargs):
         '''
-        Add a new layer. *args and **kwargs specifies parameters excluding `input_shape` and `dtype`.
-        input_shape inherit the output_shape of last layer, and dtype inherit dtype of last layer(network with mixed dtype?).
+        Add a new layer. *args and **kwargs specifies parameters excluding `input_shape` and `itype`.
+        input_shape inherit the output_shape of last layer, and itype inherit otype of last layer.
         '''
         if len(self.layers)==0:
             raise AttributeError('Please make sure this network is non-empty before using @add_layer.')
         else:
-            input_shape, dtype = self.layers[-1].output_shape, self.layers[-1].otype
-        obj=cls(input_shape=input_shape, dtype=dtype, **kwargs)
+            input_shape, itype = self.layers[-1].output_shape, self.layers[-1].otype
+        obj=cls(input_shape=input_shape, itype=itype, **kwargs)
         self.layers.append(obj)
         return obj
 
@@ -188,13 +187,13 @@ class ParallelNN(Layer):
     Parallel Artificial Neural network, is a special Layer.
 
     Attributes:
-        :dtype: str, the most `advanced` data type used, like 'complex128' if both 'complex128' and 'float32' are used.
+        :itype: str, the most `advanced` data type used, like 'complex128' if both 'complex128' and 'float32' are used.
         :axis: int, specify the additional axis.
         :layers: list,
         :do_shape_check: bool,
     '''
-    def __init__(self, input_shape, output_shape, dtype, axis=0, layers=None, otype=None, do_shape_check=False, tags=None):
-        super(ParallelNN,self).__init__(input_shape, output_shape, dtype, otype=otype, tags=tags)
+    def __init__(self, input_shape, output_shape, itype, axis=0, layers=None, otype=None, do_shape_check=False, tags=None):
+        super(ParallelNN,self).__init__(input_shape, output_shape, itype, otype=otype, tags=tags)
         if layers is None: layers = []
         self.layers = layers
         self.do_shape_check = do_shape_check
@@ -220,7 +219,7 @@ class ParallelNN(Layer):
 
     def __graphviz__(self, g, father=None):
         node = 'cluster-%s'%id(self)
-        label='<%s<br align="left"/><font color="#225566">dtype = %s</font><br align="l"/>>'%(self.__class__.__name__, self.dtype)
+        label='<%s<br align="left"/><font color="#225566">itype = %s</font><br align="l"/>>'%(self.__class__.__name__, self.itype)
 
         # as a container, add contents
         c = g.add_subgraph(name=node, shape='box', color='#AACCFF',
@@ -228,7 +227,7 @@ class ParallelNN(Layer):
 
         for i,layer in enumerate(self.layers):
             father_ = layer.__graphviz__(c, father=None)
-        _connect(g, father, c, self.input_shape, self.dtype, pos='mid')
+        _connect(g, father, c, self.input_shape, self.itype, pos='mid')
         return c
 
     @property
@@ -291,18 +290,17 @@ class ParallelNN(Layer):
         '''Dump values to an array.'''
         return np.concatenate([layer.get_variables() for layer in self.layers])
 
-    def set_variables(self,v, mode='set'):
+    def set_variables(self,v):
         '''
         Load data from an array.
         
         Parameters:
             :v: 1darray, variables.
-            :mode: choice('set', 'add').
         '''
         start=0
         for layer in self.layers:
             stop=start+layer.num_variables
-            layer.set_variables(np.asarray(v[start:stop],dtype=layer.dtype), mode=mode)
+            layer.set_variables(np.asarray(v[start:stop]))
             start=stop
 
     @property
@@ -317,7 +315,7 @@ class ParallelNN(Layer):
         '''Show requested runtime variables'''
         rd = {}
         for layer in layers:
-            for key in layer.tags.runtimes:
+            for key in layer.tags['runtimes']:
                 value=layer.__getattribute__(key)
                 if hasattr(rd, key) and (value is not rd[var]):
                     raise Exception('runtime variables conflicts %s and %s not same'%(rd[var], value))
@@ -326,9 +324,9 @@ class ParallelNN(Layer):
 
     def add_layer(self, cls, **kwargs):
         '''
-        Add a new layer. *args and **kwargs specifies parameters excluding `input_shape` and `dtype`.
-        input_shape inherit the output_shape of last layer, and dtype inherit dtype of last layer(network with mixed dtype?).
+        Add a new layer. *args and **kwargs specifies parameters excluding `input_shape` and `itype`.
+        input_shape inherit the output_shape of last layer, and itype inherit otype of last layer.
         '''
-        obj=cls(input_shape=self.input_shape, output_shape=self.output_shape1, dtype=self.dtype, otype=self.otype, **kwargs)
+        obj=cls(input_shape=self.input_shape, output_shape=self.output_shape1, itype=self.itype, otype=self.otype, **kwargs)
         self.layers.append(obj)
         return obj

@@ -9,17 +9,21 @@ import pdb
 
 from .utils import _connect
 
-__all__=['Layer','Function', 'Tags', 'EXP_OVERFLOW', 'EMPTY_VAR']
+__all__=['Layer','Function', 'EXP_OVERFLOW', 'EMPTY_VAR']
 
 '''
-Attributes for Tags:
-    :runtimes: list of str, runtime variables, that change during each forward.
-    :is_inplace: bool, True if the output is made by changing input inplace.
+List of tags:
+    :runtimes: list of str, runtime variables, that change during each forward, [] by default.
+    :is_inplace: bool, True if the output is made by changing input inplace, False by default.
+    :analytical: int,
+        * 0, no
+        * 1, yes (default)
+        * 2, yes for float, no for complex.
 '''
+TAG_LIST = ['runtimes', 'is_inplace', 'analytical']
 
-Tags = namedtuple('Tags',('runtimes', 'is_inplace'))
 EXP_OVERFLOW = 12
-EMPTY_VAR = lambda dtype: np.zeros([0], dtype=dtype)
+EMPTY_VAR = np.zeros([0], dtype='float32')
 
 class Layer(object):
     '''
@@ -28,21 +32,31 @@ class Layer(object):
     Attributes:
         :input_shape: tuple,
         :output_shape: tuple,
-        :dtype: str, input data type.
+        :itype: str, input data type.
         :otype: str, output data type.
-        :tags: named tuple, runtime variables, is inplace(change input) function or not.
+        :tags: dict, runtime variables, is inplace(change input) function or not.
     '''
 
     __metaclass__ = ABCMeta
 
-    def __init__(self, input_shape, output_shape, dtype, otype=None, tags=None):
+    def __init__(self, input_shape, output_shape, itype, otype=None, tags=None):
         self.input_shape = input_shape
         self.output_shape = output_shape
-        self.dtype = dtype
-        if otype is None: otype = dtype
+        self.itype = itype
+        if otype is None: otype = itype
         self.otype=otype
-        if tags is None: tags = Tags(runtimes = [], is_inplace = False)
-        self.tags = tags
+
+        # set tags
+        self.tags = {
+                'runtimes':[],
+                'is_inplace': False,
+                'analytical': 1,
+                }
+        if tags is not None:
+            for k, v in tags.items():
+                if k not in TAG_LIST:
+                    print('You have used a user defined tag %s'%k)
+                self.tags[k] = v
 
     def __str__(self):
         return self.__repr__()
@@ -53,7 +67,7 @@ class Layer(object):
     def __graphviz__(self, g, father=None):
         node_token = '%s'%id(self)
         label = '<%s<br/>'%(self.__class__.__name__)
-        attrs = ['dtype']
+        attrs = ['itype']
         if hasattr(self, '__graphviz_attrs__'):
             attrs.extend(self.__graphviz_attrs__)
         for attr in attrs:
@@ -61,14 +75,14 @@ class Layer(object):
         label+='>'
         g.add_node(node_token, label=label, shape='box')
         node = g.get_node(node_token)
-        _connect(g, father, node, self.input_shape, self.dtype)
+        _connect(g, father, node, self.input_shape, self.itype)
         return node
 
     def set_runtime_vars(self, var_dict={}):
         '''
         Set runtime variables for layers.
         '''
-        for key in self.tags.runtimes:
+        for key in self.tags['runtimes']:
             if not key in var_dict:
                 raise KeyError('Variable `%s` not found, which is required by %s'%(key, self))
             self.__setattr__(key, var_dict[key])
@@ -113,13 +127,12 @@ class Layer(object):
         pass
 
     @abstractmethod
-    def set_variables(self, variables, mode='set'):
+    def set_variables(self, variables):
         '''
         Change current variables.
 
         Parameters:
             :variables: 1darray,
-            :mode: choice('set', 'add').
         '''
         pass
 
@@ -135,7 +148,7 @@ class Function(Layer):
         return self.forward(x)
 
     def get_variables(self):
-        return EMPTY_VAR(self.dtype)
+        return EMPTY_VAR
 
     def set_variables(self,*args,**kwargs):
         pass

@@ -31,8 +31,8 @@ class SPConv(LinearBase):
     '''
     __graphviz_attrs__ = ['strides', 'boundary', 'kernel_shape', 'var_mask']
 
-    def __init__(self, input_shape, dtype, weight, bias, strides=None, boundary = "P", w_contiguous = True, var_mask=(1,1), **kwargs):
-        super(SPConv, self).__init__(input_shape, dtype=dtype, weight=weight, bias=bias, var_mask=var_mask)
+    def __init__(self, input_shape, itype, weight, bias, strides=None, boundary = "P", w_contiguous = True, var_mask=(1,1), **kwargs):
+        super(SPConv, self).__init__(input_shape, itype=itype, weight=weight, bias=bias, var_mask=var_mask)
 
         img_nd = self.weight.ndim-2
         if strides is None:
@@ -46,13 +46,13 @@ class SPConv(LinearBase):
         self.output_shape = input_shape[:-img_nd-1]+(self.num_feature_out,)+self.img_out_shape
 
         #use the correct fortran subroutine.
-        if dtype=='complex128':
+        if itype=='complex128':
             dtype_token = 'z'
-        elif dtype=='complex64':
+        elif itype=='complex64':
             dtype_token = 'c'
-        elif dtype=='float64':
+        elif itype=='float64':
             dtype_token = 'd'
-        elif dtype=='float32':
+        elif itype=='float32':
             dtype_token = 's'
         else:
             raise TypeError("dtype error!")
@@ -74,7 +74,7 @@ class SPConv(LinearBase):
             self._fbackward1=eval('fspconv.backward1_contiguous%s'%dtype_token)
 
     def __str__(self):
-        return self.__repr__()+'\n  - dtype = %s\n  - filter => %s\n  - strides => %s\n  - bias => %s'%(self.dtype,self.weight.shape,self.strides,self.bias.shape)
+        return self.__repr__()+'\n  - dtype = %s\n  - filter => %s\n  - strides => %s\n  - bias => %s'%(self.weight.dtype,self.weight.shape,self.strides,self.bias.shape)
 
     @property
     def img_nd(self):
@@ -165,7 +165,7 @@ class SPSP(SPConv):
         :csc_indices: 1darray, row indicator for input array.
         :weight_indices: 1darray, row indicator for filter array (if not contiguous).
     '''
-    def __init__(self, input_shape, dtype, cscmat, bias, strides=None, var_mask=(1,1)):
+    def __init__(self, input_shape, itype, cscmat, bias, strides=None, var_mask=(1,1)):
         self.cscmat = cscmat
         self.bias = bias
         self.var_mask = var_mask
@@ -184,7 +184,7 @@ class SPSP(SPConv):
         self.csc_indptr, self.csc_indices, self.img_out_shape = spscan2csc(kernel_shape, input_shape[-img_nd:], strides, boundary)
         self.img_out_shape=tuple([img_is//stride for img_is,stride in zip(img_in_shape, strides)])
         output_shape = input_shape[:1]+(self.num_feature_out,)+self.img_out_shape
-        super(SPSP, self).__init__(input_shape, output_shape, dtype=dtype)
+        super(SPSP, self).__init__(input_shape, output_shape, itype=itype)
 
         if self.num_feature_out*tuple_prod(self.img_out_shape) != cscmat.shape[1]:
             raise ValueError('csc matrix output shape mismatch! %s get, but %s desired.'%(cscmat.shape[1], self.num_feature_out*tuple_prod(self.img_out_shape)))
@@ -192,13 +192,13 @@ class SPSP(SPConv):
         # generate a larger csc_indptr, csc_indices by convolution.
 
         # use the correct fortran subroutine.
-        if dtype=='complex128':
+        if itype=='complex128':
             dtype_token = 'z'
-        elif dtype=='complex64':
+        elif itype=='complex64':
             dtype_token = 'c'
-        elif dtype=='float64':
+        elif itype=='float64':
             dtype_token = 'd'
-        elif dtype=='float32':
+        elif itype=='float32':
             dtype_token = 's'
         else:
             raise TypeError("dtype error!")
@@ -309,6 +309,6 @@ class SPConvProd(LinearBase):
 
         dx=self._fbackward(x=x.reshape([-1,img_dim_in], order='F'), dy=dy.reshape([-1,img_dim_out], order='F'), y=y.reshape([-1,img_dim_out], order='F'),\
                 weight=self.weight, csc_indptr=self.csc_indptr,csc_indices=self.csc_indices).reshape(self.input_shape, order='F')
-        return EMPTY_VAR(self.dtype), dx
+        return EMPTY_VAR, dx
 
 

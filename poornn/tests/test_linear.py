@@ -135,7 +135,7 @@ def test_linear1():
     #2 features, kernel size 3x3
     cv=nn.Linear(nfi,nfo)
     weight=cv.weight.data.numpy()
-    sv=Linear(input_shape=(nfi,), dtype='float32', weight=float32(weight),bias=float32(cv.bias.data.numpy()))
+    sv=Linear(input_shape=(nfi,), itype='float32', weight=float32(weight),bias=float32(cv.bias.data.numpy()))
     print( "Testing forward for %s"%sv)
     xin_np=asfortranarray(ts.data.numpy())
     ntest=5

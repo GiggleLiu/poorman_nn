@@ -23,33 +23,29 @@ class LinearBase(Layer):
         :bias: 1darray, (fout,)
     '''
     __graphviz_attrs__ = ['var_mask']
-    def __init__(self, input_shape, dtype, weight, bias, var_mask=(1,1)):
+    def __init__(self, input_shape, itype, weight, bias, var_mask=(1,1)):
         if sps.issparse(weight):
             self.weight = weight.tocsr()
         else:
-            self.weight = np.asarray(weight, dtype=dtype, order='F')
-        self.bias = np.asarray(bias,dtype=dtype)
+            self.weight = np.asarray(weight, order='F')
+        self.bias = np.asarray(bias)
         output_shape = input_shape[:-1]+(weight.shape[0],)
         self.var_mask = var_mask
-        super(LinearBase, self).__init__(input_shape, output_shape, dtype=dtype)
+        super(LinearBase, self).__init__(input_shape, output_shape, itype=itype)
 
     def __str__(self):
-        return self.__repr__()+'\n  - dtype = %s\n  - weight => %s\n  - bias => %s'%(self.dtype,self.weight.shape,self.bias.shape)
+        return self.__repr__()+'\n  - dtype = %s\n  - weight => %s\n  - bias => %s'%(self.weight.dtype,self.weight.shape,self.bias.shape)
 
     def get_variables(self):
         dvar=masked_concatenate([self.weight.ravel(order='F') if not sps.issparse(self.weight) else self.weight.data, self.bias], self.var_mask)
         return dvar
 
-    def set_variables(self, variables, mode='set'):
+    def set_variables(self, variables):
         nw=self.weight.size if self.var_mask[0] else 0
         var1, var2 = variables[:nw], variables[nw:]
         weight_data = self.weight.data if sps.issparse(self.weight) else self.weight.ravel(order='F')
-        if mode=='set':
-            if self.var_mask[0]: np.copyto(weight_data, var1)
-            if self.var_mask[1]: np.copyto(self.bias,var2)
-        elif mode=='add':
-            if self.var_mask[0]: weight_data+=var1
-            if self.var_mask[1]: self.bias+=var2
+        if self.var_mask[0]: weight_data[:] = var1
+        if self.var_mask[1]: self.bias[:] = var2
 
     @property
     def num_variables(self):
@@ -59,18 +55,18 @@ class Linear(LinearBase):
     '''
     Dense Linear Layer.
     '''
-    def __init__(self, input_shape, dtype, weight, bias, var_mask=(1,1), **kwargs):
+    def __init__(self, input_shape, itype, weight, bias, var_mask=(1,1), **kwargs):
         if input_shape[-1] != weight.shape[1]:
             raise ValueError('Shape Mismatch!')
-        super(Linear, self).__init__(input_shape, dtype=dtype, weight=weight, bias=bias, var_mask=var_mask)
+        super(Linear, self).__init__(input_shape, itype=itype, weight=weight, bias=bias, var_mask=var_mask)
 
-        if dtype=='complex128':
+        if itype=='complex128':
             dtype_token = 'z'
-        elif dtype=='complex64':
+        elif itype=='complex64':
             dtype_token = 'c'
-        elif dtype=='float64':
+        elif itype=='float64':
             dtype_token = 'd'
-        elif dtype=='float32':
+        elif itype=='float32':
             dtype_token = 's'
         else:
             raise TypeError("dtype error!")
@@ -118,18 +114,18 @@ class SPLinear(LinearBase):
         :bias: 1darray, (feature_out), in fortran order.
         :strides: tuple, displace for convolutions.
     '''
-    def __init__(self, input_shape, dtype, weight, bias, strides=None, var_mask=(1,1), **kwargs):
+    def __init__(self, input_shape, itype, weight, bias, strides=None, var_mask=(1,1), **kwargs):
         if input_shape[-1] != weight.shape[1]:
             raise ValueError('Shape Mismatch!')
-        super(SPLinear, self).__init__(input_shape, dtype=dtype, weight=weight, bias=bias, var_mask=var_mask)
+        super(SPLinear, self).__init__(input_shape, itype=itype, weight=weight, bias=bias, var_mask=var_mask)
 
-        if dtype=='complex128':
+        if itype=='complex128':
             dtype_token = 'z'
-        elif dtype=='complex64':
+        elif itype=='complex64':
             dtype_token = 'c'
-        elif dtype=='float64':
+        elif itype=='float64':
             dtype_token = 'd'
-        elif dtype=='float32':
+        elif itype=='float32':
             dtype_token = 's'
         else:
             raise TypeError("dtype error!")

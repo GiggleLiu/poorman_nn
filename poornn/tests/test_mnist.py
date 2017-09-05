@@ -28,11 +28,11 @@ def build_dnn():
     dtype = 'float32'
     eta=0.1
 
-    ann=ANN(dtype=dtype, do_shape_check=True)
+    ann=ANN(itype=dtype, do_shape_check=True)
 
     W_conv1 = eta*typed_randn(dtype, (F1, 1, K1, K1))  #fout, fin, K1, K2
     b_conv1 = eta*typed_randn(dtype, (F1,))
-    ann.layers.append(SPConv(input_shape=(-1,1,I1,I2), dtype=dtype, weight=W_conv1, bias=b_conv1, strides=(1,1), boundary='P'))
+    ann.layers.append(SPConv(input_shape=(-1,1,I1,I2), itype=dtype, weight=W_conv1, bias=b_conv1, strides=(1,1), boundary='P'))
     ann.add_layer(functions.ReLU)
     ann.add_layer(functions.Pooling, mode='max', kernel_shape=(2,2), boundary='O')
 
