@@ -31,6 +31,12 @@ def test_log2cosh():
     #can not pass num check for inifity values
     check_numdiff(func, xs)
 
+def test_tri():
+    func_list = [Cls((-1,),itype='complex128') for Cls in [Cos,Sin,Sinh,Cosh]]
+    for func in func_list:
+        print('Test numdiff for %s'%func)
+        assert_(all(check_numdiff(func)))
+
 def test_pooling():
     for b in ['P','O']:
         for mode in ['max', 'mean']:
@@ -279,6 +285,7 @@ def test_softmax_cross_per():
 def test_all():
     random.seed(3)
     torch.manual_seed(3)
+    test_tri()
     test_log()
     test_convprod()
     test_pooling_per()

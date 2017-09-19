@@ -7,6 +7,8 @@ from .utils import typed_randn
 __all__=['dec_check_shape', 'check_numdiff', 'generate_randx',
         'check_shape_backward', 'check_shape_forward', 'check_shape_match']
 
+# TODO: Error handling, non-differentiable error.
+
 def dec_check_shape(pos):
     '''
     Check the shape of layer's method.
@@ -102,12 +104,15 @@ def check_numdiff(layer, x=None, num_check=10, eta=None, tol=1e-1, var_dict={}):
     for i in range(num_check):
         #change variables at random position.
         pos=np.random.randint(0,x.size)
-        x_new=x.copy(order='F')
-        x_new.ravel(order='F')[pos]+=eta
-        y1=layer.forward(x_new)
-        if is_net: y1=y1[-1]
+        xn1=x.copy(order='F')
+        xn1.ravel(order='F')[pos]+=eta/2.
+        xn2=x.copy(order='F')
+        xn2.ravel(order='F')[pos]-=eta/2.
+        y1=layer.forward(xn1)
+        y2=layer.forward(xn2)
+        if is_net: y1=y1[-1]; y2=y2[-1]
 
-        ngrad_x=np.sum((y1-y)*dy)/eta
+        ngrad_x=np.sum((y1-y2)*dy)/eta
         diff=abs(dx_[pos]-ngrad_x)
         if diff/max(1,abs(dx_[pos]))>tol:
             print('XBP Diff = %s, Num Diff = %s'%(dx_[pos], ngrad_x))
@@ -119,21 +124,26 @@ def check_numdiff(layer, x=None, num_check=10, eta=None, tol=1e-1, var_dict={}):
     if not is_net and layer.num_variables==0:
         return res_x
 
-    if eta is None:
-        eta=0.003+0.004j if np.iscomplexobj(dw) else 0.005
     #check dy/dw
     res_w=[]
     var0 = layer.get_variables()
+    if eta is None:
+        eta=0.003+0.004j if np.iscomplexobj(var0) else 0.005
     for i in range(num_check):
         #change variables at random position.
-        var=var0.copy()
-        pos=np.random.randint(0,var.size)
-        var[pos]+=eta
-        layer.set_variables(var)
+        pos=np.random.randint(0,var0.size)
+        var1=var0.copy()
+        var1[pos]+=eta/2.
+        layer.set_variables(var1)
         y1=layer.forward(x)
-        if is_net: y1=y1[-1]
 
-        ngrad_w=np.sum((y1-y)*dy)/eta
+        var2=var0.copy()
+        var2[pos]-=eta/2.
+        layer.set_variables(var2)
+        y2=layer.forward(x)
+        if is_net: y1=y1[-1]; y2=y2[-1]
+
+        ngrad_w=np.sum((y1-y2)*dy)/eta
         diff=abs(dv[pos]-ngrad_w)
         if diff/max(1, abs(dv[pos]))>tol:
             print('WBP Diff = %s, Num Diff = %s'%(dv[pos], ngrad_w))

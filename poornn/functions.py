@@ -8,7 +8,8 @@ from .lib.convprod import lib as fconvprod
 from .lib.relu import lib as frelu
 from .utils import scan2csc, tuple_prod
 
-__all__=['Log2cosh','Sigmoid','Sum','Mul','Mod','Mean','ReLU','ConvProd','Pooling','DropOut','Sin','Cos','Exp','Log','Power',
+__all__=['Log2cosh','Sigmoid','Cosh','Sinh','Sum','Mul','Mod','Mean','ReLU','ConvProd',
+        'Pooling','DropOut','Sin','Cos','Exp','Log','Power',
         'SoftMax','CrossEntropy','SoftMaxCrossEntropy','SquareLoss', 'Reshape','Transpose',
         'TypeCast', 'Print']
 
@@ -35,6 +36,35 @@ class Log2cosh(Function):
     def backward(self,xy,dy, **kwargs):
         x, y = xy
         return EMPTY_VAR,np.tanh(x)*dy
+
+
+class Cosh(Function):
+    '''
+    Function cosh(theta)
+    '''
+    def __init__(self, input_shape, itype, **kwargs):
+        super(Cosh, self).__init__(input_shape, input_shape, itype)
+
+    def forward(self,x):
+        return np.cosh(x)
+
+    def backward(self,xy,dy, **kwargs):
+        x, y = xy
+        return EMPTY_VAR,np.sinh(x)*dy
+
+class Sinh(Function):
+    '''
+    Function sinh(theta)
+    '''
+    def __init__(self, input_shape, itype, **kwargs):
+        super(Sinh, self).__init__(input_shape, input_shape, itype)
+
+    def forward(self,x):
+        return np.sinh(x)
+
+    def backward(self,xy,dy, **kwargs):
+        x, y = xy
+        return EMPTY_VAR,np.cosh(x)*dy
 
 class Sigmoid(Function):
     '''
