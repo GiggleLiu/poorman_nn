@@ -11,7 +11,7 @@ from .utils import scan2csc, tuple_prod
 __all__=['Log2cosh','Sigmoid','Cosh','Sinh','Sum','Mul','Mod','Mean','ReLU','ConvProd',
         'Pooling','DropOut','Sin','Cos','Exp','Log','Power',
         'SoftMax','CrossEntropy','SoftMaxCrossEntropy','SquareLoss', 'Reshape','Transpose',
-        'TypeCast', 'Print']
+        'TypeCast', 'Print', 'Cache', 'Filter']
 
 class Log2cosh(Function):
     '''
@@ -592,4 +592,61 @@ class Power(Function):
     def backward(self,xy,dy, **kwargs):
         x, y = xy
         return EMPTY_VAR, self.order*x**(self.order-1)*dy
+
+class Cache(Function):
+    '''Cache data without changing anything.'''
+    def __init__(self, input_shape, itype, **kwargs):
+        super(Cache, self).__init__(input_shape, input_shape, itype)
+        self.forward_list = []
+        self.backward_list = []
+
+    def forward(self, x):
+        self.forward_list.append(x)
+        return x
+    
+    def backward(self, xy, dy, **kwargs):
+        self.backward_list.append(dy)
+        return EMPTY_VAR, dy
+
+    def clear(self):
+        self.forward_list = []
+        self.backward_list = []
+
+class Filter(Function):
+    '''Momentum Filter.'''
+    __graphviz_attrs__ = ['momentum', 'axes']
+
+    def __init__(self, input_shape, itype, momentum, axes, **kwargs):
+        # sort axes and momentum
+        DIM = len(input_shape)
+        axes = [axis%DIM for axis in axes]
+        order = np.argsort(axes)
+        axes = tuple([axes[od] for od in order])
+        momentum = np.atleast_1d(momentum)[order]
+
+        self.momentum = momentum
+        self.axes = axes
+        size = [input_shape[axis] for axis in axes]
+        dtype = 'float64' if all(momentum%np.pi==0) else 'complex128'
+        self.filters = [np.exp(-1j*momentum*np.arange(ni)).astype(dtype).reshape([1]*axis+[-1]+[1]*(DIM-axis-1))/ni for ki,axis,ni in zip(momentum,axes,size)]
+        output_shape = tuple([dim for axis,dim in enumerate(input_shape) if axis not in axes])
+        #np.prod(np.ix_([np.exp(-1j*k*np.arange(ni))/ni for ki,ni in zip(momentum,size)]),axis=0)
+        super(Filter, self).__init__(input_shape, output_shape, itype)
+
+    def __repr__(self):
+        return '<%s>: %s -> %s\n - momentum = %s\n - axes = %s'%(self.__class__.__name__, self.input_shape,self.output_shape,self.momentum,self.axes)
+
+    def forward(self, x):
+        y = x
+        for axis, fltr in zip(self.axes[::-1], self.filters[::-1]):
+            y = (y*fltr).sum(axis=axis)
+        return y
+
+    def backward(self, xy, dy, **kwargs):
+        x, y = xy
+        dx = dy
+        for axis, fltr in zip(self.axes, self.filters):
+            dx = np.asarray(dx, order='F')[(slice(None),)*axis+(np.newaxis,)]*fltr.reshape(fltr.shape[:dx.ndim+1])
+        return EMPTY_VAR, dx
+
 

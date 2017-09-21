@@ -219,6 +219,28 @@ def test_summean():
     assert_(all(check_numdiff(func, x)))
     assert_(all(check_numdiff(func2, x)))
 
+def test_filter():
+    random.seed(2)
+    func=Filter(input_shape=(-1,2), itype='float32',axes=(1,),momentum=0.)
+    func2=Mean(input_shape=(-1,2), itype='float32',axis=1)
+    func3=Filter(input_shape=(-1,2), itype='float32',axes=(1,),momentum=pi)
+    print('Test forward for %s, %s.'%(func, func2))
+    x=arange(8).reshape([4,2], order='F')
+    y=func.forward(x)
+    y2=func2.forward(x)
+    y3=func3.forward(x)
+    assert_allclose(y,[2,3,4,5])
+    assert_allclose(y2,y)
+    assert_allclose(y3,[-2,-2,-2,-2])
+    print('Test backward')
+    dy=arange(4,dtype='float32')
+    dx=func.backward([x,y],dy)[1]
+    dx2=func2.backward([x,y2],dy)[1]
+    assert_allclose(dx, reshape([0,0.5,1,1.5,0,0.5,1,1.5],[4,2], order='F'))
+    assert_allclose(dx2, dx)
+    assert_(all(check_numdiff(func, x)))
+    assert_(all(check_numdiff(func3, x)))
+
 def test_relu_per():
     N1,N2,N3=100,20,10
     x=torch.randn(N1,N2,N3)
@@ -285,6 +307,7 @@ def test_softmax_cross_per():
 def test_all():
     random.seed(3)
     torch.manual_seed(3)
+    test_filter()
     test_tri()
     test_log()
     test_convprod()
