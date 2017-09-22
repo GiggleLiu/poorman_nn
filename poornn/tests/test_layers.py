@@ -7,10 +7,11 @@ from ..checks import check_numdiff
 from ..utils import typed_randn
 
 def test_poly():
-    random.seed(2)
-    func=Poly(input_shape=(-1,2), itype='complex128',params=[3.,2,2+0j])
-    print('Test numdiff for %s.'%func)
-    assert_(all(check_numdiff(func)))
+    kernels = ['polynomial','chebyshev', 'legendre','laguerre','hermite','hermiteE']
+    for kernel in kernels:
+        func=Poly(input_shape=(-1,2), itype='complex128',params=[3.,2,2+1j], kernel=kernel)
+        print('Test numdiff for %s.'%func)
+        assert_(all(check_numdiff(func)))
 
 def test_all():
     random.seed(3)

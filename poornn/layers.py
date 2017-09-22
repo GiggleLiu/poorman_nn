@@ -1,4 +1,5 @@
 import numpy as np
+from numpy.polynomial import Polynomial, Chebyshev, Legendre, Laguerre, Hermite, HermiteE
 import pdb
 
 from .core import Layer
@@ -52,20 +53,27 @@ class Poly(Layer):
     '''
     Ploynomial function layer.
 
-        f(x) = \sum_i params[-(i+1)]*x^i
+        e.g. for polynomial kernel, we have f(x) = \sum_i params[i]*x^i
     '''
-    __display_attrs__ = ['params', 'var_mask']
+    __display_attrs__ = ['kernel', 'max_order', 'var_mask']
+    kernel_dict = {'polynomial':Polynomial,'chebyshev':Chebyshev,
+            'legendre':Legendre,'laguerre':Laguerre,'hermite':Hermite,'hermiteE':HermiteE}
 
-    def __init__(self, input_shape, itype, params, var_mask=None):
+    def __init__(self, input_shape, itype, params, kernel='polynomial', var_mask=None):
+        # check input data
         params = np.asarray(params)
-        dtype = params.dtype.name
-        otype = np.find_common_type((dtype, itype),())
-        super(Poly,self).__init__(input_shape, input_shape, itype, otype=otype, dtype=dtype)
-        self.params = params
         if var_mask is None:
             var_mask = np.ones(len(params),dtype='bool')
         else:
             var_mask = np.asarray(var_mask, dtype='bool')
+        if kernel not in self.kernel_dict:
+            raise ValueError('Kernel %s not found, should be one of %s'%(kernel,self.kernel_dict))
+
+        dtype = params.dtype.name
+        otype = np.find_common_type((dtype, itype),())
+        super(Poly,self).__init__(input_shape, input_shape, itype, otype=otype, dtype=dtype)
+        self.params = params
+        self.kernel = kernel
         self.var_mask = var_mask
 
     @property
@@ -73,19 +81,20 @@ class Poly(Layer):
         return len(self.params)-1
 
     def forward(self, x, **kwargs):
-        p = np.poly1d(self.params)
+        p = self.kernel_dict[self.kernel](self.params)
         y = p(x)
         return y
 
     def backward(self, xy, dy, **kwargs):
         x,y = xy
-        p = np.poly1d(self.params)
+        p = self.kernel_dict[self.kernel](self.params)
         dp = p.deriv()
         dx = dp(x)*dy
         dw = []
-        for mask, i in zip(self.var_mask,range(self.max_order,-1,-1)):
+        for i,mask in enumerate(self.var_mask):
             if mask:
-                dwi = (x**i*dy).sum()
+                basis_func = self.kernel_dict[self.kernel].basis(i)
+                dwi = (basis_func(x)*dy).sum()
                 dw.append(dwi)
         return np.array(dw, dtype=self.dtype), dx
 
