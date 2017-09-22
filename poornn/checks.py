@@ -73,7 +73,7 @@ def check_shape_backward(f):
         return res
     return wrapper
 
-def check_numdiff(layer, x=None, num_check=10, eta=None, tol=1e-1, var_dict={}):
+def check_numdiff(layer, x=None, num_check=10, eta_x=None, eta_w=None, tol=1e-1, var_dict={}):
     '''Random Numerical Differential check.'''
     from .nets import ANN
     is_net = isinstance(layer, ANN)
@@ -96,8 +96,8 @@ def check_numdiff(layer, x=None, num_check=10, eta=None, tol=1e-1, var_dict={}):
         dy=typed_randn(output_dtype, y.shape)
         dv, dx=layer.backward([x,y], dy=dy)
     dx_=np.ravel(dx, order='F')
-    if eta is None:
-        eta=0.003+0.004j if np.iscomplexobj(dx) else 0.005
+    if eta_x is None:
+        eta_x=0.003+0.004j if np.iscomplexobj(x) else 0.005
 
     res_x=[]
     #check dy/dx
@@ -105,14 +105,14 @@ def check_numdiff(layer, x=None, num_check=10, eta=None, tol=1e-1, var_dict={}):
         #change variables at random position.
         pos=np.random.randint(0,x.size)
         xn1=x.copy(order='F')
-        xn1.ravel(order='F')[pos]+=eta/2.
+        xn1.ravel(order='F')[pos]+=eta_x/2.
         xn2=x.copy(order='F')
-        xn2.ravel(order='F')[pos]-=eta/2.
+        xn2.ravel(order='F')[pos]-=eta_x/2.
         y1=layer.forward(xn1)
         y2=layer.forward(xn2)
         if is_net: y1=y1[-1]; y2=y2[-1]
 
-        ngrad_x=np.sum((y1-y2)*dy)/eta
+        ngrad_x=np.sum((y1-y2)*dy)/eta_x
         diff=abs(dx_[pos]-ngrad_x)
         if diff/max(1,abs(dx_[pos]))>tol:
             print('XBP Diff = %s, Num Diff = %s'%(dx_[pos], ngrad_x))
@@ -127,27 +127,27 @@ def check_numdiff(layer, x=None, num_check=10, eta=None, tol=1e-1, var_dict={}):
     #check dy/dw
     res_w=[]
     var0 = layer.get_variables()
-    if eta is None:
-        eta=0.003+0.004j if np.iscomplexobj(var0) else 0.005
+    if eta_w is None:
+        eta_w=0.003+0.004j if np.iscomplexobj(var0) else 0.005
     for i in range(num_check):
         #change variables at random position.
         pos=np.random.randint(0,var0.size)
         var1=var0.copy()
-        var1[pos]+=eta/2.
+        var1[pos]+=eta_w/2.
         layer.set_variables(var1)
         y1=layer.forward(x)
 
         var2=var0.copy()
-        var2[pos]-=eta/2.
+        var2[pos]-=eta_w/2.
         layer.set_variables(var2)
         y2=layer.forward(x)
         if is_net: y1=y1[-1]; y2=y2[-1]
 
-        ngrad_w=np.sum((y1-y2)*dy)/eta
+        ngrad_w=np.sum((y1-y2)*dy)/eta_w
         diff=abs(dv[pos]-ngrad_w)
         if diff/max(1, abs(dv[pos]))>tol:
             print('WBP Diff = %s, Num Diff = %s'%(dv[pos], ngrad_w))
-            print('Num Diff Test Fail! @var[%s] = %s'%(pos,var[pos]))
+            print('Num Diff Test Fail! @var[%s] = %s'%(pos,var0[pos]))
             res_w.append(False)
         else:
             res_w.append(True)

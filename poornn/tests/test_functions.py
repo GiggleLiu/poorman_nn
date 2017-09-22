@@ -63,13 +63,13 @@ def test_pooling():
             dx=func.backward([x,y],dy)[1]
             assert_allclose(dx.ravel(),dx_true_ravel)
             assert_allclose(dx.shape,[1,1,4,4])
-            assert_(all(check_numdiff(func, eta=1e-4)))
+            assert_(all(check_numdiff(func, eta_x=1e-4)))
 
 def test_pooling_per():
     for mode in ['max', 'max-abs','min','min-abs', 'mean']:
         func=Pooling(input_shape=(10,3,40,40), itype='complex128', kernel_shape=(2,2), mode=mode)
         print("Num Diff test for %s"%func)
-        assert_(all(check_numdiff(func, eta=1e-3)))
+        assert_(all(check_numdiff(func, eta_x=1e-3)))
 
 def test_exp():
     oldshape=(3,4,2)

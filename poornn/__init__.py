@@ -1,7 +1,8 @@
 from .spconv import SPConv
-from .linears import Linear, Apdot
+from .linears import Linear, SPLinear
 from .nets import ParallelNN, ANN
 from .visualize import viznn
 from . import functions
+from . import layers
 from . import core
 from . import lib
