@@ -65,6 +65,7 @@ def build_dnn():
     y_true=zeros(F4); y_true[3]=1
     assert(all(check_numdiff(ann, var_dict={'y_true':y_true, 'seed':2}, eta=1e-3)))
     viznn(ann, filename='%s/data/test_mnist.pdf'%os.path.dirname(__file__))
+    print(ann)
     return ann
 
 def compute_gradient(weight_vec, info_dict):

@@ -6,7 +6,7 @@ from .core import Layer, Function, EXP_OVERFLOW, EMPTY_VAR
 from .lib.pooling import lib as fpooling
 from .lib.convprod import lib as fconvprod
 from .lib.relu import lib as frelu
-from .utils import scan2csc, tuple_prod
+from .utils import scan2csc, tuple_prod, dtype2token
 
 __all__=['Log2cosh','Sigmoid','Cosh','Sinh','Sum','Mul','Mod','Mean','ReLU','ConvProd',
         'Pooling','DropOut','Sin','Cos','Exp','Log','Power',
@@ -91,7 +91,7 @@ class Sum(Function):
     '''
     Sum along specific axis.
     '''
-    __graphviz_attrs__ = ['axis']
+    __display_attrs__ = ['axis']
     def __init__(self, input_shape, itype, axis, **kwargs):
         if axis > len(input_shape)-1: raise ValueError('invalid axis')
         self.axis=axis%len(input_shape)
@@ -114,7 +114,7 @@ class Mean(Function):
     '''
     Mean along specific axis.
     '''
-    __graphviz_attrs__ = ['axis']
+    __display_attrs__ = ['axis']
     def __init__(self,input_shape, itype, axis, **kwargs):
         if axis > len(input_shape)-1: raise ValueError('invalid axis')
         self.axis=axis%len(input_shape)
@@ -138,7 +138,7 @@ class ReLU(Function):
     '''
     ReLU.
     '''
-    __graphviz_attrs__ = ['leak']
+    __display_attrs__ = ['leak']
     def __init__(self, input_shape, itype, leak = 0, is_inplace=False, **kwargs):
         super(ReLU,self).__init__(input_shape, input_shape, itype, tags=dict(is_inplace=is_inplace))
         if leak>1 or leak<0:
@@ -146,16 +146,7 @@ class ReLU(Function):
         self.leak = leak
 
         #use the correct fortran subroutine.
-        if itype=='complex128':
-            dtype_token = 'z'
-        elif itype=='complex64':
-            dtype_token = 'c'
-        elif itype=='float64':
-            dtype_token = 'd'
-        elif itype=='float32':
-            dtype_token = 's'
-        else:
-            raise TypeError("data type error!")
+        dtype_token = dtype2token(np.find_common_type((self.itype,self.dtype),()))
 
         #use the correct function
         self._fforward=eval('frelu.forward_%s'%dtype_token)
@@ -176,7 +167,7 @@ class Pooling(Function):
     Note:
         for complex numbers, what does max pooling looks like?
     '''
-    __graphviz_attrs__ = ['mode', 'kernel_shape']
+    __display_attrs__ = ['mode', 'kernel_shape']
     mode_list = ['max', 'max-abs', 'min', 'min-abs', 'mean']
 
     def __init__(self, input_shape, itype, kernel_shape, mode, **kwargs):
@@ -190,23 +181,11 @@ class Pooling(Function):
         super(Pooling,self).__init__(input_shape, output_shape, itype)
 
         #use the correct fortran subroutine.
-        if itype=='complex128':
-            dtype_token = 'z'
-        elif itype=='complex64':
-            dtype_token = 'c'
-        elif itype=='float64':
-            dtype_token = 'd'
-        elif itype=='float32':
-            dtype_token = 's'
-        else:
-            raise TypeError("data type error!")
+        dtype_token = dtype2token(np.find_common_type((self.itype,self.dtype),()))
 
         #use the correct function
         self._fforward=eval('fpooling.forward_%s'%dtype_token)
         self._fbackward=eval('fpooling.backward_%s'%dtype_token)
-
-    def __repr__(self):
-        return '<%s>(%s): %s -> %s'%(self.__class__.__name__,self.mode, self.input_shape,self.output_shape)
 
     @property
     def img_nd(self):
@@ -242,7 +221,7 @@ class ConvProd(Function):
     '''
     Convolutional product layer.
     '''
-    __graphviz_attrs__ = ['powers', 'strides', 'boundary']
+    __display_attrs__ = ['powers', 'strides', 'boundary']
     def __init__(self, input_shape, itype, powers, strides=None, boundary='O', **kwargs):
         self.boundary = boundary
         self.powers = np.asarray(powers, order='F')
@@ -258,23 +237,11 @@ class ConvProd(Function):
         super(ConvProd,self).__init__(input_shape, output_shape, itype)
 
         #use the correct fortran subroutine.
-        if itype=='complex128':
-            dtype_token = 'z'
-        elif itype=='complex64':
-            dtype_token = 'c'
-        elif itype=='float64':
-            dtype_token = 'd'
-        elif itype=='float32':
-            dtype_token = 's'
-        else:
-            raise TypeError("data type error!")
+        dtype_token = dtype2token(np.find_common_type((self.itype,self.dtype),()))
 
         #use the correct function
         self._fforward=eval('fconvprod.forward_%s'%dtype_token)
         self._fbackward=eval('fconvprod.backward_%s'%dtype_token)
-
-    def __repr__(self):
-        return '<%s>: %s -> %s\n - strides = %s\n - filter = %s'%(self.__class__.__name__, self.input_shape,self.output_shape,self.strides,self.powers)
 
     @property
     def img_nd(self):
@@ -310,7 +277,7 @@ class DropOut(Function):
     '''
     DropOut inplace.
     '''
-    __graphviz_attrs__ = ['axis', 'keep_rate']
+    __display_attrs__ = ['axis', 'keep_rate']
 
     def __init__(self, input_shape, itype, keep_rate, axis, is_inplace=False, **kwargs):
         if axis > len(input_shape)-1: raise ValueError('invalid axis')
@@ -348,7 +315,7 @@ class SoftMax(Function):
     '''
     Soft max function applied on the last axis.
     '''
-    __graphviz_attrs__ = ['axis']
+    __display_attrs__ = ['axis']
 
     def __init__(self, input_shape, itype, axis, **kwargs):
         self.axis=axis
@@ -369,6 +336,7 @@ class CrossEntropy(Function):
         q = x
     '''
     ZERO_REF=1e-15
+    __display_attrs__ = ['axis']
 
     def __init__(self, input_shape, itype, axis, **kwargs):
         if axis > len(input_shape)-1: raise ValueError('invalid axis')
@@ -394,7 +362,7 @@ class SoftMaxCrossEntropy(Function):
     Cross Entropy sum(p*log(q)). With p the true labels.
         q = exp(x)/sum(exp(x))
     '''
-    __graphviz_attrs__ = ['axis']
+    __display_attrs__ = ['axis']
 
     def __init__(self, input_shape, itype, axis, **kwargs):
         if axis > len(input_shape)-1: raise ValueError('invalid axis')
@@ -526,7 +494,7 @@ class TypeCast(Function):
         return EMPTY_VAR, np.asarray(dy, dtype=self.itype, order='F')
 
 class Transpose(Function):
-    __graphviz_attrs__ = ['axes']
+    __display_attrs__ = ['axes']
     def __init__(self, input_shape, itype, axes, **kwargs):
         self.axes=axes
         if len(axes)!=len(input_shape):
@@ -543,7 +511,7 @@ class Transpose(Function):
 
 class Mul(Function):
     '''Multiply by a constant'''
-    __graphviz_attrs__ = ['alpha']
+    __display_attrs__ = ['alpha']
 
     def __init__(self, input_shape, itype, alpha, **kwargs):
         self.alpha = alpha
@@ -554,7 +522,7 @@ class Mul(Function):
 
 class Mod(Function):
     '''Mod by a constant'''
-    __graphviz_attrs__ = ['n']
+    __display_attrs__ = ['n']
 
     def __init__(self, input_shape, itype, n, **kwargs):
         self.n = n
@@ -581,7 +549,7 @@ class Power(Function):
     '''
     Function x**order
     '''
-    __graphviz_attrs__ = ['order']
+    __display_attrs__ = ['order']
     def __init__(self, input_shape, itype, order, **kwargs):
         super(Power, self).__init__(input_shape, input_shape, itype)
         self.order = order
@@ -614,7 +582,7 @@ class Cache(Function):
 
 class Filter(Function):
     '''Momentum Filter.'''
-    __graphviz_attrs__ = ['momentum', 'axes']
+    __display_attrs__ = ['momentum', 'axes']
 
     def __init__(self, input_shape, itype, momentum, axes, **kwargs):
         # sort axes and momentum
@@ -633,9 +601,6 @@ class Filter(Function):
         #np.prod(np.ix_([np.exp(-1j*k*np.arange(ni))/ni for ki,ni in zip(momentum,size)]),axis=0)
         super(Filter, self).__init__(input_shape, output_shape, itype)
 
-    def __repr__(self):
-        return '<%s>: %s -> %s\n - momentum = %s\n - axes = %s'%(self.__class__.__name__, self.input_shape,self.output_shape,self.momentum,self.axes)
-
     def forward(self, x):
         y = x
         for axis, fltr in zip(self.axes[::-1], self.filters[::-1]):
@@ -648,5 +613,3 @@ class Filter(Function):
         for axis, fltr in zip(self.axes, self.filters):
             dx = np.asarray(dx, order='F')[(slice(None),)*axis+(np.newaxis,)]*fltr.reshape(fltr.shape[:dx.ndim+1])
         return EMPTY_VAR, dx
-
-

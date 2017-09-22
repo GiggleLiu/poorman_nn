@@ -8,7 +8,7 @@ import pdb,time
 
 from .lib.spconv import lib as fspconv
 from .lib.spsp import lib as fspsp
-from .utils import scan2csc, tuple_prod, spscan2csc, masked_concatenate
+from .utils import scan2csc, tuple_prod, spscan2csc, masked_concatenate, dtype2token
 from .linears import LinearBase
 
 __all__ = ['SPConv']
@@ -29,7 +29,7 @@ class SPConv(LinearBase):
         :csc_indices: 1darray, row indicator for input array.
         :weight_indices: 1darray, row indicator for filter array (if not contiguous).
     '''
-    __graphviz_attrs__ = ['strides', 'boundary', 'kernel_shape', 'var_mask']
+    __display_attrs__ = ['strides', 'boundary', 'kernel_shape', 'var_mask']
 
     def __init__(self, input_shape, itype, weight, bias, strides=None, boundary = "P", w_contiguous = True, var_mask=(1,1), **kwargs):
         super(SPConv, self).__init__(input_shape, itype=itype, weight=weight, bias=bias, var_mask=var_mask)
@@ -46,16 +46,7 @@ class SPConv(LinearBase):
         self.output_shape = input_shape[:-img_nd-1]+(self.num_feature_out,)+self.img_out_shape
 
         #use the correct fortran subroutine.
-        if itype=='complex128':
-            dtype_token = 'z'
-        elif itype=='complex64':
-            dtype_token = 'c'
-        elif itype=='float64':
-            dtype_token = 'd'
-        elif itype=='float32':
-            dtype_token = 's'
-        else:
-            raise TypeError("dtype error!")
+        dtype_token = dtype2token(np.find_common_type((self.itype,self.dtype),()))
 
         if not w_contiguous:
             self.weight_indices = np.asarray(np.tile(np.arange(tuple_prod(kernel_shape),dtype='int32'),tuple_prod(img_out_shape)), order='F')+1  #pointer to filter data
@@ -72,9 +63,6 @@ class SPConv(LinearBase):
             self._fforward1=eval('fspconv.forward1_contiguous%s'%dtype_token)
             self._fbackward=eval('fspconv.backward_contiguous%s'%dtype_token)
             self._fbackward1=eval('fspconv.backward1_contiguous%s'%dtype_token)
-
-    def __str__(self):
-        return self.__repr__()+'\n  - dtype = %s\n  - filter => %s\n  - strides => %s\n  - bias => %s'%(self.weight.dtype,self.weight.shape,self.strides,self.bias.shape)
 
     @property
     def img_nd(self):
@@ -189,26 +177,12 @@ class SPSP(SPConv):
         if self.num_feature_out*tuple_prod(self.img_out_shape) != cscmat.shape[1]:
             raise ValueError('csc matrix output shape mismatch! %s get, but %s desired.'%(cscmat.shape[1], self.num_feature_out*tuple_prod(self.img_out_shape)))
 
-        # generate a larger csc_indptr, csc_indices by convolution.
-
         # use the correct fortran subroutine.
-        if itype=='complex128':
-            dtype_token = 'z'
-        elif itype=='complex64':
-            dtype_token = 'c'
-        elif itype=='float64':
-            dtype_token = 'd'
-        elif itype=='float32':
-            dtype_token = 's'
-        else:
-            raise TypeError("dtype error!")
+        dtype_token = dtype2token(np.find_common_type((self.itype,self.dtype),()))
 
         # select function
         self._fforward=eval('fspsp.forward_conv%s'%dtype_token)
         self._fbackward=eval('fspsp.backward_conv%s'%dtype_token)
-
-    def __str__(self):
-        return self.__repr__()+'\n  dtype = %s\n  csc matrix => %s\n  bias => %s'%(self.dtype,self.cscmat.shape,self.bias.shape)
 
     @property
     def img_nd(self):
@@ -246,7 +220,7 @@ class SPConvProd(LinearBase):
     '''
     Convolutional product layer, the version with variables.
     '''
-    __graphviz_attrs__ = ['strides', 'boundary', 'kernel_shape', 'var_mask']
+    __display_attrs__ = ['strides', 'boundary', 'kernel_shape', 'var_mask']
 
     def __init__(self, input_shape, dtype, weight, bias, strides=None, boundary='O', var_mask=(1,1), **kwargs):
         super(SPConvProd, self).__init__(input_shape, dtype=dtype, weight=weight, bias=bias, var_mask=var_mask)
@@ -263,23 +237,11 @@ class SPConvProd(LinearBase):
         output_shape = input_shape[:-img_nd]+self.img_out_shape
 
         #use the correct fortran subroutine.
-        if dtype=='complex128':
-            dtype_token = 'z'
-        elif dtype=='complex64':
-            dtype_token = 'c'
-        elif dtype=='float64':
-            dtype_token = 'd'
-        elif dtype=='float32':
-            dtype_token = 's'
-        else:
-            raise TypeError("data type error!")
+        dtype_token = dtype2token(np.find_common_type((self.itype,self.dtype),()))
 
         #use the correct function
         self._fforward=eval('fspconvprod.forward_%s'%dtype_token)
         self._fbackward=eval('fspconvprod.backward_%s'%dtype_token)
-
-    def __str__(self):
-        return self.__repr__()+'\n  - dtype = %s\n  - filter => %s\n  - strides => %s\n  - bias => %s'%(self.dtype,self.weight.shape,self.strides,self.bias.shape)
 
     @property
     def img_nd(self):

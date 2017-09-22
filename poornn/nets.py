@@ -48,10 +48,10 @@ class ANN(Layer):
                     else:
                         raise Exception('Shape between layers(%s,%s) mismatch! in%s, out%s'%(la,lb, la.output_shape, lb.input_shape))
 
-    def __str__(self):
+    def __str__(self, offset=0):
         s='<%s>, layers ='%self.__class__.__name__
         for layer in self.layers:
-            s+='\n  '+layer.__str__()
+            s+='\n  - '+layer.__str__(offset=offset+4)
         return s
 
     def __graphviz__(self, g, father=None):
@@ -211,10 +211,10 @@ class ParallelNN(Layer):
                 if sa!=sb and sa!=-1 and sb!=-1:
                     raise Exception('Shape for layers %s mismatch!'%la)
 
-    def __str__(self):
+    def __str__(self, offset=0):
         s='<%s>, layers ='%self.__class__.__name__
         for layer in self.layers:
-            s+='\n  '+layer.__str__()
+            s+='\n  - '+layer.__str__(offset=offset+4)
         return s
 
     def __graphviz__(self, g, father=None):

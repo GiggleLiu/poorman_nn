@@ -9,7 +9,7 @@ import pdb
 from .core import Layer, EMPTY_VAR
 from .lib.spsp import lib as fspsp
 from .lib.linear import lib as flinear
-from .utils import masked_concatenate
+from .utils import masked_concatenate, dtype2token
 
 __all__=['LinearBase', 'Linear', 'SPLinear', 'Apdot']
 
@@ -22,7 +22,7 @@ class LinearBase(Layer):
         :weight: 2darray, (fout, fin), in fortran order.
         :bias: 1darray, (fout,)
     '''
-    __graphviz_attrs__ = ['var_mask']
+    __display_attrs__ = ['var_mask']
     def __init__(self, input_shape, itype, weight, bias, var_mask=(1,1)):
         if sps.issparse(weight):
             self.weight = weight.tocsr()
@@ -31,10 +31,7 @@ class LinearBase(Layer):
         self.bias = np.asarray(bias)
         output_shape = input_shape[:-1]+(weight.shape[0],)
         self.var_mask = var_mask
-        super(LinearBase, self).__init__(input_shape, output_shape, itype=itype)
-
-    def __str__(self):
-        return self.__repr__()+'\n  - dtype = %s\n  - weight => %s\n  - bias => %s'%(self.weight.dtype,self.weight.shape,self.bias.shape)
+        super(LinearBase, self).__init__(input_shape, output_shape, itype=itype, dtype=np.find_common_type((weight.dtype,bias.dtype),()))
 
     def get_variables(self):
         dvar=masked_concatenate([self.weight.ravel(order='F') if not sps.issparse(self.weight) else self.weight.data, self.bias], self.var_mask)
@@ -60,16 +57,7 @@ class Linear(LinearBase):
             raise ValueError('Shape Mismatch!')
         super(Linear, self).__init__(input_shape, itype=itype, weight=weight, bias=bias, var_mask=var_mask)
 
-        if itype=='complex128':
-            dtype_token = 'z'
-        elif itype=='complex64':
-            dtype_token = 'c'
-        elif itype=='float64':
-            dtype_token = 'd'
-        elif itype=='float32':
-            dtype_token = 's'
-        else:
-            raise TypeError("dtype error!")
+        dtype_token = dtype2token(np.find_common_type((self.itype,self.dtype),()))
         self._fforward=eval('flinear.forward_%s'%(dtype_token))
         self._fbackward=eval('flinear.backward_%s'%(dtype_token))
 
@@ -119,16 +107,7 @@ class SPLinear(LinearBase):
             raise ValueError('Shape Mismatch!')
         super(SPLinear, self).__init__(input_shape, itype=itype, weight=weight, bias=bias, var_mask=var_mask)
 
-        if itype=='complex128':
-            dtype_token = 'z'
-        elif itype=='complex64':
-            dtype_token = 'c'
-        elif itype=='float64':
-            dtype_token = 'd'
-        elif itype=='float32':
-            dtype_token = 's'
-        else:
-            raise TypeError("dtype error!")
+        dtype_token = dtype2token(np.find_common_type((self.itype,self.dtype),()))
         self._fforward=eval('fspsp.forward%s'%(dtype_token))
         self._fbackward=eval('fspsp.backward%s'%(dtype_token))
 

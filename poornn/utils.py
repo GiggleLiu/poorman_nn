@@ -2,7 +2,8 @@ from __future__ import division
 import numpy as np
 import pdb
 
-__all__=['take_slice', 'scan2csc', 'typed_random', 'typed_randn', 'tuple_prod', 'masked_concatenate']
+__all__=['take_slice', 'scan2csc', 'typed_random', 'typed_randn', 'tuple_prod',
+        'masked_concatenate', 'dtype2token']
 
 def take_slice(arr,sls,axis):
     '''take using slices.'''
@@ -168,6 +169,21 @@ def _connect(g, start, end, arr_shape, dtype, pos='mid'):
         end = get_node(nodes)
     g.add_edge(start, end, label='<<font point-size="10px">%s</font><br align="center"/>\
 <font point-size="10px">%s</font><br align="center"/>>'%(arr_shape, dtype), **kwargs)
+
+def dtype2token(dtype):
+    '''Parse data type to token.'''
+    if dtype=='complex128':
+        dtype_token = 'z'
+    elif dtype=='complex64':
+        dtype_token = 'c'
+    elif dtype=='float64':
+        dtype_token = 'd'
+    elif dtype=='float32':
+        dtype_token = 's'
+    else:
+        raise TypeError("dtype error - get %s!"%dtype)
+    return dtype_token
+
 
 if __name__ == '__main__':
     typed_randn('float64',(2,2))

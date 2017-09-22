@@ -9,11 +9,15 @@ class PReLU(Layer):
     '''
     Parametric ReLU.
     '''
-    def __init__(self, leak = 0, itype='float32'):
+    __display_attrs__ = ['leak']
+
+    def __init__(self, input_shape, itype, leak = 0):
         self.leak = leak
         self.itype=itype
         if leak>1 or leak<0:
             raise ValueError('leak parameter should be 0-1!')
+        super(PReLU,self)__init__(input_shape, input_shape, itype, otype=itype,
+                dtype=np.dtype(type(leak)).name)
 
     def __call__(self,x):
         return self.forward(x)

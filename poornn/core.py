@@ -7,7 +7,7 @@ from abc import ABCMeta, abstractmethod
 from collections import namedtuple
 import pdb
 
-from .utils import _connect
+from .utils import _connect, dtype2token
 
 __all__=['Layer','Function', 'EXP_OVERFLOW', 'EMPTY_VAR']
 
@@ -39,12 +39,14 @@ class Layer(object):
 
     __metaclass__ = ABCMeta
 
-    def __init__(self, input_shape, output_shape, itype, otype=None, tags=None):
+    def __init__(self, input_shape, output_shape, itype, dtype=None, otype=None, tags=None):
         self.input_shape = input_shape
         self.output_shape = output_shape
         self.itype = itype
         if otype is None: otype = itype
+        if dtype is None: dtype = itype
         self.otype=otype
+        self.dtype=dtype
 
         # set tags
         self.tags = {
@@ -58,18 +60,23 @@ class Layer(object):
                     print('You have used a user defined tag %s'%k)
                 self.tags[k] = v
 
-    def __str__(self):
-        return self.__repr__()
+    def __str__(self, offset=0):
+        s = self.__repr__()
+        if hasattr(self,'__display_attrs__'):
+            for attr in self.__display_attrs__:
+                s+='\n'+' '*offset+'  - %s = %s'%(attr, getattr(self,attr))
+        return s
 
-    def __repr__(self):
-        return '<%s>: %s -> %s'%(self.__class__.__name__,self.input_shape,self.output_shape)
+    def __repr__(self, offset=0):
+        return '<%s|%s>: %s|%s -> %s|%s'%(self.__class__.__name__,dtype2token(self.dtype),self.input_shape,
+                dtype2token(self.itype),self.output_shape,dtype2token(self.otype))
 
     def __graphviz__(self, g, father=None):
         node_token = '%s'%id(self)
         label = '<%s<br/>'%(self.__class__.__name__)
         attrs = ['itype']
-        if hasattr(self, '__graphviz_attrs__'):
-            attrs.extend(self.__graphviz_attrs__)
+        if hasattr(self, '__display_attrs__'):
+            attrs.extend(self.__display_attrs__)
         for attr in attrs:
             label+='<font color="#225566" point-size="10px"> %s = %s</font><br align="left"/>'%(attr, getattr(self,attr))
         label+='>'
