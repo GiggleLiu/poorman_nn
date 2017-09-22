@@ -61,7 +61,7 @@ class Layer(object):
                 self.tags[k] = v
 
     def __str__(self, offset=0):
-        s = self.__repr__()
+        s = ' '*offset+self.__repr__()
         if hasattr(self,'__display_attrs__'):
             for attr in self.__display_attrs__:
                 s+='\n'+' '*offset+'  - %s = %s'%(attr, getattr(self,attr))

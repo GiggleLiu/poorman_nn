@@ -10,7 +10,7 @@ from .core import Layer, Function
 from . import functions
 from .spconv import SPConv
 from .linears import Linear
-from .utils import _connect
+from .utils import _connect, dtype2token
 
 __all__=['ANN', 'ParallelNN']
 
@@ -27,8 +27,11 @@ class ANN(Layer):
         if layers is None: layers = []
         self.layers = layers
         self.do_shape_check = do_shape_check
+
         self.itype = itype
+        self.dtype = None
         self.tags = None
+        # input_shape and output_shape are defined as properties.
 
         #check connections
         if len(layers)<2: return
@@ -49,10 +52,14 @@ class ANN(Layer):
                         raise Exception('Shape between layers(%s,%s) mismatch! in%s, out%s'%(la,lb, la.output_shape, lb.input_shape))
 
     def __str__(self, offset=0):
-        s='<%s>, layers ='%self.__class__.__name__
+        s = ' '*offset+self.__repr__()
         for layer in self.layers:
-            s+='\n  - '+layer.__str__(offset=offset+4)
+            s+='\n'+layer.__str__(offset=offset+4)
         return s
+
+    def __repr__(self, offset=0):
+        return '<%s>: %s|%s -> %s'%(self.__class__.__name__,self.input_shape,
+                dtype2token(self.itype),self.output_shape)
 
     def __graphviz__(self, g, father=None):
         node = 'cluster-%s'%id(self)
@@ -212,9 +219,9 @@ class ParallelNN(Layer):
                     raise Exception('Shape for layers %s mismatch!'%la)
 
     def __str__(self, offset=0):
-        s='<%s>, layers ='%self.__class__.__name__
+        s = ' '*offset+self.__repr__()
         for layer in self.layers:
-            s+='\n  - '+layer.__str__(offset=offset+4)
+            s+='\n'+layer.__str__(offset=offset+4)
         return s
 
     def __graphviz__(self, g, father=None):
