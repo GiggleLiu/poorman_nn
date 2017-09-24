@@ -2,7 +2,7 @@ from __future__ import division
 import numpy as np
 import pdb
 
-__all__=['take_slice', 'scan2csc', 'typed_random', 'typed_randn', 'tuple_prod',
+__all__=['take_slice', 'scan2csc', 'typed_random', 'typed_randn', 'typed_uniform', 'tuple_prod',
         'masked_concatenate', 'dtype2token']
 
 def take_slice(arr,sls,axis):
@@ -124,6 +124,20 @@ def typed_randn(dtype, shape):
     else:
         return np.transpose(np.random.randn(*shape[::-1])).astype(np.dtype(dtype))
 
+def typed_uniform(dtype, shape, low=-1., high=1.):
+    '''
+    Typed random normal distributions, in fortran order.
+    '''
+    #fix shape with dummy index.
+    shp=[si if si>=0 else np.random.randint(1,21) for si in shape]
+
+    if dtype=='complex128':
+        return np.transpose(np.random.uniform(low,high,shape[::-1])+1j*np.random.uniform(low,high,shape[::-1]))
+    elif dtype=='complex64':
+        return np.complex64(typed_uniform('complex128', shape,low,high))
+    else:
+        return np.transpose(np.random.uniform(low,high,shape[::-1])).astype(np.dtype(dtype))
+
 def tuple_prod(tp):
     '''
     Product of a tuple of numbers.
@@ -186,4 +200,6 @@ def dtype2token(dtype):
 
 
 if __name__ == '__main__':
+    print(typed_uniform('complex128',(2,2)))
+    print(typed_uniform('float64',(2,2)))
     typed_randn('float64',(2,2))

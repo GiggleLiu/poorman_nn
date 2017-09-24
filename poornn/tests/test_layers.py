@@ -8,10 +8,11 @@ from ..utils import typed_randn
 
 def test_poly():
     kernels = ['polynomial','chebyshev', 'legendre','laguerre','hermite','hermiteE']
-    for kernel in kernels:
-        func=Poly(input_shape=(-1,2), itype='complex128',params=[3.,2,2+1j], kernel=kernel)
-        print('Test numdiff for %s.'%func)
-        assert_(all(check_numdiff(func)))
+    for factorial_rescale in [True,False]:
+        for kernel in kernels:
+            func=Poly(input_shape=(-1,2), itype='complex128',params=[3.,2,2+1j], kernel=kernel, factorial_rescale = factorial_rescale)
+            print('Test numdiff for %s.'%func)
+            assert_(all(check_numdiff(func)))
 
 def test_all():
     random.seed(3)

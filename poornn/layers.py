@@ -1,5 +1,6 @@
 import numpy as np
 from numpy.polynomial import Polynomial, Chebyshev, Legendre, Laguerre, Hermite, HermiteE
+from scipy.misc import factorial
 import pdb
 
 from .core import Layer
@@ -53,13 +54,15 @@ class Poly(Layer):
     '''
     Ploynomial function layer.
 
-        e.g. for polynomial kernel, we have f(x) = \sum_i params[i]*x^i
+        e.g. for polynomial kernel, we have 
+            * f(x) = \sum_i params[i]*x^i/i!  (factorial_rescale == True)
+            * f(x) = \sum_i params[i]*x^i  (factorial_rescale == False)
     '''
-    __display_attrs__ = ['kernel', 'max_order', 'var_mask']
+    __display_attrs__ = ['kernel', 'max_order', 'var_mask', 'factorial_rescale']
     kernel_dict = {'polynomial':Polynomial,'chebyshev':Chebyshev,
             'legendre':Legendre,'laguerre':Laguerre,'hermite':Hermite,'hermiteE':HermiteE}
 
-    def __init__(self, input_shape, itype, params, kernel='polynomial', var_mask=None):
+    def __init__(self, input_shape, itype, params, kernel='polynomial', var_mask=None, factorial_rescale=False):
         # check input data
         params = np.asarray(params)
         if var_mask is None:
@@ -75,26 +78,29 @@ class Poly(Layer):
         self.params = params
         self.kernel = kernel
         self.var_mask = var_mask
+        self.factorial_rescale = factorial_rescale
 
     @property
     def max_order(self):
         return len(self.params)-1
 
     def forward(self, x, **kwargs):
-        p = self.kernel_dict[self.kernel](self.params)
+        factor = 1./factorial(np.arange(len(self.params))) if self.factorial_rescale else 1
+        p = self.kernel_dict[self.kernel](self.params*factor)
         y = p(x)
         return y
 
     def backward(self, xy, dy, **kwargs):
+        factor = 1./factorial(np.arange(len(self.params))) if self.factorial_rescale else np.ones(len(self.params))
         x,y = xy
-        p = self.kernel_dict[self.kernel](self.params)
+        p = self.kernel_dict[self.kernel](self.params*factor)
         dp = p.deriv()
         dx = dp(x)*dy
         dw = []
         for i,mask in enumerate(self.var_mask):
             if mask:
                 basis_func = self.kernel_dict[self.kernel].basis(i)
-                dwi = (basis_func(x)*dy).sum()
+                dwi = (basis_func(x)*dy*factor[i]).sum()
                 dw.append(dwi)
         return np.array(dw, dtype=self.dtype), dx
 
