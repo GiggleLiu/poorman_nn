@@ -14,9 +14,15 @@ def test_poly():
             print('Test numdiff for %s.'%func)
             assert_(all(check_numdiff(func)))
 
+def test_mobius():
+    func=Mobius(input_shape=(-1,2), itype='complex128',params=[1,2j,1e10], var_mask=[1,1,0])
+    print('Test numdiff for %s.'%func)
+    assert_(all(check_numdiff(func)))
+
 def test_all():
     random.seed(3)
     test_poly()
+    test_mobius()
 
 if __name__=='__main__':
     test_all()

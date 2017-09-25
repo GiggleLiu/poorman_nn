@@ -5,7 +5,7 @@ import pdb
 
 from .core import Layer
 
-__all__=['PReLU', 'Poly']
+__all__=['PReLU', 'Poly', 'Mobius']
 
 class PReLU(Layer):
     '''
@@ -102,6 +102,57 @@ class Poly(Layer):
                 basis_func = self.kernel_dict[self.kernel].basis(i)
                 dwi = (basis_func(x)*dy*factor[i]).sum()
                 dw.append(dwi)
+        return np.array(dw, dtype=self.dtype), dx
+
+    def get_variables(self):
+        return self.params[self.var_mask]
+
+    def set_variables(self, a):
+        self.params[self.var_mask] = a
+
+    @property
+    def num_variables(self):
+        return self.var_mask.sum()
+
+class Mobius(Layer):
+    '''
+    Mobius transformation, f(x) = (z-a)(b-c)/(z-c)(b-a)
+    
+    a, b, c map to 0, 1 Inf respectively.
+    '''
+    __display_attrs__ = ['var_mask']
+
+    def __init__(self, input_shape, itype, params, var_mask=None):
+        # check input data
+        if len(params)!=3:
+            raise ValueError('Mobius take 3 params! but get %s'%len(params))
+        params = np.asarray(params)
+        if var_mask is None:
+            var_mask = np.ones(len(params),dtype='bool')
+        else:
+            var_mask = np.asarray(var_mask, dtype='bool')
+
+        dtype = params.dtype.name
+        otype = np.find_common_type((dtype, itype),())
+        super(Mobius,self).__init__(input_shape, input_shape, itype, otype=otype, dtype=dtype)
+        self.params = params
+        self.var_mask = var_mask
+
+    def forward(self, x, **kwargs):
+        a,b,c = self.params
+        return (b-c)/(b-a)*(x-a)/(x-c)
+
+    def backward(self, xy, dy, **kwargs):
+        x, y = xy
+        a,b,c = self.params
+        dx = (a-c)*(c-b)/(a-b)/(x-c)**2*dy
+        dw = []
+        if self.var_mask[0]:
+            dw.append((b-c)/(a-b)**2*((x-b)/(x-c)*dy).sum())
+        if self.var_mask[1]:
+            dw.append(-(a-c)/(a-b)**2*((x-a)/(x-c)*dy).sum())
+        if self.var_mask[2]:
+            dw.append(((x-a)*(x-b)/(x-c)**2/(a-b)*dy).sum())
         return np.array(dw, dtype=self.dtype), dx
 
     def get_variables(self):

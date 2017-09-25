@@ -1,4 +1,5 @@
 import numpy as np
+import scipy
 from numbers import Number
 import pdb
 
@@ -9,7 +10,7 @@ from .lib.relu import lib as frelu
 from .utils import scan2csc, tuple_prod, dtype2token
 
 __all__=['Log2cosh','Sigmoid','Cosh','Sinh','Sum','Mul','Mod','Mean','ReLU','ConvProd',
-        'Pooling','DropOut','Sin','Cos','Exp','Log','Power',
+        'Pooling','DropOut','Sin','Cos','Exp','Log','SoftPlus','Power',
         'SoftMax','CrossEntropy','SoftMaxCrossEntropy','SquareLoss', 'Reshape','Transpose',
         'TypeCast', 'Print', 'Cache', 'Filter']
 
@@ -20,9 +21,10 @@ class Log2cosh(Function):
     def __init__(self, input_shape, itype, **kwargs):
         super(Log2cosh, self).__init__(input_shape, input_shape, itype)
 
+    @classmethod
     def forward(self,x):
         if np.ndim(x)==0:
-            return np.log(2*np.cosh(x)) if abs(x.real)<=12 else np.sign(x.real)*x
+            return scipy.log(2*np.cosh(x)) if abs(x.real)<=12 else np.sign(x.real)*x
         x=np.asarray(x)
         res=np.zeros_like(x)
         m1=x.real>EXP_OVERFLOW
@@ -30,9 +32,10 @@ class Log2cosh(Function):
         m3=~(m1|m2)
         res[m1]=x[m1]
         res[m2]=-x[m2]
-        res[m3]=np.log(2*np.cosh(x[m3]))
-        return res.reshape(self.output_shape, order='F')
+        res[m3]=scipy.log(2*np.cosh(x[m3]))
+        return res
 
+    @classmethod
     def backward(self,xy,dy, **kwargs):
         x, y = xy
         return EMPTY_VAR,np.tanh(x)*dy
@@ -45,9 +48,11 @@ class Cosh(Function):
     def __init__(self, input_shape, itype, **kwargs):
         super(Cosh, self).__init__(input_shape, input_shape, itype)
 
+    @classmethod
     def forward(self,x):
         return np.cosh(x)
 
+    @classmethod
     def backward(self,xy,dy, **kwargs):
         x, y = xy
         return EMPTY_VAR,np.sinh(x)*dy
@@ -59,20 +64,23 @@ class Sinh(Function):
     def __init__(self, input_shape, itype, **kwargs):
         super(Sinh, self).__init__(input_shape, input_shape, itype)
 
+    @classmethod
     def forward(self,x):
         return np.sinh(x)
 
+    @classmethod
     def backward(self,xy,dy, **kwargs):
         x, y = xy
         return EMPTY_VAR,np.cosh(x)*dy
 
 class Sigmoid(Function):
     '''
-    Function log(2*cosh(theta)).
+    Function 1/(1+exp(-x))
     '''
     def __init__(self, input_shape, itype, **kwargs):
         super(Sigmoid, self).__init__(input_shape, input_shape, itype)
 
+    @classmethod
     def forward(self,x):
         #for ndarray
         y=np.zeros_like(x)
@@ -83,6 +91,7 @@ class Sigmoid(Function):
         y[m3]=1/(1+np.exp(-x[m3]))
         return y
 
+    @classmethod
     def backward(self,xy,dy, **kwargs):
         x, y = xy
         return EMPTY_VAR,y*(1-y)*dy
@@ -351,7 +360,7 @@ class CrossEntropy(Function):
             :x: ndarray, note 0 < x <= 1.
             :y_true: ndarray, correct one-hot y.
         '''
-        return (-self.y_true*np.log(np.maximum(self.ZERO_REF,x))).sum(axis=self.axis)
+        return (-self.y_true*scipy.log(np.maximum(self.ZERO_REF,x))).sum(axis=self.axis)
 
     def backward(self, xy, dy, **kwargs):
         x,y = xy
@@ -382,7 +391,7 @@ class SoftMaxCrossEntropy(Function):
         x=x-x.max(axis=self.axis, keepdims=True)
         rho=np.exp(x)
         Z=rho.sum(axis=self.axis, keepdims=True)
-        return ((np.log(Z)-x)*self.y_true).sum(axis=self.axis)
+        return ((scipy.log(Z)-x)*self.y_true).sum(axis=self.axis)
 
     def backward(self, xy, dy, **kwargs):
         x,y = xy
@@ -424,9 +433,11 @@ class Exp(Function):
     def __init__(self, input_shape, itype, **kwargs):
         super(Exp, self).__init__(input_shape, input_shape, itype)
 
+    @classmethod
     def forward(self,x):
         return np.exp(x)
 
+    @classmethod
     def backward(self,xy,dy, **kwargs):
         x, y = xy
         return EMPTY_VAR,dy*y
@@ -438,9 +449,11 @@ class Log(Function):
     def __init__(self, input_shape, itype, **kwargs):
         super(Log, self).__init__(input_shape, input_shape, itype)
 
+    @classmethod
     def forward(self,x):
-        return np.log(x.astype(self.itype))
+        return scipy.log(x)
 
+    @classmethod
     def backward(self,xy,dy, **kwargs):
         x, y = xy
         return EMPTY_VAR,dy/x
@@ -453,9 +466,11 @@ class Sin(Function):
     def __init__(self, input_shape, itype, **kwargs):
         super(Sin, self).__init__(input_shape, input_shape, itype)
 
+    @classmethod
     def forward(self,x):
         return np.sin(x)
 
+    @classmethod
     def backward(self,xy,dy, **kwargs):
         x, y = xy
         return EMPTY_VAR,dy*np.cos(x)
@@ -467,12 +482,30 @@ class Cos(Function):
     def __init__(self, input_shape, itype, **kwargs):
         super(Cos, self).__init__(input_shape, input_shape, itype)
 
+    @classmethod
     def forward(self,x):
         return np.cos(x)
 
+    @classmethod
     def backward(self,xy,dy, **kwargs):
         x, y = xy
         return EMPTY_VAR,-dy*np.sin(x)
+
+class SoftPlus(Function):
+    '''
+    Function log(1+exp(x))
+    '''
+    def __init__(self, input_shape, itype, **kwargs):
+        super(SoftPlus, self).__init__(input_shape, input_shape, itype)
+
+    @classmethod
+    def forward(self,x):
+        return scipy.log(1+np.exp(x))
+
+    @classmethod
+    def backward(self,xy,dy, **kwargs):
+        x, y = xy
+        return EMPTY_VAR,dy*Sigmoid.forward(x)
 
 class Reshape(Function):
     def forward(self, x):
@@ -517,8 +550,11 @@ class Mul(Function):
         self.alpha = alpha
         super(Mul, self).__init__(input_shape, input_shape, itype)
 
-    def forward(self, x): return self.alpha*x
-    def backward(self,xy, dy, **kwargs): return EMPTY_VAR, self.alpha*dy
+    def forward(self, x):
+        return self.alpha*x
+
+    def backward(self,xy, dy, **kwargs):
+        return EMPTY_VAR, self.alpha*dy
 
 class Mod(Function):
     '''Mod by a constant'''
@@ -528,18 +564,24 @@ class Mod(Function):
         self.n = n
         super(Mod, self).__init__(input_shape, input_shape, itype)
 
-    def forward(self, x): return x%self.n
-    def backward(self,xy, dy, **kwargs): return EMPTY_VAR, dy
+    def forward(self, x):
+        return x%self.n
+
+    @classmethod
+    def backward(self,xy, dy, **kwargs):
+        return EMPTY_VAR, dy
 
 class Print(Function):
     '''Print data without changing anything.'''
     def __init__(self, input_shape, itype, **kwargs):
         super(Print, self).__init__(input_shape, input_shape, itype)
 
+    @classmethod
     def forward(self, x):
         print('Forward\n -  x = %s'%x)
         return x
     
+    @classmethod
     def backward(self, xy, dy, **kwargs):
         x,y=xy
         print('Backward\n -  x = %s\n -  y = %s\n -  dy = %s'%(x,y,dy))
@@ -595,8 +637,9 @@ class Filter(Function):
         self.momentum = momentum
         self.axes = axes
         size = [input_shape[axis] for axis in axes]
-        dtype = 'float64' if all(momentum%np.pi==0) else 'complex128'
-        self.filters = [np.exp(-1j*momentum*np.arange(ni)).astype(dtype).reshape([1]*axis+[-1]+[1]*(DIM-axis-1))/ni for ki,axis,ni in zip(momentum,axes,size)]
+        self.filters = [np.exp(-1j*momentum*np.arange(ni)).reshape([1]*axis+[-1]+[1]*(DIM-axis-1))/ni for ki,axis,ni in zip(momentum,axes,size)]
+        if all(momentum%np.pi==0):
+            self.filters = [flt.real for flt in self.filters]
         output_shape = tuple([dim for axis,dim in enumerate(input_shape) if axis not in axes])
         #np.prod(np.ix_([np.exp(-1j*k*np.arange(ni))/ni for ki,ni in zip(momentum,size)]),axis=0)
         super(Filter, self).__init__(input_shape, output_shape, itype)

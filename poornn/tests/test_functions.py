@@ -8,16 +8,18 @@ from ..functions import *
 from ..checks import check_numdiff
 from ..utils import typed_randn
 
-def test_sigmoid():
+def test_sigmoidsoftplus():
     func=Sigmoid((-1,),itype='complex128')
-    print('Test forward for %s'%func)
+    func2=SoftPlus((-1,),itype='complex128')
+    print('Test forward for \n%s\n%s'%(func, func2))
     xs=array([-1e100,-1e20,-0.5j*pi,-log(2),0,log(2),0.5j*pi,1e20,1e100])
     ys=array([0.,0.,1./(1+1j),1./3,0.5,2./3,1./(1-1j),1.,1.])
     dydx=[0.,0.,1j/(1+1j)**2,2./9,0.25,2./9,-1j/(1-1j)**2,0.,0.]
     assert_allclose(func.forward(xs),ys)
-    print('Test backward for Sigmoid')
+    print('Test backward for Sigmoid and SoftPlus')
     assert_allclose(func.backward([xs,ys],1.)[1],dydx)
-    assert_(all(check_numdiff(func, xs)))
+    assert_(all(check_numdiff(func)))
+    assert_(all(check_numdiff(func2)))
 
 def test_log2cosh():
     func=Log2cosh((-1,),itype='complex128')
@@ -29,7 +31,7 @@ def test_log2cosh():
     print('Test backward')
     assert_allclose(func.backward([xs,ys],1.)[1],dydx)
     #can not pass num check for inifity values
-    check_numdiff(func, xs)
+    assert_(all(check_numdiff(func)))
 
 def test_tri():
     func_list = [Cls((-1,),itype='complex128') for Cls in [Cos,Sin,Sinh,Cosh]]
@@ -325,6 +327,6 @@ def test_all():
     test_dropout()
     test_pooling()
     test_log2cosh()
-    test_sigmoid()
+    test_sigmoidsoftplus()
 
 test_all()
