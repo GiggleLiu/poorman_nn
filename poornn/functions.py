@@ -9,7 +9,7 @@ from .lib.convprod import lib as fconvprod
 from .lib.relu import lib as frelu
 from .utils import scan2csc, tuple_prod, dtype2token
 
-__all__=['Log2cosh','Sigmoid','Cosh','Sinh','Sum','Mul','Mod','Mean','ReLU','ConvProd',
+__all__=['Log2cosh','Sigmoid','Cosh','Sinh','Tanh','Sum','Mul','Mod','Mean','ReLU','ConvProd',
         'Pooling','DropOut','Sin','Cos','Exp','Log','SoftPlus','Power',
         'SoftMax','CrossEntropy','SoftMaxCrossEntropy','SquareLoss', 'Reshape','Transpose',
         'TypeCast', 'Print', 'Cache', 'Filter', 'BatchNorm']
@@ -72,6 +72,22 @@ class Sinh(Function):
     def backward(self,xy,dy, **kwargs):
         x, y = xy
         return EMPTY_VAR,np.cosh(x)*dy
+
+class Tanh(Function):
+    '''
+    Function tanh(theta)
+    '''
+    def __init__(self, input_shape, itype, **kwargs):
+        super(Tanh, self).__init__(input_shape, input_shape, itype)
+
+    @classmethod
+    def forward(self,x):
+        return np.tanh(x)
+
+    @classmethod
+    def backward(self,xy,dy, **kwargs):
+        x, y = xy
+        return EMPTY_VAR,1./np.cosh(x)**2*dy
 
 class Sigmoid(Function):
     '''
