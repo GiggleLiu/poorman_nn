@@ -3,7 +3,7 @@ ABC of neural network.
 '''
 
 import numpy as np
-import pdb
+import pdb, numbers
 
 from .checks import check_shape_forward, check_shape_backward
 from .core import Layer, Function
@@ -23,9 +23,12 @@ class ANN(Layer):
         :layers: list,
         :do_shape_check: bool,
     '''
-    def __init__(self, itype, layers=None, do_shape_check=False):
+    def __init__(self, itype, layers=None, labels=None, do_shape_check=False):
         if layers is None: layers = []
+        if labels is None: labels = []
         self.layers = layers
+        self.__layer_dict__ = dict(zip(labels,layers))
+
         self.do_shape_check = do_shape_check
 
         self.itype = itype
@@ -74,6 +77,14 @@ class ANN(Layer):
             father_ = layer.__graphviz__(c, father=father_)
         _connect(g, father, c, self.input_shape, self.itype, pos='first')
         return c
+
+    def __getitem__(self, name):
+        if isinstance(name,numbers.Number):
+            return self.layers[name]
+        elif isinstance(name,str) and name in self.__layer_dict__:
+            return self.__layer_dict__[name]
+        else:
+            raise KeyError('Get invalid key %s'%name)
 
     @property
     def input_shape(self):
@@ -175,10 +186,14 @@ class ANN(Layer):
                 rd[var]=value
         return rd
 
-    def add_layer(self, cls, **kwargs):
+    def add_layer(self, cls, label=None, **kwargs):
         '''
         Add a new layer. *args and **kwargs specifies parameters excluding `input_shape` and `itype`.
         input_shape inherit the output_shape of last layer, and itype inherit otype of last layer.
+
+        Parameters:
+            :cls: class, create a layer instance, take input_shape and itype as first and second parameters.
+            :label: str, label to index this layer.
         '''
         if len(self.layers)==0:
             raise AttributeError('Please make sure this network is non-empty before using @add_layer.')
@@ -186,6 +201,8 @@ class ANN(Layer):
             input_shape, itype = self.layers[-1].output_shape, self.layers[-1].otype
         obj=cls(input_shape=input_shape, itype=itype, **kwargs)
         self.layers.append(obj)
+        if label is not None:
+            self.__layer_dict__[label] = obj
         return obj
 
 

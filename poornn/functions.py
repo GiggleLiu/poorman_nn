@@ -12,7 +12,7 @@ from .utils import scan2csc, tuple_prod, dtype2token
 __all__=['Log2cosh','Sigmoid','Cosh','Sinh','Sum','Mul','Mod','Mean','ReLU','ConvProd',
         'Pooling','DropOut','Sin','Cos','Exp','Log','SoftPlus','Power',
         'SoftMax','CrossEntropy','SoftMaxCrossEntropy','SquareLoss', 'Reshape','Transpose',
-        'TypeCast', 'Print', 'Cache', 'Filter']
+        'TypeCast', 'Print', 'Cache', 'Filter', 'BatchNorm']
 
 class Log2cosh(Function):
     '''
@@ -656,3 +656,39 @@ class Filter(Function):
         for axis, fltr in zip(self.axes, self.filters):
             dx = np.asarray(dx, order='F')[(slice(None),)*axis+(np.newaxis,)]*fltr.reshape(fltr.shape[:dx.ndim+1])
         return EMPTY_VAR, dx
+
+class BatchNorm(Function):
+    '''
+    Batch normalization layer.
+
+    Attributes:
+        :axis: int/None, batch axis to calculate norm, if it is None, we don't use any axis as batch, instead, we need to set mean and variance manually.
+        :eps: float, small number to avoid division to 0.
+
+    Note:
+        shall we take mean and variance as run time variable?
+    '''
+    __display_attrs__ = ['axis']
+
+    def __init__(self, input_shape, itype, eps=1e-8, axis=None, **kwargs):
+        super(BatchNorm,self).__init__(input_shape, input_shape, itype)
+        self.mean = None
+        self.variance = None
+        self.eps = eps
+
+        if axis is not None:
+            if axis > len(input_shape)-1: raise ValueError('invalid axis')
+            axis=axis%len(input_shape)
+        self.axis = axis
+
+    def forward(self, x, **kwargs):
+        if self.axis is not None:
+            self.mean = x.mean(axis=self.axis,keepdims=True)
+            self.variance = np.var(x, axis=self.axis,keepdims=True)
+        elif self.mean is None or self.variance is None:
+            raise Exception('mean and variance not initialized!')
+        return (x-self.mean)/np.sqrt(self.variance+self.eps)
+
+    def backward(self, xy, dy, **kwargs):
+        x, y = xy
+        return EMPTY_VAR, dy/np.sqrt(self.variance+self.eps)

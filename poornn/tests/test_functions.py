@@ -306,9 +306,18 @@ def test_softmax_cross_per():
     assert_(all(check_numdiff(f3, x_np, var_dict=rd)))
     assert_(all(check_numdiff(f4, y2)))
 
+def test_batchnorm():
+    func=BatchNorm(input_shape=(-1,2), itype='complex128',axis=None)
+    func.mean = array([[0,1j]])
+    func.variance = array([[3,0.5]])
+    print('Test numdiff for %s.'%func)
+    assert_(all(check_numdiff(func)))
+
 def test_all():
     random.seed(3)
     torch.manual_seed(3)
+
+    test_batchnorm()
     test_filter()
     test_tri()
     test_log()
