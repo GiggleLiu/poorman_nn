@@ -12,7 +12,7 @@ from .utils import scan2csc, tuple_prod, dtype2token
 __all__=['Log2cosh','Sigmoid','Cosh','Sinh','Tanh','Sum','Mul','Mod','Mean','ReLU','ConvProd',
         'Pooling','DropOut','Sin','Cos','Exp','Log','SoftPlus','Power',
         'SoftMax','CrossEntropy','SoftMaxCrossEntropy','SquareLoss', 'Reshape','Transpose',
-        'TypeCast', 'Print', 'Cache', 'Filter', 'BatchNorm']
+        'TypeCast', 'Cache', 'Filter', 'BatchNorm']
 
 class Log2cosh(Function):
     '''
@@ -585,22 +585,6 @@ class Mod(Function):
 
     @classmethod
     def backward(self,xy, dy, **kwargs):
-        return EMPTY_VAR, dy
-
-class Print(Function):
-    '''Print data without changing anything.'''
-    def __init__(self, input_shape, itype, **kwargs):
-        super(Print, self).__init__(input_shape, input_shape, itype)
-
-    @classmethod
-    def forward(self, x):
-        print('Forward\n -  x = %s'%x)
-        return x
-    
-    @classmethod
-    def backward(self, xy, dy, **kwargs):
-        x,y=xy
-        print('Backward\n -  x = %s\n -  y = %s\n -  dy = %s'%(x,y,dy))
         return EMPTY_VAR, dy
 
 class Power(Function):

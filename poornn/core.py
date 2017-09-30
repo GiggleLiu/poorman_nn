@@ -151,6 +151,8 @@ class Layer(object):
 
 class Function(Layer):
     '''Function layer with no variables.'''
+    __metaclass__ = ABCMeta
+
     def __call__(self,x):
         return self.forward(x)
 
@@ -164,3 +166,21 @@ class Function(Layer):
     def num_variables(self):
         return 0
 
+class Monitor(Function):
+    __metaclass__ = ABCMeta
+
+    @abstractmethod
+    def monitor_forward(self, x):
+        pass
+
+    @abstractmethod
+    def monitor_backward(self, xy, dy, **kwargs):
+        pass
+
+    def forward(self, x):
+        self.monitor_forward(x)
+        return x
+
+    def backward(self, xy, dy, **kwargs):
+        self.monitor_backward(xy, dy, **kwargs)
+        return EMPTY_VAR, dy
