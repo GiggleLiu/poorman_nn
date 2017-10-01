@@ -34,9 +34,9 @@ def test_log2cosh():
     assert_(all(check_numdiff(func)))
 
 def test_tri():
-    func_list = [Cls((-1,),itype='complex128') for Cls in [Cos,Sin,Sinh,Cosh,Tanh]]
+    func_list = [Cls((-1,),itype='complex128') for Cls in [Cos,Sin,Sinh,Cosh,Tan,Tanh,ArcTan]]
     for func in func_list:
-        print('Test numdiff for %s'%func)
+        print('Test numdiff for \n%s'%func)
         assert_(all(check_numdiff(func)))
 
 def test_pooling():

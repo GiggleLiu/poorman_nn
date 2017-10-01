@@ -9,10 +9,68 @@ from .lib.convprod import lib as fconvprod
 from .lib.relu import lib as frelu
 from .utils import scan2csc, tuple_prod, dtype2token
 
-__all__=['Log2cosh','Sigmoid','Cosh','Sinh','Tanh','Sum','Mul','Mod','Mean','ReLU','ConvProd',
-        'Pooling','DropOut','Sin','Cos','Exp','Log','SoftPlus','Power',
+__all__=['wrapfunc','Log2cosh','Sigmoid','Cosh','Sinh','Tan','Tanh','Sum','Mul','Mod','Mean','ReLU','ConvProd',
+        'Pooling','DropOut','Sin','Cos','ArcTan','Exp','Log','SoftPlus','Power',
         'SoftMax','CrossEntropy','SoftMaxCrossEntropy','SquareLoss', 'Reshape','Transpose',
         'TypeCast', 'Cache', 'Filter', 'BatchNorm']
+
+def wrapfunc(func, dfunc, classname='GeneralFunc', attrs={}, verbose=False, docstring=""):
+    '''
+    Wrap a function into a Functiona layer.
+
+    Parameters:
+        :func: func, forward function, take input (x,attrs) as parameters.
+        :dfunc: func, derivative function, take input/output (x,y,**attrs) as parameters.
+        :classname: str, function classname,
+        :attrs: dict, attributes, and input parameters.
+        :verbose: bool, print class string if True.
+        :docstring: str,
+
+    Return:
+        class,
+    '''
+    # Parse and validate the field names.  Validation serves two purposes,
+    # generating informative error messages and preventing template injection attacks.
+    field_names = tuple(map(str, attrs.keys()))
+    for name in (classname,) + field_names:
+        if not all(c.isalnum() or c=='_' for c in name):
+            raise ValueError('Type names and field names can only contain alphanumeric characters and underscores: %r' % name)
+        if name[0].isdigit():
+            raise ValueError('Type names and field names cannot start with a number: %r' % name)
+    seen_names = set()
+    for name in field_names:
+        if name.startswith('_'):
+            raise ValueError('Field names cannot start with an underscore: %r' % name)
+        if name in seen_names:
+            raise ValueError('Encountered duplicate field name: %r' % name)
+        seen_names.add(name)
+
+    def __init__(self, input_shape, itype, **kwargs):
+        for fieldname in field_names:
+            if fieldname in kwargs:
+                setattr(self, fieldname, kwargs.pop(fieldname))
+            else:
+                val = attrs.pop(fieldname)
+                if val is None:
+                    raise KeyError('You must specify %s'%fieldname)
+                else:
+                    setattr(self, fieldname, val)
+        Function.__init__(self, input_shape, input_shape, itype, **kwargs)
+
+    def forward(self,x,**kwargs):
+        return func(x,**dict([(attr,getattr(self,attr)) for attr in attrs]))
+
+    def backward(self,xy,dy, **kwargs):
+        return EMPTY_VAR,dfunc(xy,dy,**dict([(attr,getattr(self,attr)) for attr in attrs]))
+
+    newclass = type(classname, (Function,),{
+        '__init__': __init__,
+        'forward': classmethod(forward) if len(attrs)==0 else forward,
+        'backward': classmethod(backward) if len(attrs)==0 else backward,
+        '__doc__': '%s'%docstring,
+        })
+    newclass.__display_attrs__ = field_names
+    return newclass
 
 class Log2cosh(Function):
     '''
@@ -39,55 +97,6 @@ class Log2cosh(Function):
     def backward(self,xy,dy, **kwargs):
         x, y = xy
         return EMPTY_VAR,np.tanh(x)*dy
-
-
-class Cosh(Function):
-    '''
-    Function cosh(theta)
-    '''
-    def __init__(self, input_shape, itype, **kwargs):
-        super(Cosh, self).__init__(input_shape, input_shape, itype)
-
-    @classmethod
-    def forward(self,x):
-        return np.cosh(x)
-
-    @classmethod
-    def backward(self,xy,dy, **kwargs):
-        x, y = xy
-        return EMPTY_VAR,np.sinh(x)*dy
-
-class Sinh(Function):
-    '''
-    Function sinh(theta)
-    '''
-    def __init__(self, input_shape, itype, **kwargs):
-        super(Sinh, self).__init__(input_shape, input_shape, itype)
-
-    @classmethod
-    def forward(self,x):
-        return np.sinh(x)
-
-    @classmethod
-    def backward(self,xy,dy, **kwargs):
-        x, y = xy
-        return EMPTY_VAR,np.cosh(x)*dy
-
-class Tanh(Function):
-    '''
-    Function tanh(theta)
-    '''
-    def __init__(self, input_shape, itype, **kwargs):
-        super(Tanh, self).__init__(input_shape, input_shape, itype)
-
-    @classmethod
-    def forward(self,x):
-        return np.tanh(x)
-
-    @classmethod
-    def backward(self,xy,dy, **kwargs):
-        x, y = xy
-        return EMPTY_VAR,1./np.cosh(x)**2*dy
 
 class Sigmoid(Function):
     '''
@@ -442,87 +451,6 @@ class SquareLoss(Function):
         #return EMPTY_VAR,((xy[0]-xt).conj()*dy) if self.itype[:7]=='complex' else (2*(xy[0]-xt)*dy)
         return EMPTY_VAR,((xy[0]-xt)*dy) if is_complex else (2*(xy[0]-xt)*dy)  #paritial x.conj() for complex
 
-class Exp(Function):
-    '''
-    Function exp(x)
-    '''
-    def __init__(self, input_shape, itype, **kwargs):
-        super(Exp, self).__init__(input_shape, input_shape, itype)
-
-    @classmethod
-    def forward(self,x):
-        return np.exp(x)
-
-    @classmethod
-    def backward(self,xy,dy, **kwargs):
-        x, y = xy
-        return EMPTY_VAR,dy*y
-
-class Log(Function):
-    '''
-    Function log(x)
-    '''
-    def __init__(self, input_shape, itype, **kwargs):
-        super(Log, self).__init__(input_shape, input_shape, itype)
-
-    @classmethod
-    def forward(self,x):
-        return scipy.log(x)
-
-    @classmethod
-    def backward(self,xy,dy, **kwargs):
-        x, y = xy
-        return EMPTY_VAR,dy/x
-
-
-class Sin(Function):
-    '''
-    Function sin(x)
-    '''
-    def __init__(self, input_shape, itype, **kwargs):
-        super(Sin, self).__init__(input_shape, input_shape, itype)
-
-    @classmethod
-    def forward(self,x):
-        return np.sin(x)
-
-    @classmethod
-    def backward(self,xy,dy, **kwargs):
-        x, y = xy
-        return EMPTY_VAR,dy*np.cos(x)
-
-class Cos(Function):
-    '''
-    Function cos(x)
-    '''
-    def __init__(self, input_shape, itype, **kwargs):
-        super(Cos, self).__init__(input_shape, input_shape, itype)
-
-    @classmethod
-    def forward(self,x):
-        return np.cos(x)
-
-    @classmethod
-    def backward(self,xy,dy, **kwargs):
-        x, y = xy
-        return EMPTY_VAR,-dy*np.sin(x)
-
-class SoftPlus(Function):
-    '''
-    Function log(1+exp(x))
-    '''
-    def __init__(self, input_shape, itype, **kwargs):
-        super(SoftPlus, self).__init__(input_shape, input_shape, itype)
-
-    @classmethod
-    def forward(self,x):
-        return scipy.log(1+np.exp(x))
-
-    @classmethod
-    def backward(self,xy,dy, **kwargs):
-        x, y = xy
-        return EMPTY_VAR,dy*Sigmoid.forward(x)
-
 class Reshape(Function):
     def forward(self, x):
         return x.reshape(self.output_shape, order='F')
@@ -557,51 +485,6 @@ class Transpose(Function):
     def backward(self, xy, dy, **kwargs):
         x, y = xy
         return EMPTY_VAR, dy.transpose(np.argsort(self.axes))
-
-class Mul(Function):
-    '''Multiply by a constant'''
-    __display_attrs__ = ['alpha']
-
-    def __init__(self, input_shape, itype, alpha, **kwargs):
-        self.alpha = alpha
-        super(Mul, self).__init__(input_shape, input_shape, itype)
-
-    def forward(self, x):
-        return self.alpha*x
-
-    def backward(self,xy, dy, **kwargs):
-        return EMPTY_VAR, self.alpha*dy
-
-class Mod(Function):
-    '''Mod by a constant'''
-    __display_attrs__ = ['n']
-
-    def __init__(self, input_shape, itype, n, **kwargs):
-        self.n = n
-        super(Mod, self).__init__(input_shape, input_shape, itype)
-
-    def forward(self, x):
-        return x%self.n
-
-    @classmethod
-    def backward(self,xy, dy, **kwargs):
-        return EMPTY_VAR, dy
-
-class Power(Function):
-    '''
-    Function x**order
-    '''
-    __display_attrs__ = ['order']
-    def __init__(self, input_shape, itype, order, **kwargs):
-        super(Power, self).__init__(input_shape, input_shape, itype)
-        self.order = order
-
-    def forward(self,x):
-        return x**self.order
-
-    def backward(self,xy,dy, **kwargs):
-        x, y = xy
-        return EMPTY_VAR, self.order*x**(self.order-1)*dy
 
 class Cache(Function):
     '''Cache data without changing anything.'''
@@ -692,3 +575,19 @@ class BatchNorm(Function):
     def backward(self, xy, dy, **kwargs):
         x, y = xy
         return EMPTY_VAR, dy/np.sqrt(self.variance+self.eps)
+
+Sin = wrapfunc(np.sin, lambda xy, dy:np.cos(xy[0])*dy, classname='Sin',docstring="Function sin(x)")
+Sinh = wrapfunc(np.sinh, lambda xy, dy:np.cosh(xy[0])*dy, classname='Sinh',docstring="Function sinh(x)")
+Cos = wrapfunc(np.cos, lambda xy, dy:-np.sin(xy[0])*dy, classname='Cos',docstring="Function cos(x)")
+Cosh = wrapfunc(np.cosh, lambda xy, dy:np.sinh(xy[0])*dy, classname='Cosh',docstring="Function cosh(x)")
+Tan = wrapfunc(np.tan, lambda xy, dy:1./np.cos(xy)[0]**2*dy, classname='Tan',docstring="Function tan(x)")
+Tanh = wrapfunc(np.tanh, lambda xy, dy:1./np.cosh(xy)[0]**2*dy, classname='Tanh',docstring="Function tanh(x)")
+ArcTan = wrapfunc(np.arctan, lambda xy, dy:1./(1+xy[0]**2)*dy, classname='ArcTan',docstring="Function arctan(x)")
+
+Exp = wrapfunc(np.exp, lambda xy,dy:xy[1]*dy, classname='Exp',docstring="Function exp(x)")
+Log = wrapfunc(scipy.log, lambda xy,dy:dy/xy[0], classname='Log',docstring="Function log(x)")
+SoftPlus = wrapfunc(lambda x:scipy.log(1+np.exp(x)), lambda xy,dy:dy*Sigmoid.forward(xy[0]), classname='SoftPlus',docstring="Function log(1+exp(x))")
+
+Mul = wrapfunc(lambda x,alpha:x*alpha, lambda xy,dy,alpha:alpha*dy, attrs={'alpha':None}, classname='Mul',docstring="Function x*alpha")
+Mod = wrapfunc(lambda x,n:x%n, lambda xy,dy,n:dy, attrs={'n':None}, classname='Mod',docstring="Function x%n")
+Power = wrapfunc(lambda x,order:x**order, lambda xy,dy,order:order*xy[0]**(order-1)*dy, attrs={'order':None}, classname='Power',docstring="Function x**order")
