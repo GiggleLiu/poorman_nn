@@ -243,6 +243,11 @@ def test_filter():
     assert_(all(check_numdiff(func, x)))
     assert_(all(check_numdiff(func3, x)))
 
+def test_relu_c():
+    dtype='complex128'
+    func=ReLU((10,10),dtype, 0.)
+    assert_(all(check_numdiff(func)))
+
 def test_relu_per():
     N1,N2,N3=100,20,10
     x=torch.randn(N1,N2,N3)
@@ -313,11 +318,21 @@ def test_batchnorm():
     print('Test numdiff for %s.'%func)
     assert_(all(check_numdiff(func)))
 
+def test_realimagconj():
+    for cls in [Real,Imag,Conj]:
+        func=cls(input_shape=(-1,2), itype='complex128')
+        print('Test numdiff for \n%s'%func)
+        if cls==Conj:
+            print(all(check_numdiff(func)))
+        else:
+            assert_(all(check_numdiff(func)))
+
 def test_all():
     random.seed(3)
     torch.manual_seed(3)
 
     test_batchnorm()
+    test_realimagconj()
     test_filter()
     test_tri()
     test_log()
@@ -331,6 +346,7 @@ def test_all():
     test_transpose()
     test_softmax_cross_per()
     test_relu_per()
+    test_relu_c()
     test_summean()
     test_softmax_cross()
     test_dropout()

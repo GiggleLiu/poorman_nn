@@ -12,9 +12,10 @@ from .utils import scan2csc, tuple_prod, dtype2token, dtype_c2r
 __all__=['wrapfunc','Log2cosh','Sigmoid','Cosh','Sinh','Tan','Tanh','Sum','Mul','Mod','Mean','ReLU','ConvProd',
         'Pooling','DropOut','Sin','Cos','ArcTan','Exp','Log','SoftPlus','Power',
         'SoftMax','CrossEntropy','SoftMaxCrossEntropy','SquareLoss', 'Reshape','Transpose',
-        'TypeCast', 'Cache', 'Filter', 'BatchNorm']
+        'TypeCast', 'Cache', 'Filter', 'BatchNorm',
+        'Real','Imag','Conj']
 
-def wrapfunc(func, dfunc, classname='GeneralFunc', attrs={}, verbose=False, docstring=""):
+def wrapfunc(func, dfunc, classname='GeneralFunc', attrs={}, verbose=False, docstring="",tags={}):
     '''
     Wrap a function into a Functiona layer.
 
@@ -55,7 +56,7 @@ def wrapfunc(func, dfunc, classname='GeneralFunc', attrs={}, verbose=False, docs
                     raise KeyError('You must specify %s'%fieldname)
                 else:
                     setattr(self, fieldname, val)
-        Function.__init__(self, input_shape, input_shape, itype, **kwargs)
+        Function.__init__(self, input_shape, input_shape, itype, tags=tags, **kwargs)
 
     def forward(self,x,**kwargs):
         return func(x,**dict([(attr,getattr(self,attr)) for attr in attrs]))
@@ -71,6 +72,17 @@ def wrapfunc(func, dfunc, classname='GeneralFunc', attrs={}, verbose=False, docs
         })
     newclass.__display_attrs__ = field_names
     return newclass
+
+def complex_backward(dz,dzc):
+    def backward(xy,dy,**kwargs):
+        x, y = xy
+        if dz is None:
+            return (dzc(x,y)*dy).conj()
+        elif dzc is None:
+            return dz(x,y)*dy
+        else:
+            return dz(x,y)*dy+(dzc(x,y)*dy).conj()
+    return backward
 
 class Log2cosh(Function):
     '''
@@ -432,8 +444,7 @@ class SquareLoss(Function):
     '''
     def __init__(self, input_shape, itype, **kwargs):
         self.y_true = None
-        otype = dtype_c2r(itype) if itype[:7]=='complex' else itype
-        super(SquareLoss, self).__init__(input_shape, input_shape, itype, otype=otype, tags=dict(runtimes=['y_true'],analytical=2))
+        super(SquareLoss, self).__init__(input_shape, input_shape, itype, tags=dict(runtimes=['y_true'],analytical=2))
 
     def forward(self, x):
         '''
@@ -590,6 +601,10 @@ ArcTan = wrapfunc(np.arctan, lambda xy, dy:1./(1+xy[0]**2)*dy, classname='ArcTan
 Exp = wrapfunc(np.exp, lambda xy,dy:xy[1]*dy, classname='Exp',docstring="Function exp(x)")
 Log = wrapfunc(scipy.log, lambda xy,dy:dy/xy[0], classname='Log',docstring="Function log(x)")
 SoftPlus = wrapfunc(lambda x:scipy.log(1+np.exp(x)), lambda xy,dy:dy*Sigmoid.forward(xy[0]), classname='SoftPlus',docstring="Function log(1+exp(x))")
+
+Conj = wrapfunc(np.conj, complex_backward(None,lambda x,y:1), classname='Conj',docstring="Function conj(x)", tags={'analytical':3})
+Real = wrapfunc(np.real, complex_backward(lambda x,y:0.5,lambda x,y:0.5), classname='Real',docstring="Function real(x)", tags={'analytical':2})
+Imag = wrapfunc(np.imag, complex_backward(lambda x,y:-0.5j,lambda x,y:0.5j), classname='Imag',docstring="Function imag(x)", tags={'analytical':2})
 
 Mul = wrapfunc(lambda x,alpha:x*alpha, lambda xy,dy,alpha:alpha*dy, attrs={'alpha':None}, classname='Mul',docstring="Function x*alpha")
 Mod = wrapfunc(lambda x,n:x%n, lambda xy,dy,n:dy, attrs={'n':None}, classname='Mod',docstring="Function x%n")

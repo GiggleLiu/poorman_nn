@@ -33,7 +33,7 @@ class ANN(Layer):
 
         self.itype = itype
         self.dtype = None
-        self.tags = None
+        self.tags = {}
         # input_shape and output_shape are defined as properties.
 
         #check connections

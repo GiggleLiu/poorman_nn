@@ -7,7 +7,7 @@ from abc import ABCMeta, abstractmethod
 from collections import namedtuple
 import pdb
 
-from .utils import _connect, dtype2token
+from .utils import _connect, dtype2token, dtype_c2r
 
 __all__=['Layer','Function', 'EXP_OVERFLOW', 'EMPTY_VAR']
 
@@ -44,9 +44,7 @@ class Layer(object):
         self.input_shape = input_shape
         self.output_shape = output_shape
         self.itype = itype
-        if otype is None: otype = itype
         if dtype is None: dtype = itype
-        self.otype=otype
         self.dtype=dtype
 
         # set tags
@@ -60,6 +58,13 @@ class Layer(object):
                 if k not in TAG_LIST:
                     print('You have used a user defined tag %s'%k)
                 self.tags[k] = v
+
+        if otype is None:
+            if self.tags['analytical']==2:
+                otype = dtype_c2r(itype) if itype[:7]=='complex' else itype
+            else:
+                otype = itype
+        self.otype=otype
 
     def __str__(self, offset=0):
         s = ' '*offset+self.__repr__()

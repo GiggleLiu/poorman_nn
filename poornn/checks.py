@@ -76,7 +76,7 @@ def check_shape_backward(f):
 def check_numdiff(layer, x=None, num_check=10, eta_x=None, eta_w=None, tol=1e-5, var_dict={}):
     '''Random Numerical Differentiation check.'''
     from .nets import ANN
-    analytical = layer.tags.get('analytical',1)
+    analytical = layer.tags.get('analytical',1) if hasattr(layer,'tags') else 1
     if analytical == 0 or (analytical==3 and layer.itype[:7]=='complex'):
         print('Warning: Layer %s is not analytic, going on numdiff check!'%layer)
     is_net = isinstance(layer, ANN)
