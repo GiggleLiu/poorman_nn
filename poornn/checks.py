@@ -73,28 +73,32 @@ def check_shape_backward(f):
         return res
     return wrapper
 
-def check_numdiff(layer, x=None, num_check=10, eta_x=None, eta_w=None, tol=1e-1, var_dict={}):
-    '''Random Numerical Differential check.'''
+def check_numdiff(layer, x=None, num_check=10, eta_x=None, eta_w=None, tol=1e-5, var_dict={}):
+    '''Random Numerical Differentiation check.'''
     from .nets import ANN
+    analytical = layer.tags.get('analytical',1)
+    if analytical == 0 or (analytical==3 and layer.itype[:7]=='complex'):
+        print('Warning: Layer %s is not analytic, going on numdiff check!'%layer)
     is_net = isinstance(layer, ANN)
+
+    # generate input and set runtime input
     input_dtype = layer.itype
     if x is None:
         x=generate_randx(layer)
     else:
         x=np.asarray(x, dtype=input_dtype, order='F')
 
+    # forward to generate ys, and y.
     layer.set_runtime_vars(var_dict)
     ys=layer.forward(x)
-    if is_net:
-        y=ys[-1]
-        output_dtype = layer.layers[-1].otype
-        dy=typed_randn(output_dtype, y.shape)
-        dv, dx=layer.backward(ys, dy=dy)
-    else:
-        y=ys
-        output_dtype = layer.otype
-        dy=typed_randn(output_dtype, y.shape)
-        dv, dx=layer.backward([x,y], dy=dy)
+    if not is_net: ys = [x,ys]
+    y = ys[-1]
+    if y.dtype != layer.otype:
+        print('Warning: output data type not match, %s expected, but get %s! switch to debug mode:'%(layer.otype, y.dtype))
+        pdb.set_trace()
+
+    dy=typed_randn(layer.otype, y.shape)
+    dv, dx=layer.backward(ys, dy=dy)
     dx_=np.ravel(dx, order='F')
     if eta_x is None:
         eta_x=0.003+0.004j if np.iscomplexobj(x) else 0.005
@@ -112,11 +116,14 @@ def check_numdiff(layer, x=None, num_check=10, eta_x=None, eta_w=None, tol=1e-1,
         y2=layer.forward(xn2)
         if is_net: y1=y1[-1]; y2=y2[-1]
 
-        ngrad_x=np.sum((y1-y2)*dy)/eta_x
-        diff=abs(dx_[pos]-ngrad_x)
-        if diff/max(1,abs(dx_[pos]))>tol:
-            print('XBP Diff = %s, Num Diff = %s'%(dx_[pos], ngrad_x))
+        ngrad_x = np.sum((y1-y2)*dy)
+        cgrad_x = dx_[pos]*eta_x
+        if analytical==2 and layer.itype[:7]=='complex':
+            cgrad_x = cgrad_x.real
+        diff = abs(cgrad_x-ngrad_x)
+        if diff/max(1,abs(cgrad_x))>tol:
             print('Num Diff Test Fail! @x_[%s] = %s'%(pos, x.ravel()[pos]))
+            print('XBP Diff = %s, Num Diff = %s'%(cgrad_x, ngrad_x))
             res_x.append(False)
         else:
             res_x.append(True)
@@ -128,7 +135,7 @@ def check_numdiff(layer, x=None, num_check=10, eta_x=None, eta_w=None, tol=1e-1,
     res_w=[]
     var0 = layer.get_variables()
     if eta_w is None:
-        eta_w=0.003+0.004j if np.iscomplexobj(var0) else 0.005
+        eta_w = 0.003+0.004j if np.iscomplexobj(var0) else 0.005
     for i in range(num_check):
         #change variables at random position.
         pos=np.random.randint(0,var0.size)
@@ -143,11 +150,12 @@ def check_numdiff(layer, x=None, num_check=10, eta_x=None, eta_w=None, tol=1e-1,
         y2=layer.forward(x)
         if is_net: y1=y1[-1]; y2=y2[-1]
 
-        ngrad_w=np.sum((y1-y2)*dy)/eta_w
-        diff=abs(dv[pos]-ngrad_w)
-        if diff/max(1, abs(dv[pos]))>tol:
-            print('WBP Diff = %s, Num Diff = %s'%(dv[pos], ngrad_w))
+        ngrad_w = np.sum((y1-y2)*dy)
+        cgrad_w = dv[pos]*eta_w
+        diff=abs(cgrad_w-ngrad_w)
+        if diff/max(1, abs(cgrad_w))>tol:
             print('Num Diff Test Fail! @var[%s] = %s'%(pos,var0[pos]))
+            print('WBP Diff = %s, Num Diff = %s'%(cgrad_w, ngrad_w))
             res_w.append(False)
         else:
             res_w.append(True)

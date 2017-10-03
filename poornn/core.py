@@ -18,7 +18,8 @@ List of tags:
     :analytical: int,
         * 0, no
         * 1, yes (default)
-        * 2, yes for float, no for complex.
+        * 2, yes for float, no for complex, complex output for real output.
+        * 3, yes for float, no for complex, complex output for complex input.
 '''
 TAG_LIST = ['runtimes', 'is_inplace', 'analytical']
 

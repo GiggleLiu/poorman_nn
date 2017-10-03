@@ -7,7 +7,7 @@ from .core import Layer, Function, EXP_OVERFLOW, EMPTY_VAR
 from .lib.pooling import lib as fpooling
 from .lib.convprod import lib as fconvprod
 from .lib.relu import lib as frelu
-from .utils import scan2csc, tuple_prod, dtype2token
+from .utils import scan2csc, tuple_prod, dtype2token, dtype_c2r
 
 __all__=['wrapfunc','Log2cosh','Sigmoid','Cosh','Sinh','Tan','Tanh','Sum','Mul','Mod','Mean','ReLU','ConvProd',
         'Pooling','DropOut','Sin','Cos','ArcTan','Exp','Log','SoftPlus','Power',
@@ -432,7 +432,8 @@ class SquareLoss(Function):
     '''
     def __init__(self, input_shape, itype, **kwargs):
         self.y_true = None
-        super(SquareLoss, self).__init__(input_shape, input_shape, itype, tags=dict(runtimes=['y_true'],analytical=2))
+        otype = dtype_c2r(itype) if itype[:7]=='complex' else itype
+        super(SquareLoss, self).__init__(input_shape, input_shape, itype, otype=otype, tags=dict(runtimes=['y_true'],analytical=2))
 
     def forward(self, x):
         '''
@@ -443,13 +444,13 @@ class SquareLoss(Function):
         if self.y_true is None:
             raise AttributeError('Please initialize variable `y_true`(use @set_runtime_vars) before using a runtime layer %s!'%self)
         diff=x-self.y_true
-        return diff.conj()*diff
+        return (diff.conj()*diff).real
 
     def backward(self, xy, dy, **kwargs):
+        x, y = xy
         xt=self.y_true
         is_complex = self.itype[:7]=='complex'
-        #return EMPTY_VAR,((xy[0]-xt).conj()*dy) if self.itype[:7]=='complex' else (2*(xy[0]-xt)*dy)
-        return EMPTY_VAR,((xy[0]-xt)*dy) if is_complex else (2*(xy[0]-xt)*dy)  #paritial x.conj() for complex
+        return EMPTY_VAR,((x-xt).conj()*dy.real*2) if is_complex else (2*(xy[0]-xt)*dy)
 
 class Reshape(Function):
     def forward(self, x):
@@ -522,7 +523,9 @@ class Filter(Function):
         size = [input_shape[axis] for axis in axes]
         self.filters = [np.exp(-1j*momentum*np.arange(ni)).reshape([1]*axis+[-1]+[1]*(DIM-axis-1))/ni for ki,axis,ni in zip(momentum,axes,size)]
         if all(momentum%np.pi==0):
-            self.filters = [flt.real for flt in self.filters]
+            self.filters = [flt.real.astype(itype) for flt in self.filters]
+        else:
+            self.filters = [flt.astype(itype) for flt in self.filters]
         output_shape = tuple([dim for axis,dim in enumerate(input_shape) if axis not in axes])
         #np.prod(np.ix_([np.exp(-1j*k*np.arange(ni))/ni for ki,ni in zip(momentum,size)]),axis=0)
         super(Filter, self).__init__(input_shape, output_shape, itype)

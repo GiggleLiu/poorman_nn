@@ -127,9 +127,9 @@ def test_softmax_cross():
     f1=SoftMax(input_shape=(-1,4), itype='float32',axis=1)
     f2=CrossEntropy(input_shape=(-1,4), itype='float32', axis=1)
     f3=SoftMaxCrossEntropy(input_shape=(-1,4), itype='float32', axis=1)
-    print('Test forward for %s, %s, %s.'%(f1,f2,f3))
+    print('Test forward for \n%s, \n%s, \n%s.'%(f1,f2,f3))
     x=random.random(12).reshape([3,4], order='F')  #3 batches, 4 logits.
-    y_true=array([[0.,1.,0.,0.], [0,0,1.,0],[1,0,0,0]],order='F')
+    y_true=array([[0.,1.,0.,0.], [0,0,1.,0],[1,0,0,0]],order='F',dtype='float32')
     y1=f1.forward(x)
     rd={'y_true':y_true}
     f2.set_runtime_vars(var_dict=rd)
@@ -152,7 +152,7 @@ def test_square_loss():
     f3=SquareLoss(input_shape=(-1,4), itype=itype)
     print('Test numdiff for %s.'%(f3,))
     x=typed_randn(itype, [3,4])  #3 batches, 4 logits.
-    y_true=array([[0.,1.,0.,0.], [0,0,1.,0],[1,0,0,0]],order='F')
+    y_true=array([[0.,1.,0.,0.], [0,0,1.,0],[1,0,0,0]],order='F',dtype=itype)
     rd={'y_true':y_true}
     assert_(all(check_numdiff(f3, x, var_dict=rd)))
  
@@ -160,9 +160,9 @@ def test_square_loss():
     f3=SquareLoss(input_shape=(-1,4), itype=itype)
     print('Test numdiff for complex %s.'%(f3,))
     x=typed_randn(itype, [3,4])  #3 batches, 4 logits.
-    y_true=array([[0.,1.,0.,0.], [0,0,1.,0],[1,0,0,0]],order='F')
+    y_true=array([[0.,1.,0.,0.], [0,0,1.,0],[1,0,0,0]],order='F',dtype=itype)
     rd={'y_true':y_true}
-    print(check_numdiff(f3, x, var_dict=rd))
+    assert_(all(check_numdiff(f3, x, var_dict=rd)))
 
 def test_mul():
     itype='complex128'
@@ -278,7 +278,7 @@ def test_softmax_cross_per():
     f4=Mean(input_shape=(N1,), itype='float32',axis=0)
     print('Test forward for %s, %s, %s, %s'%(f1,f2,f3,f4))
     x_np=x.numpy()
-    y_true_hot=zeros(f1.output_shape)
+    y_true_hot=zeros(f1.output_shape, dtype='float32')
     y_true_hot[arange(N1),y_true.numpy()]=1
     y1=f1.forward(x_np)
     rd={'y_true':y_true_hot}
@@ -302,7 +302,7 @@ def test_softmax_cross_per():
     assert_allclose(dx,dx_,atol=1e-5)
     assert_allclose(dx,vx.grad.data.numpy(),atol=1e-5)
     assert_(all(check_numdiff(f1, x_np)))
-    assert_(all(check_numdiff(f2, y1, var_dict=rd)))
+    assert_(all(check_numdiff(f2, y1, var_dict=rd,tol=1e-2)))
     assert_(all(check_numdiff(f3, x_np, var_dict=rd)))
     assert_(all(check_numdiff(f4, y2)))
 

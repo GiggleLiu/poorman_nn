@@ -3,7 +3,7 @@ import numpy as np
 import pdb
 
 __all__=['take_slice', 'scan2csc', 'typed_random', 'typed_randn', 'typed_uniform', 'tuple_prod',
-        'masked_concatenate', 'dtype2token']
+        'masked_concatenate', 'dtype2token', 'dtype_c2r']
 
 def take_slice(arr,sls,axis):
     '''take using slices.'''
@@ -198,6 +198,13 @@ def dtype2token(dtype):
         raise TypeError("dtype error - get %s!"%dtype)
     return dtype_token
 
+def dtype_c2r(complex_dtype):
+    if complex_dtype=='complex128':
+        return 'float64'
+    elif complex_dtype=='complex64':
+        return 'float32'
+    else:
+        raise ValueError('Complex data type %s not valid'%complex_dtype)
 
 if __name__ == '__main__':
     print(typed_uniform('complex128',(2,2)))
