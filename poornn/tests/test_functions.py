@@ -245,8 +245,10 @@ def test_filter():
 
 def test_relu_c():
     dtype='complex128'
-    func=ReLU((10,10),dtype, 0.)
+    func=ReLU((10,10),dtype, 0.1, version='r')
     assert_(all(check_numdiff(func)))
+    func2=ReLU((10,10),dtype, 0.1, version='ri')
+    assert_(all(check_numdiff(func2)))
 
 def test_relu_per():
     N1,N2,N3=100,20,10
@@ -307,7 +309,7 @@ def test_softmax_cross_per():
     assert_allclose(dx,dx_,atol=1e-5)
     assert_allclose(dx,vx.grad.data.numpy(),atol=1e-5)
     assert_(all(check_numdiff(f1, x_np)))
-    assert_(all(check_numdiff(f2, y1, var_dict=rd,tol=1e-2)))
+    assert_(all(check_numdiff(f2, y1, var_dict=rd,tol=1e-3)))
     assert_(all(check_numdiff(f3, x_np, var_dict=rd)))
     assert_(all(check_numdiff(f4, y2)))
 
@@ -319,13 +321,10 @@ def test_batchnorm():
     assert_(all(check_numdiff(func)))
 
 def test_realimagconj():
-    for cls in [Real,Imag,Conj]:
+    for cls in [Real,Imag,Abs,Conj,Abs2,Angle]:
         func=cls(input_shape=(-1,2), itype='complex128')
         print('Test numdiff for \n%s'%func)
-        if cls==Conj:
-            print(all(check_numdiff(func)))
-        else:
-            assert_(all(check_numdiff(func)))
+        assert_(all(check_numdiff(func)))
 
 def test_all():
     random.seed(3)

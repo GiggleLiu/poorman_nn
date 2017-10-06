@@ -1,13 +1,13 @@
 import numpy as np
 import pdb
 
-from .utils import typed_randn
+from .utils import typed_randn, get_tag
+from .core import AnalyticityError
+from . import functions
 
 
 __all__=['dec_check_shape', 'check_numdiff', 'generate_randx',
         'check_shape_backward', 'check_shape_forward', 'check_shape_match']
-
-# TODO: Error handling, non-differentiable error.
 
 def dec_check_shape(pos):
     '''
@@ -73,12 +73,18 @@ def check_shape_backward(f):
         return res
     return wrapper
 
-def check_numdiff(layer, x=None, num_check=10, eta_x=None, eta_w=None, tol=1e-5, var_dict={}):
+def check_numdiff(layer, x=None, num_check=10, eta_x=None, eta_w=None, tol=1e-3, var_dict={}):
     '''Random Numerical Differentiation check.'''
     from .nets import ANN
-    analytical = layer.tags.get('analytical',1) if hasattr(layer,'tags') else 1
-    if analytical == 0 or (analytical==3 and layer.itype[:7]=='complex'):
+    analytical = get_tag(layer, 'analytical')
+    if analytical == 4:
         print('Warning: Layer %s is not analytic, going on numdiff check!'%layer)
+    elif analytical==3 and layer.itype[:7]=='complex':
+        res = []
+        for out_layer in ['Abs','Angle']:
+            layer_i = get_complex_checker_net(layer,out_layer)
+            res = res+check_numdiff(layer_i, x=x, num_check=num_check, eta_x=eta_x, eta_w=eta_w, tol=tol, var_dict=var_dict)
+        return res
     is_net = isinstance(layer, ANN)
 
     # generate input and set runtime input
@@ -118,17 +124,17 @@ def check_numdiff(layer, x=None, num_check=10, eta_x=None, eta_w=None, tol=1e-5,
 
         ngrad_x = np.sum((y1-y2)*dy)
         cgrad_x = dx_[pos]*eta_x
-        if analytical==2 and layer.itype[:7]=='complex':
+        if (analytical==2 or analytical==3) and layer.itype[:7]=='complex':
             cgrad_x = cgrad_x.real
         diff = abs(cgrad_x-ngrad_x)
-        if diff/max(1,abs(cgrad_x))>tol:
+        if diff/max(abs(eta_x), abs(cgrad_x))>tol:
             print('Num Diff Test Fail! @x_[%s] = %s'%(pos, x.ravel()[pos]))
             print('XBP Diff = %s, Num Diff = %s'%(cgrad_x, ngrad_x))
             res_x.append(False)
         else:
             res_x.append(True)
 
-    if not is_net and layer.num_variables==0:
+    if layer.num_variables==0:
         return res_x
 
     #check dy/dw
@@ -153,7 +159,7 @@ def check_numdiff(layer, x=None, num_check=10, eta_x=None, eta_w=None, tol=1e-5,
         ngrad_w = np.sum((y1-y2)*dy)
         cgrad_w = dv[pos]*eta_w
         diff=abs(cgrad_w-ngrad_w)
-        if diff/max(1, abs(cgrad_w))>tol:
+        if diff/max(abs(eta_w), abs(cgrad_w))>tol:
             print('Num Diff Test Fail! @var[%s] = %s'%(pos,var0[pos]))
             print('WBP Diff = %s, Num Diff = %s'%(cgrad_w, ngrad_w))
             res_w.append(False)
@@ -209,8 +215,8 @@ def check_shape_match(shape_get, shape_desire):
         return shape_get
 
     #dimension mismatch
-    if shape_get!=len(shape_desire):
-        raise ValueError('Dimension mismatch! y %s, desire %s'%(y.ndim, len(layer.output_shape)))
+    if len(shape_get)!=len(shape_desire):
+        raise ValueError('Dimension mismatch! get %s, desire %s'%(len(shape_get), len(shape_desire)))
 
     #element wise check
     shape=[]
@@ -225,3 +231,22 @@ def check_shape_match(shape_get, shape_desire):
             else:
                 shape.append(shape_get_i)
     return tuple(shape)
+
+def get_complex_checker_net(layer, out_layer):
+    '''
+    Add a Abs layer after this layer for type-3 analytical network,
+    so that in can be tested.
+
+    Parameters:
+        :layer: <Layer>,
+
+    Return:
+        ANN,
+    '''
+    from .nets import ANN
+    if layer.otype[:7]!='complex':
+        raise ValueError('This function is not intended for real output functions like %s.'%layer)
+    if hasattr(layer,'tags'):
+        if layer.tags['analytical']!=3: raise AnalyticityError('Analyticity type 3 (not analytical only in complex plane) is expected, check your layer or tags.')
+    abslayer=eval('functions.%s'%out_layer)(input_shape=layer.output_shape, itype=layer.otype)
+    return ANN(layers=[layer,abslayer])

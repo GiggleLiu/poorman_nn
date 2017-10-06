@@ -31,7 +31,7 @@ class LinearBase(Layer):
         self.bias = np.asarray(bias)
         output_shape = input_shape[:-1]+(weight.shape[0],)
         self.var_mask = var_mask
-        super(LinearBase, self).__init__(input_shape, output_shape, itype=itype, dtype=np.find_common_type((weight.dtype,bias.dtype),()))
+        super(LinearBase, self).__init__(input_shape, output_shape, itype=itype, dtype=np.find_common_type((weight.dtype,bias.dtype),()).name)
 
     def get_variables(self):
         dvar=masked_concatenate([self.weight.ravel(order='F') if not sps.issparse(self.weight) else self.weight.data, self.bias], self.var_mask)

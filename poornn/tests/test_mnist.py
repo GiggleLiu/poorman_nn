@@ -28,7 +28,7 @@ def build_dnn():
     dtype = 'float32'
     eta=0.1
 
-    ann=ANN(itype=dtype, do_shape_check=True)
+    ann=ANN()
 
     W_conv1 = eta*typed_randn(dtype, (F1, 1, K1, K1))  #fout, fin, K1, K2
     b_conv1 = eta*typed_randn(dtype, (F1,))
@@ -62,8 +62,8 @@ def build_dnn():
     ann.add_layer(functions.Mean, axis=0)
 
     #random num-diff check
-    y_true=zeros(F4); y_true[3]=1
-    assert(all(check_numdiff(ann, var_dict={'y_true':y_true, 'seed':2}, eta_x=1e-3)))
+    y_true=zeros(F4,dtype='float32'); y_true[3]=1
+    assert(all(check_numdiff(ann, var_dict={'y_true':y_true, 'seed':2}, eta_x=1e-3, tol=3e-2)))
     viznn(ann, filename='%s/data/test_mnist.pdf'%os.path.dirname(__file__))
     print(ann)
     return ann
@@ -72,8 +72,8 @@ def compute_gradient(weight_vec, info_dict):
     dnn=info_dict['dnn']
     dnn.set_variables(weight_vec)
     dnn.set_runtime_vars({'y_true':info_dict['y_true'], 'seed':random.randint(1,99999)})
-    ys = dnn.forward(info_dict['x_batch'])
-    gradient_w, gradient_x = dnn.backward(ys, dy=ones_like(ys[-1]))
+    ys = dnn.forward(info_dict['x_batch'],do_shape_check=True)
+    gradient_w, gradient_x = dnn.backward(ys, dy=ones_like(ys[-1]),do_shape_check=True)
     info_dict['gradient_x'] = gradient_x
     info_dict['ys'] = ys
     vec = gradient_w

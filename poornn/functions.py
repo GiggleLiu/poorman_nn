@@ -7,15 +7,15 @@ from .core import Layer, Function, EXP_OVERFLOW, EMPTY_VAR
 from .lib.pooling import lib as fpooling
 from .lib.convprod import lib as fconvprod
 from .lib.relu import lib as frelu
-from .utils import scan2csc, tuple_prod, dtype2token, dtype_c2r
+from .utils import scan2csc, tuple_prod, dtype2token, dtype_c2r, dtype_r2c, complex_backward, fsign
 
 __all__=['wrapfunc','Log2cosh','Sigmoid','Cosh','Sinh','Tan','Tanh','Sum','Mul','Mod','Mean','ReLU','ConvProd',
         'Pooling','DropOut','Sin','Cos','ArcTan','Exp','Log','SoftPlus','Power',
         'SoftMax','CrossEntropy','SoftMaxCrossEntropy','SquareLoss', 'Reshape','Transpose',
         'TypeCast', 'Cache', 'Filter', 'BatchNorm',
-        'Real','Imag','Conj']
+        'Real','Imag','Conj','Abs','Abs2','Angle']
 
-def wrapfunc(func, dfunc, classname='GeneralFunc', attrs={}, verbose=False, docstring="",tags={}):
+def wrapfunc(func, dfunc, classname='GeneralFunc', attrs={}, docstring="",tags={}, real_out=False):
     '''
     Wrap a function into a Functiona layer.
 
@@ -24,8 +24,9 @@ def wrapfunc(func, dfunc, classname='GeneralFunc', attrs={}, verbose=False, docs
         :dfunc: func, derivative function, take input/output (x,y,**attrs) as parameters.
         :classname: str, function classname,
         :attrs: dict, attributes, and input parameters.
-        :verbose: bool, print class string if True.
         :docstring: str,
+        :tags: dict,
+        :real_out: bool, output data type is real if True.
 
     Return:
         class,
@@ -56,7 +57,8 @@ def wrapfunc(func, dfunc, classname='GeneralFunc', attrs={}, verbose=False, docs
                     raise KeyError('You must specify %s'%fieldname)
                 else:
                     setattr(self, fieldname, val)
-        Function.__init__(self, input_shape, input_shape, itype, tags=tags, **kwargs)
+        Function.__init__(self, input_shape, input_shape, itype, tags=tags, \
+                otype=kwargs.pop('otype',dtype_c2r(itype) if itype[:5]!='float' and real_out else itype), **kwargs)
 
     def forward(self,x,**kwargs):
         return func(x,**dict([(attr,getattr(self,attr)) for attr in attrs]))
@@ -73,23 +75,12 @@ def wrapfunc(func, dfunc, classname='GeneralFunc', attrs={}, verbose=False, docs
     newclass.__display_attrs__ = field_names
     return newclass
 
-def complex_backward(dz,dzc):
-    def backward(xy,dy,**kwargs):
-        x, y = xy
-        if dz is None:
-            return (dzc(x,y)*dy).conj()
-        elif dzc is None:
-            return dz(x,y)*dy
-        else:
-            return dz(x,y)*dy+(dzc(x,y)*dy).conj()
-    return backward
-
 class Log2cosh(Function):
     '''
     Function log(2*cosh(theta)).
     '''
     def __init__(self, input_shape, itype, **kwargs):
-        super(Log2cosh, self).__init__(input_shape, input_shape, itype)
+        super(Log2cosh, self).__init__(input_shape, input_shape, itype, **kwargs)
 
     @classmethod
     def forward(self,x):
@@ -183,20 +174,27 @@ class Mean(Function):
 class ReLU(Function):
     '''
     ReLU.
+
+    Attributes:
+        :leak: float, leakage,
+        :mode: 'ri'/'r', non-holomophic real-imaginary (ri) relu or holomophic real (r) relu.
     '''
     __display_attrs__ = ['leak']
-    def __init__(self, input_shape, itype, leak = 0, is_inplace=False, **kwargs):
-        super(ReLU,self).__init__(input_shape, input_shape, itype, tags=dict(is_inplace=is_inplace))
+    def __init__(self, input_shape, itype, leak = 0.0, is_inplace=False, mode=None, **kwargs):
         if leak>1 or leak<0:
             raise ValueError('leak parameter should be 0-1!')
         self.leak = leak
+        if mode is None:
+            mode = 'ri' if itype[:7]=='complex' else 'r'
+        self.mode=mode
+        super(ReLU,self).__init__(input_shape, input_shape, itype,tags=dict(is_inplace=is_inplace,analytical=3 if mode=='ri' else 1))
 
         #use the correct fortran subroutine.
         dtype_token = dtype2token(np.find_common_type((self.itype,self.dtype),()))
 
         #use the correct function
-        self._fforward=eval('frelu.forward_%s'%dtype_token)
-        self._fbackward=eval('frelu.backward_%s'%dtype_token)
+        self._fforward=eval('frelu.forward_%s%s'%(mode,dtype_token))
+        self._fbackward=eval('frelu.backward_%s%s'%(mode,dtype_token))
 
     def forward(self, x):
         y=self._fforward(x.ravel(order='F'),self.leak).reshape(self.output_shape, order='F')
@@ -602,9 +600,13 @@ Exp = wrapfunc(np.exp, lambda xy,dy:xy[1]*dy, classname='Exp',docstring="Functio
 Log = wrapfunc(scipy.log, lambda xy,dy:dy/xy[0], classname='Log',docstring="Function log(x)")
 SoftPlus = wrapfunc(lambda x:scipy.log(1+np.exp(x)), lambda xy,dy:dy*Sigmoid.forward(xy[0]), classname='SoftPlus',docstring="Function log(1+exp(x))")
 
-Conj = wrapfunc(np.conj, complex_backward(None,lambda x,y:1), classname='Conj',docstring="Function conj(x)", tags={'analytical':3})
-Real = wrapfunc(np.real, complex_backward(lambda x,y:0.5,lambda x,y:0.5), classname='Real',docstring="Function real(x)", tags={'analytical':2})
-Imag = wrapfunc(np.imag, complex_backward(lambda x,y:-0.5j,lambda x,y:0.5j), classname='Imag',docstring="Function imag(x)", tags={'analytical':2})
+Conj = wrapfunc(np.conj, lambda xy,dy:dy.conj(), classname='Conj',docstring="Function conj(x)", tags={'analytical':3})
+Real = wrapfunc(np.real, lambda xy,dy:dy.real, classname='Real',docstring="Function real(x)", tags={'analytical':2},real_out=True)
+Imag = wrapfunc(np.imag, lambda xy,dy:-1j*dy.real, classname='Imag',docstring="Function imag(x)", tags={'analytical':2},real_out=True)
+Abs = wrapfunc(np.abs, lambda xy,dy:xy[0].conj()/np.abs(xy[0])*dy.real, classname='Abs',docstring="Function abs(x)", tags={'analytical':2},real_out=True)
+Abs2 = wrapfunc(lambda x:np.abs(x)**2, lambda xy,dy:2*xy[0].conj()*dy.real, classname='Abs2',docstring="Function abs(x)^2", tags={'analytical':2},real_out=True)
+Sign = wrapfunc(lambda x:fsign, lambda xy,dy:xy[1].conj()/np.abs(x)*1j*(y*dy).imag, classname='Sign', docstring="Function x/abs(x)", tags={'analytical':3})
+Angle = wrapfunc(lambda x:np.angle(x), lambda xy,dy:-1j/xy[0]*dy.real, classname='Angle', docstring="Function angle(x)", tags={'analytical':2},real_out=True)
 
 Mul = wrapfunc(lambda x,alpha:x*alpha, lambda xy,dy,alpha:alpha*dy, attrs={'alpha':None}, classname='Mul',docstring="Function x*alpha")
 Mod = wrapfunc(lambda x,n:x%n, lambda xy,dy,n:dy, attrs={'n':None}, classname='Mod',docstring="Function x%n")

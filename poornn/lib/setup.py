@@ -3,7 +3,7 @@ import os
 
 template_list=['linear.template.f90', 'spconv.template.f90',\
         'pooling.template.f90','relu.template.f90', 'spsp.template.f90',\
-        'convprod.template.f90']
+        'convprod.template.f90','futils.template.f90']
 source_list=[tmplt[:-12]+'f90' for tmplt in template_list]
 extension_list=[source[:-4] for source in source_list]
 
@@ -26,7 +26,7 @@ def render_f90s(templates=None):
         if not os.path.isfile(source_file) or os.path.getmtime(source_file) < pytime:
             render_f90(libdir, os.path.join('templates', template),{
                 'version_list': version_dict.get(source,['']),
-                'dtype_list':['complex*16','real*8','real*4']
+                'dtype_list':['complex*16','complex*8','real*8','real*4']
                 }, out_file=os.path.join(libdir, source))
 
 def configuration(parent_package='',top_path=None):

@@ -39,16 +39,16 @@ def build_dnn():
         costfunc = functions.SoftMaxCrossEntropy((-1,F1), dtype, axis=1)
 
         meanfunc = functions.Mean((-1,), dtype, axis=0)
-        ann=ANN(itype=dtype, layers=[linear1, costfunc, meanfunc] ,do_shape_check=True)
+        ann=ANN(layers=[linear1, costfunc, meanfunc])
     else:
-        ann=ANN(itype=dtype, do_shape_check=True)  #do not specify layers.
+        ann=ANN()  #do not specify layers.
         linear1 = Linear((-1, I1*I2), dtype, W_fc1, b_fc1)
         ann.layers.append(linear1)
         ann.add_layer(functions.SoftMaxCrossEntropy, axis=1)
         ann.add_layer(functions.Mean, axis=0)
 
     #random num-diff check
-    y_true=zeros(10); y_true[3]=1
+    y_true=zeros(10,dtype='float32'); y_true[3]=1
     assert(all(check_numdiff(ann, var_dict={'y_true':y_true})))
     return ann
 
@@ -56,8 +56,8 @@ def compute_gradient(weight_vec, info_dict):
     dnn=info_dict['dnn']
     dnn.set_variables(weight_vec)
     dnn.set_runtime_vars({'y_true':info_dict['y_true']})
-    ys = dnn.forward(info_dict['x_batch'])
-    gradient_w, gradient_x = dnn.backward(ys, dy=ones_like(ys[-1]))
+    ys = dnn.forward(info_dict['x_batch'],do_shape_check=True)
+    gradient_w, gradient_x = dnn.backward(ys, dy=ones_like(ys[-1]),do_shape_check=True)
     info_dict['ys'] = ys
     vec = gradient_w
     return vec

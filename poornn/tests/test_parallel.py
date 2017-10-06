@@ -21,13 +21,14 @@ def test_pa():
 
     input_shape = (-1, dim_in)
     output_shape = (-1, -1, dim_in)
-    pnet = ParallelNN(input_shape, output_shape, itype=dtype, otype=dtype, axis=1)
+    pnet = ParallelNN(axis=1)
     x=asfortranarray(typed_randn(dtype, [num_batch,dim_in]))
     weight=asfortranarray(typed_randn(dtype, [dim_in, dim_in]))
     bias=typed_randn(dtype, [dim_in])
-    pnet.add_layer(Linear, weight=weight, bias=bias)
+    ll = Linear(input_shape=input_shape, itype=dtype, weight=weight, bias=bias)
+    pnet.layers.append(ll)
     pnet.add_layer(functions.Power, order=2)
-    pnet.add_layer(functions.Reshape)
+    pnet.add_layer(functions.Reshape, output_shape = ll.output_shape)
     y = pnet.forward(x)
     ll = pnet.layers[0]
     assert_allclose(y[:,0,:], x.dot(ll.weight.T)+ll.bias)

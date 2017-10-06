@@ -2,8 +2,10 @@ from __future__ import division
 import numpy as np
 import pdb
 
+from .lib import futils
+
 __all__=['take_slice', 'scan2csc', 'typed_random', 'typed_randn', 'typed_uniform', 'tuple_prod',
-        'masked_concatenate', 'dtype2token', 'dtype_c2r']
+        'masked_concatenate', 'dtype2token', 'dtype_c2r', 'dtype_r2c', 'complex_backward', 'fsign']
 
 def take_slice(arr,sls,axis):
     '''take using slices.'''
@@ -195,16 +197,55 @@ def dtype2token(dtype):
     elif dtype=='float32':
         dtype_token = 's'
     else:
-        raise TypeError("dtype error - get %s!"%dtype)
+        print("Warning: dtype unrecognized - get %s!"%dtype)
+        return 'x'
     return dtype_token
 
 def dtype_c2r(complex_dtype):
+    '''Get corresponding real data type from complex data type'''
     if complex_dtype=='complex128':
         return 'float64'
     elif complex_dtype=='complex64':
         return 'float32'
     else:
         raise ValueError('Complex data type %s not valid'%complex_dtype)
+
+def dtype_r2c(real_dtype):
+    '''Get corresponding complex data type from real data type'''
+    if real_dtype=='float64':
+        return 'complex128'
+    elif real_dtype=='float32':
+        return 'complex64'
+    else:
+        raise ValueError('Real data type %s not valid'%real_dtype)
+
+def get_tag(layer, tag):
+    '''Get tag from a layer.'''
+    if hasattr(layer, 'tags') and tag in layer.tags:
+        return layer.tags[tag]
+    else:
+        from .core import DEFAULT_TAGS
+        if tag in DEFAULT_TAGS:
+            return DEFAULT_TAGS[tag]
+        else:
+            raise KeyError('Can not find Tag %s'%tag)
+
+def complex_backward(dz,dzc):
+    '''Complex backward.'''
+    def backward(xy,dy,**kwargs):
+        x, y = xy
+        if dz is None:
+            return (dzc(x,y)*dy).conj()
+        elif dzc is None:
+            return dz(x,y)*dy
+        else:
+            return dz(x,y)*dy+(dzc(x,y)*dy).conj()
+    return backward
+
+def fsign(x):
+    '''sign function that work properly for complex numbers.'''
+    order = 'F' if np.isfortran(x) else 'C'
+    return eval('futils.fsign_%s'%dtype2token(x.dtype.name))(x.ravel(order=order)).reshape(x.shape,order=order)
 
 if __name__ == '__main__':
     print(typed_uniform('complex128',(2,2)))

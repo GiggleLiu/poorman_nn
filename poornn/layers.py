@@ -4,8 +4,9 @@ from scipy.misc import factorial
 import pdb
 
 from .core import Layer
+from .utils import fsign
 
-__all__=['PReLU', 'Poly', 'Mobius']
+__all__=['PReLU', 'Poly', 'Mobius', 'Georgiou1992']
 
 class PReLU(Layer):
     '''
@@ -16,9 +17,10 @@ class PReLU(Layer):
     def __init__(self, input_shape, itype, leak = 0):
         self.leak = leak
         self.itype=itype
+        otype = np.find_common_type((dtype, itype),()).name
         if leak>1 or leak<0:
             raise ValueError('leak parameter should be 0-1!')
-        super(PReLU,self).__init__(input_shape, input_shape, itype, otype=itype,
+        super(PReLU,self).__init__(input_shape, input_shape, itype, otype=otype,
                 dtype=np.dtype(type(leak)).name)
 
     def __call__(self,x):
@@ -73,7 +75,7 @@ class Poly(Layer):
             raise ValueError('Kernel %s not found, should be one of %s'%(kernel,self.kernel_dict))
 
         dtype = params.dtype.name
-        otype = np.find_common_type((dtype, itype),())
+        otype = np.find_common_type((dtype, itype),()).name
         super(Poly,self).__init__(input_shape, input_shape, itype, otype=otype, dtype=dtype)
         self.params = params
         self.kernel = kernel
@@ -133,7 +135,7 @@ class Mobius(Layer):
             var_mask = np.asarray(var_mask, dtype='bool')
 
         dtype = params.dtype.name
-        otype = np.find_common_type((dtype, itype),())
+        otype = np.find_common_type((dtype, itype),()).name
         super(Mobius,self).__init__(input_shape, input_shape, itype, otype=otype, dtype=dtype)
         self.params = params
         self.var_mask = var_mask
@@ -154,6 +156,58 @@ class Mobius(Layer):
         if self.var_mask[2]:
             dw.append(((x-a)*(x-b)/(x-c)**2/(a-b)*dy).sum())
         return np.array(dw, dtype=self.dtype), dx
+
+    def get_variables(self):
+        return self.params[self.var_mask]
+
+    def set_variables(self, a):
+        self.params[self.var_mask] = a
+
+    @property
+    def num_variables(self):
+        return self.var_mask.sum()
+
+class Georgiou1992(Layer):
+    '''
+    Function f(x) = x/(c+|x|/r)
+    '''
+    __display_attrs__ = ['c', 'r', 'var_mask']
+
+    def __init__(self, input_shape, itype, params, var_mask=None):
+        params = np.asarray(params)
+        if np.iscomplexobj(params):
+            raise ValueError('Parameters c, r for %s should not be complex!'%self.__class__.__name__)
+        if params[1] == 0:
+            raise ValueError('r = 0 get!')
+        if var_mask is None:
+            var_mask = np.ones(len(params),dtype='bool')
+        else:
+            var_mask = np.asarray(var_mask, dtype='bool')
+
+        dtype = params.dtype.name
+        otype = np.find_common_type((dtype, itype),()).name
+        super(Georgiou1992,self).__init__(input_shape, input_shape, itype, otype=otype, dtype=dtype, tags = {'analytical':3})
+        self.params = params
+        self.var_mask = var_mask
+
+    @property
+    def c(self): return self.params[0]
+    @property
+    def r(self): return self.params[1]
+
+    def forward(self, x, **kwargs):
+        c, r = self.params
+        return x/(c+np.abs(x)/r)
+
+    def backward(self, xy, dy, **kwargs):
+        x, y = xy
+        c, r = self.params
+        deno = 1./(c+np.abs(x)/r)**2
+        dc, dr = -x*deno*dy, x*np.abs(x)/r**2*deno*dy
+        dx = c*dy*deno
+        if self.otype[:7]=='complex':
+            dx = dx + x.conj()/r*1j*(fsign(x)*dy).imag*deno
+        return np.array([dc.sum().real,dr.sum().real], dtype=self.dtype), dx
 
     def get_variables(self):
         return self.params[self.var_mask]
