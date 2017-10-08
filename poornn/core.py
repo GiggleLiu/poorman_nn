@@ -9,7 +9,7 @@ import pdb
 
 from .utils import _connect, dtype2token, dtype_c2r
 
-__all__=['Layer','Function', 'Monitor', 'EXP_OVERFLOW', 'EMPTY_VAR', 'AnalyticityError', 'DEFAULT_TAGS']
+__all__=['Layer','Function', 'ParamFunction', 'Monitor', 'EXP_OVERFLOW', 'EMPTY_VAR', 'AnalyticityError', 'DEFAULT_TAGS']
 
 '''
 List of tags:
@@ -102,7 +102,7 @@ class Layer(object):
             self.__setattr__(key, var_dict[key])
 
     @abstractmethod
-    def forward(self,x):
+    def forward(self,x, **kwargs):
         '''
         Forward propagration to evaluate F(x).
 
@@ -172,6 +172,39 @@ class Function(Layer):
     @property
     def num_variables(self):
         return 0
+
+class ParamFunction(Layer):
+    '''Function layer with params as variables and var_mask as variable mask.'''
+    __metaclass__ = ABCMeta
+
+    def __init__(self, input_shape, output_shape, itype, params, var_mask, **kwargs):
+        self.params = np.atleast_1d(params)
+        if var_mask is None:
+            var_mask = np.ones(len(params),dtype='bool')
+        else:
+            var_mask = np.asarray(var_mask, dtype='bool')
+        self.var_mask = np.atleast_1d(var_mask)
+        if 'dtype' in kwargs:
+            dtype = kwargs.pop('dtype')
+            self.params = self.params.astype(dtype)
+        else:
+            dtype = self.params.dtype.name
+        otype = kwargs.pop('otype', np.find_common_type((dtype, itype),()).name)
+        super(ParamFunction,self).__init__(input_shape, output_shape, itype, dtype = dtype, otype=otype, **kwargs)
+
+    def __call__(self,x):
+        return self.forward(x)
+
+    def get_variables(self):
+        return self.params[self.var_mask]
+
+    def set_variables(self, a):
+        self.params[self.var_mask] = a
+
+    @property
+    def num_variables(self):
+        return self.var_mask.sum()
+
 
 class Container(Layer):
     '''
@@ -252,7 +285,7 @@ class Container(Layer):
     def dtype(self):
         if self.num_layers==0:
             raise AttributeError('Can not infer dtype from empty network.')
-        return np.find_common_type([layer.dtype for layer in self.layers],())
+        return np.find_common_type([layer.dtype for layer in self.layers],()).name
 
     def check_connections(self):
         pass
@@ -307,7 +340,7 @@ class Monitor(Function):
     def monitor_backward(self, xy, dy, **kwargs):
         pass
 
-    def forward(self, x):
+    def forward(self, x, **kwargs):
         self.monitor_forward(x)
         return x
 

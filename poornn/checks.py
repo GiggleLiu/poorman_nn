@@ -75,7 +75,7 @@ def check_shape_backward(f):
 
 def check_numdiff(layer, x=None, num_check=10, eta_x=None, eta_w=None, tol=1e-3, var_dict={}):
     '''Random Numerical Differentiation check.'''
-    from .nets import ANN
+    cache = {}
     analytical = get_tag(layer, 'analytical')
     if analytical == 4:
         print('Warning: Layer %s is not analytic, going on numdiff check!'%layer)
@@ -85,7 +85,6 @@ def check_numdiff(layer, x=None, num_check=10, eta_x=None, eta_w=None, tol=1e-3,
             layer_i = get_complex_checker_net(layer,out_layer)
             res = res+check_numdiff(layer_i, x=x, num_check=num_check, eta_x=eta_x, eta_w=eta_w, tol=tol, var_dict=var_dict)
         return res
-    is_net = isinstance(layer, ANN)
 
     # generate input and set runtime input
     input_dtype = layer.itype
@@ -94,17 +93,15 @@ def check_numdiff(layer, x=None, num_check=10, eta_x=None, eta_w=None, tol=1e-3,
     else:
         x=np.asarray(x, dtype=input_dtype, order='F')
 
-    # forward to generate ys, and y.
+    # forward to generate cache and y.
     layer.set_runtime_vars(var_dict)
-    ys=layer.forward(x)
-    if not is_net: ys = [x,ys]
-    y = ys[-1]
+    y = layer.forward(x, data_cache=cache)
     if y.dtype != layer.otype:
         print('Warning: output data type not match, %s expected, but get %s! switch to debug mode:'%(layer.otype, y.dtype))
         pdb.set_trace()
 
     dy=typed_randn(layer.otype, y.shape)
-    dv, dx=layer.backward(ys, dy=dy)
+    dv, dx=layer.backward((x,y), dy=dy, data_cache=cache)
     dx_=np.ravel(dx, order='F')
     if eta_x is None:
         eta_x=0.003+0.004j if np.iscomplexobj(x) else 0.005
@@ -120,7 +117,6 @@ def check_numdiff(layer, x=None, num_check=10, eta_x=None, eta_w=None, tol=1e-3,
         xn2.ravel(order='F')[pos]-=eta_x/2.
         y1=layer.forward(xn1)
         y2=layer.forward(xn2)
-        if is_net: y1=y1[-1]; y2=y2[-1]
 
         ngrad_x = np.sum((y1-y2)*dy)
         cgrad_x = dx_[pos]*eta_x
@@ -154,10 +150,11 @@ def check_numdiff(layer, x=None, num_check=10, eta_x=None, eta_w=None, tol=1e-3,
         var2[pos]-=eta_w/2.
         layer.set_variables(var2)
         y2=layer.forward(x)
-        if is_net: y1=y1[-1]; y2=y2[-1]
 
         ngrad_w = np.sum((y1-y2)*dy)
         cgrad_w = dv[pos]*eta_w
+        if (analytical==2 or analytical==3) and layer.dtype[:7]=='complex':
+            cgrad_w = cgrad_w.real
         diff=abs(cgrad_w-ngrad_w)
         if diff/max(abs(eta_w), abs(cgrad_w))>tol:
             print('Num Diff Test Fail! @var[%s] = %s'%(pos,var0[pos]))

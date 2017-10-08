@@ -1,7 +1,5 @@
 from numpy import *
 from numpy.testing import dec,assert_,assert_raises,assert_almost_equal,assert_allclose
-from torch.nn import functional as F
-import torch
 import pdb,time
 
 from ..functions import *
@@ -34,7 +32,7 @@ def test_log2cosh():
     assert_(all(check_numdiff(func)))
 
 def test_tri():
-    func_list = [Cls((-1,),itype='complex128') for Cls in [Cos,Sin,Sinh,Cosh,Tan,Tanh,ArcTan]]
+    func_list = [Cls((-1,),itype='complex128') for Cls in [Cos,Sin,Sinh,Cosh,Tan,Tanh,ArcTan,Logcosh]]
     for func in func_list:
         print('Test numdiff for \n%s'%func)
         assert_(all(check_numdiff(func)))
@@ -245,13 +243,29 @@ def test_filter():
 
 def test_relu_c():
     dtype='complex128'
-    func=ReLU((10,10),dtype, 0.1, version='r')
+    func=ReLU((10,10),dtype, 0.1, mode='r')
     assert_(all(check_numdiff(func)))
-    func2=ReLU((10,10),dtype, 0.1, version='ri')
+    func2=ReLU((10,10),dtype, 0.1, mode='ri')
     assert_(all(check_numdiff(func2)))
+    func3=ReLU((10,10),dtype, 0.0, mode='ri')
+    assert_(all(check_numdiff(func3)))
+
+def test_relu_chain():
+    dtype='complex128'
+    from ..nets import ANN
+    from ..linears import Linear
+    func1=Linear((10,10),dtype,typed_randn(dtype,(10,10)),bias=typed_randn(dtype,(10,)))
+    func2=ReLU((10,10),dtype, 0.1, mode='ri')
+    ann = ANN([func1,func2])
+    assert_(all(check_numdiff(ann)))
 
 def test_relu_per():
     N1,N2,N3=100,20,10
+    try:
+        from torch.nn import functional as F
+        import torch
+    except:
+        pass
     x=torch.randn(N1,N2,N3)
     vx=torch.autograd.Variable(x)
     vx.requires_grad=True
@@ -269,6 +283,11 @@ def test_relu_per():
 
 def test_softmax_cross_per():
     N1,N3=100,10
+    try:
+        from torch.nn import functional as F
+        import torch
+    except:
+        pass
     x=torch.randn(N1,N3)
     y_true=torch.from_numpy(random.randint(0,N3,N1))
     vy_true=torch.autograd.Variable(y_true)
@@ -309,7 +328,7 @@ def test_softmax_cross_per():
     assert_allclose(dx,dx_,atol=1e-5)
     assert_allclose(dx,vx.grad.data.numpy(),atol=1e-5)
     assert_(all(check_numdiff(f1, x_np)))
-    assert_(all(check_numdiff(f2, y1, var_dict=rd,tol=1e-3)))
+    assert_(all(check_numdiff(f2, y1, var_dict=rd,tol=5e-3)))
     assert_(all(check_numdiff(f3, x_np, var_dict=rd)))
     assert_(all(check_numdiff(f4, y2)))
 
@@ -328,7 +347,11 @@ def test_realimagconj():
 
 def test_all():
     random.seed(3)
-    torch.manual_seed(3)
+    try:
+        import torch
+        torch.manual_seed(3)
+    except:
+        print('Skip Comparative Benchmark with Pytorch!')
 
     test_batchnorm()
     test_realimagconj()
@@ -346,6 +369,7 @@ def test_all():
     test_softmax_cross_per()
     test_relu_per()
     test_relu_c()
+    test_relu_chain()
     test_summean()
     test_softmax_cross()
     test_dropout()

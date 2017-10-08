@@ -3,56 +3,50 @@ from numpy.polynomial import Polynomial, Chebyshev, Legendre, Laguerre, Hermite,
 from scipy.misc import factorial
 import pdb
 
-from .core import Layer
-from .utils import fsign
+from .core import ParamFunction, EMPTY_VAR
+from .utils import fsign, dtype_c2r, dtype_r2c
 
-__all__=['PReLU', 'Poly', 'Mobius', 'Georgiou1992']
+__all__=['PReLU', 'Poly', 'Mobius', 'Georgiou1992', 'Gaussian']
 
-class PReLU(Layer):
+class PReLU(ParamFunction):
     '''
     Parametric ReLU.
     '''
     __display_attrs__ = ['leak']
 
-    def __init__(self, input_shape, itype, leak = 0):
-        self.leak = leak
-        self.itype=itype
+    def __init__(self, input_shape, itype, leak = 0.1, var_mask=[True]):
+        dtype = np.find_common_type(('float32', np.dtype(type(leak))),()).name
         otype = np.find_common_type((dtype, itype),()).name
         if leak>1 or leak<0:
             raise ValueError('leak parameter should be 0-1!')
         super(PReLU,self).__init__(input_shape, input_shape, itype, otype=otype,
-                dtype=np.dtype(type(leak)).name)
+                dtype=dtype, params = [leak], var_mask = var_mask)
 
-    def __call__(self,x):
-        return self.forward(x)
+    @property
+    def leak(self): return self.params[0]
 
-    def forward(self, x):
+    def forward(self, x, **kwargs):
         if self.leak==0:
-            return maximum(x,0)
+            return np.maximum(x,0)
         else:
-            return maximum(x,self.leak*x)
+            return np.maximum(x,self.leak*x)
 
-    def backward(self, x, y, dy, **kwargs):
+    def backward(self, xy, dy, **kwargs):
+        x, y = xy
         dx=dy.copy(order='F')
         xmask=x<0
         if self.leak==0:
             dx[xmask]=0
         else:
-            dx[xmask]=leak*dy
-        da = np.sum(dy[xmask]*x[xmask].conj())
-        return np.array([da], dtype=self.itype), dx
+            dx[xmask]=self.leak*dy[xmask]
+        if self.var_mask[0]:
+            da = np.sum(dy[xmask]*x[xmask].conj())
+            dw = np.array([da], dtype=self.dtype)
+        else:
+            dw = EMPTY_VAR
+        return dw, dx
 
-    def get_variables(self):
-        return np.array([self.leak], dtype=self.dtype)
-
-    def set_variables(self, a):
-        self.leak=a[0]
-
-    @property
-    def num_variables(self):
-        return 1
-
-class Poly(Layer):
+class Poly(ParamFunction):
     '''
     Ploynomial function layer.
 
@@ -61,25 +55,17 @@ class Poly(Layer):
             * f(x) = \sum_i params[i]*x^i  (factorial_rescale == False)
     '''
     __display_attrs__ = ['kernel', 'max_order', 'var_mask', 'factorial_rescale']
+
     kernel_dict = {'polynomial':Polynomial,'chebyshev':Chebyshev,
             'legendre':Legendre,'laguerre':Laguerre,'hermite':Hermite,'hermiteE':HermiteE}
 
     def __init__(self, input_shape, itype, params, kernel='polynomial', var_mask=None, factorial_rescale=False):
         # check input data
-        params = np.asarray(params)
-        if var_mask is None:
-            var_mask = np.ones(len(params),dtype='bool')
-        else:
-            var_mask = np.asarray(var_mask, dtype='bool')
         if kernel not in self.kernel_dict:
             raise ValueError('Kernel %s not found, should be one of %s'%(kernel,self.kernel_dict))
 
-        dtype = params.dtype.name
-        otype = np.find_common_type((dtype, itype),()).name
-        super(Poly,self).__init__(input_shape, input_shape, itype, otype=otype, dtype=dtype)
-        self.params = params
+        super(Poly,self).__init__(input_shape, input_shape, itype, params=params, var_mask=var_mask)
         self.kernel = kernel
-        self.var_mask = var_mask
         self.factorial_rescale = factorial_rescale
 
     @property
@@ -106,17 +92,7 @@ class Poly(Layer):
                 dw.append(dwi)
         return np.array(dw, dtype=self.dtype), dx
 
-    def get_variables(self):
-        return self.params[self.var_mask]
-
-    def set_variables(self, a):
-        self.params[self.var_mask] = a
-
-    @property
-    def num_variables(self):
-        return self.var_mask.sum()
-
-class Mobius(Layer):
+class Mobius(ParamFunction):
     '''
     Mobius transformation, f(x) = (z-a)(b-c)/(z-c)(b-a)
     
@@ -128,17 +104,8 @@ class Mobius(Layer):
         # check input data
         if len(params)!=3:
             raise ValueError('Mobius take 3 params! but get %s'%len(params))
-        params = np.asarray(params)
-        if var_mask is None:
-            var_mask = np.ones(len(params),dtype='bool')
-        else:
-            var_mask = np.asarray(var_mask, dtype='bool')
 
-        dtype = params.dtype.name
-        otype = np.find_common_type((dtype, itype),()).name
-        super(Mobius,self).__init__(input_shape, input_shape, itype, otype=otype, dtype=dtype)
-        self.params = params
-        self.var_mask = var_mask
+        super(Mobius,self).__init__(input_shape, input_shape, itype, params=params, var_mask=var_mask)
 
     def forward(self, x, **kwargs):
         a,b,c = self.params
@@ -157,17 +124,7 @@ class Mobius(Layer):
             dw.append(((x-a)*(x-b)/(x-c)**2/(a-b)*dy).sum())
         return np.array(dw, dtype=self.dtype), dx
 
-    def get_variables(self):
-        return self.params[self.var_mask]
-
-    def set_variables(self, a):
-        self.params[self.var_mask] = a
-
-    @property
-    def num_variables(self):
-        return self.var_mask.sum()
-
-class Georgiou1992(Layer):
+class Georgiou1992(ParamFunction):
     '''
     Function f(x) = x/(c+|x|/r)
     '''
@@ -179,16 +136,9 @@ class Georgiou1992(Layer):
             raise ValueError('Parameters c, r for %s should not be complex!'%self.__class__.__name__)
         if params[1] == 0:
             raise ValueError('r = 0 get!')
-        if var_mask is None:
-            var_mask = np.ones(len(params),dtype='bool')
-        else:
-            var_mask = np.asarray(var_mask, dtype='bool')
 
-        dtype = params.dtype.name
-        otype = np.find_common_type((dtype, itype),()).name
-        super(Georgiou1992,self).__init__(input_shape, input_shape, itype, otype=otype, dtype=dtype, tags = {'analytical':3})
-        self.params = params
-        self.var_mask = var_mask
+        super(Georgiou1992,self).__init__(input_shape, input_shape, itype, params=params,
+                var_mask=var_mask, tags = {'analytical':3})
 
     @property
     def c(self): return self.params[0]
@@ -203,18 +153,53 @@ class Georgiou1992(Layer):
         x, y = xy
         c, r = self.params
         deno = 1./(c+np.abs(x)/r)**2
-        dc, dr = -x*deno*dy, x*np.abs(x)/r**2*deno*dy
+        dw = []
+        if self.var_mask[0]:
+            dw.append((-x*deno*dy).real.sum())
+        if self.var_mask[1]:
+            dw.append((x*np.abs(x)/r**2*deno*dy).real.sum())
         dx = c*dy*deno
         if self.otype[:7]=='complex':
             dx = dx + x.conj()/r*1j*(fsign(x)*dy).imag*deno
-        return np.array([dc.sum().real,dr.sum().real], dtype=self.dtype), dx
+        return np.array(dw, dtype=self.dtype), dx
 
-    def get_variables(self):
-        return self.params[self.var_mask]
+class Gaussian(ParamFunction):
+    '''
+    Function f(x) = x/(c+|x|/r)
+    '''
+    __display_attrs__ = ['mean', 'variance', 'var_mask']
 
-    def set_variables(self, a):
-        self.params[self.var_mask] = a
+    def __init__(self, input_shape, itype, params, var_mask=None):
+        dtype = itype
+        params = np.asarray(params, dtype=dtype)
+        otype = dtype_c2r(itype) if itype[:7]=='complex' else itype
+        if params[1].imag!=0 or params[1] <= 0:
+            raise ValueError('non-positive variance get!')
+
+        super(Gaussian,self).__init__(input_shape, input_shape, itype, dtype=dtype, otype=otype, params=params,
+                var_mask=var_mask, tags = {'analytical':2})
 
     @property
-    def num_variables(self):
-        return self.var_mask.sum()
+    def mean(self): return self.params[0]
+    @property
+    def variance(self): return self.params[1]
+
+    def forward(self, x, **kwargs):
+        mu, sig = self.params
+        sig = np.real(sig)
+        xx = x - mu
+        return np.exp(-(xx*xx.conj()).real/(2*sig**2.))/np.sqrt(2*np.pi)/sig
+
+    def backward(self, xy, dy, **kwargs):
+        x, y = xy
+        ydy = y*dy
+        mu, sig = self.params
+        xx = x-mu
+        sig = np.real(sig)
+        dw = []
+        if self.var_mask[0]:
+            dw.append((xx.real/sig**2*ydy).sum())
+        if self.var_mask[1]:
+            dw.append(((xx*xx.conj()-sig**2).real/sig**3*ydy).sum())
+        dx = -xx.conj()/sig**2*ydy
+        return np.array(dw,dtype=self.dtype), dx

@@ -10,7 +10,7 @@ from ..checks import check_numdiff
 from ..utils import typed_randn
 from ..nets import JointComplex, KeepSignFunc, ANN
 from ..linears import Linear
-from .. import functions, layers
+from .. import functions, pfunctions
 from ..derivatives import *
 
 random.seed(2)
@@ -60,7 +60,7 @@ def test_derivatives():
             kwargs['params'] = array([0.5, 2.])
         func = eval(func_i)(input_shape, itype, **kwargs)
         if func_i=='KS_Georgiou1992':
-            func2 = layers.Georgiou1992(input_shape, itype, params=array([0.5,2]))
+            func2 = pfunctions.Georgiou1992(input_shape, itype, params=array([0.5,2]))
             x = array([1,2,3.])
             assert_allclose(func.forward(x), func2.forward(x))
         print("Testing numdiff for \n%s"%func)

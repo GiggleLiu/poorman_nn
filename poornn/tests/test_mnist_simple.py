@@ -16,6 +16,7 @@ from ..spconv import SPConv
 from ..linears import Linear
 
 FLAGS = None
+data_cache = {}
 
 def build_dnn():
     '''deepnn builds the graph for a deep net for classifying digits.'''
@@ -56,9 +57,10 @@ def compute_gradient(weight_vec, info_dict):
     dnn=info_dict['dnn']
     dnn.set_variables(weight_vec)
     dnn.set_runtime_vars({'y_true':info_dict['y_true']})
-    ys = dnn.forward(info_dict['x_batch'],do_shape_check=True)
-    gradient_w, gradient_x = dnn.backward(ys, dy=ones_like(ys[-1]),do_shape_check=True)
-    info_dict['ys'] = ys
+    x = info_dict['x_batch']
+    y = dnn.forward(x,do_shape_check=True,data_cache=data_cache)
+    gradient_w, gradient_x = dnn.backward((x,y), dy=ones_like(y),do_shape_check=True, data_cache=data_cache)
+    info_dict['ys'] = data_cache['%s-ys'%id(dnn)]
     vec = gradient_w
     return vec
 
@@ -95,8 +97,8 @@ def main(_):
 
     #apply on test cases
     dnn.set_runtime_vars({'y_true':mnist.test.labels})
-    ys = dnn.forward(mnist.test.images)
-    analyse_result(ys, mnist.test.labels)
+    ys = dnn.forward(mnist.test.images,data_cache=data_cache)
+    analyse_result(data_cache['%d-ys'%id(dnn)], mnist.test.labels)
 
 if __name__ == '__main__':
   parser = argparse.ArgumentParser()

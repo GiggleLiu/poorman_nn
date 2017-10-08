@@ -61,11 +61,11 @@ class Linear(LinearBase):
         self._fforward=eval('flinear.forward_%s'%(dtype_token))
         self._fbackward=eval('flinear.backward_%s'%(dtype_token))
 
-    def forward(self, x):
+    def forward(self, x, **kwargs):
         y = self._fforward(np.atleast_2d(x), self.weight, self.bias)
         return y.reshape(self.output_shape, order='F')
 
-    def backward(self, xy, dy):
+    def backward(self, xy, dy, **kwargs):
         mask = self.var_mask
         x,y = xy
         dx, dweight, dbias = self._fbackward(np.atleast_2d(dy), np.atleast_2d(x), self.weight,
@@ -76,13 +76,13 @@ class Linear(LinearBase):
 class Apdot(LinearBase):
     '''product layer.'''
 
-    def forward(self, x):
+    def forward(self, x, **kwargs):
         if x.ndim==1:
             x=x[np.newaxis]
         y=(np.prod(self.weight+x[:,np.newaxis,:],axis=2)*self.bias).reshape(self.output_shape, order='F')
         return y
 
-    def backward(self, xy, dy):
+    def backward(self, xy, dy, **kwargs):
         x,y = xy
         if dy.ndim==1:
             dy=dy[np.newaxis]
@@ -111,12 +111,12 @@ class SPLinear(LinearBase):
         self._fforward=eval('fspsp.forward%s'%(dtype_token))
         self._fbackward=eval('fspsp.backward%s'%(dtype_token))
 
-    def forward(self, x):
+    def forward(self, x, **kwargs):
         y = self._fforward(np.atleast_2d(x), csc_indices=self.weight.indices+1, csc_indptr=self.weight.indptr+1,\
                 csc_data=self.weight.data, bias=self.bias)
         return y.reshape(self.output_shape, order='F')
 
-    def backward(self, xy, dy):
+    def backward(self, xy, dy, **kwargs):
         x,y = xy
         mask = self.var_mask
         dx, dweight, dbias = self._fbackward(np.atleast_2d(dy), np.atleast_2d(x), csc_data=self.weight.data, csc_indices=self.weight.indices+1,\

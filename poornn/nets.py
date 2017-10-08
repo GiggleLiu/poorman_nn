@@ -70,24 +70,28 @@ class ANN(Container):
         for la,lb in zip(layers[:-1], layers[1:]):
             shape = check_shape_match(lb.input_shape, la.output_shape)
 
-    def forward(self, x, return_info=True, do_shape_check=False):
+    def forward(self, x, data_cache=None, do_shape_check=False, **kwargs):
         '''
         Parameters:
             :x: ndarray, (num_batch, nfi, img_in_dims), in 'F' order.
+            :data_cache: dict,
 
         Return:
             list, output in each layer.
         '''
-        xy=[x]
+        ys=[]
         for layer in self.layers:
             if do_shape_check:
-                x=check_shape_forward(layer.forward)(layer, x)
+                x=check_shape_forward(layer.forward)(layer, x, data_cache=data_cache)
             else:
-                x=layer.forward(x)
-            xy.append(x)
-        return xy
+                x=layer.forward(x, data_cache=data_cache)
+            ys.append(x)
+            if isinstance(x,list): x = x[-1]
+        if data_cache is not None:
+            data_cache['%d-ys'%id(self)] = ys
+        return x
 
-    def backward(self, xy, dy=np.array(1), do_shape_check=False):
+    def backward(self, xy, dy=np.array(1), data_cache=None, do_shape_check=False):
         '''
         Compute gradients.
 
@@ -99,13 +103,19 @@ class ANN(Container):
         '''
         dvs=[]
         x_broken = False
+        x, y = xy
+        key = '%d-ys'%id(self)
+        if data_cache is None or key not in data_cache:
+            raise TypeError('Can not find cached ys! get %s'%data_cache)
+        else:
+            xy = [x]+data_cache[key]
         for i in range(1,len(xy)):
             x, y = xy[-i-1], xy[-i]
             layer = self.layers[-i]
             if do_shape_check:
-                dv, dy=check_shape_backward(layer.backward)(layer, [x, y], dy)
+                dv, dy=check_shape_backward(layer.backward)(layer, [x, y], dy, data_cache=data_cache)
             else:
-                dv, dy=layer.backward([x, y], dy)
+                dv, dy=layer.backward([x, y], dy, data_cache=data_cache)
             dvs.append(dv)
         return np.concatenate(dvs[::-1]), dy
 
@@ -192,14 +202,13 @@ class ParallelNN(Container):
             la.input_shape = input_shape
             la.output_shape = output_shape
 
-    def forward(self, x, return_info=False, do_shape_check=False):
+    def forward(self, x, do_shape_check=False, **kwargs):
         '''
         Parameters:
             :x: ndarray, (num_batch, nfi, img_in_dims), in 'F' order.
 
         Return:
             ndarray, output,
-            (ndarray, list) if return_info, (output, outputs in each layer).
         '''
         ys = []
         for layer in self.layers:
@@ -209,12 +218,9 @@ class ParallelNN(Container):
                 y=layer.forward(x)
             ys.append(y[(slice(None),)*self.axis+(None,)])
         y = np.concatenate(ys,axis=self.axis)
-        if return_info:
-            return y, {}
-        else:
-            return y
+        return y
 
-    def backward(self, xy, dy=np.array(1), do_shape_check=False):
+    def backward(self, xy, dy=np.array(1), do_shape_check=False, **kwargs):
         '''
         Compute gradients.
 

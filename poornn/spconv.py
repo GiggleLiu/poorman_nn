@@ -83,7 +83,7 @@ class SPConv(LinearBase):
     def kernel_shape(self):
         return self.weight.shape[2:]
 
-    def forward(self, x):
+    def forward(self, x, **kwargs):
         '''
         Parameters:
             :x: ndarray, (num_batch, nfi, img_in_dims), input in 'F' order.
@@ -105,7 +105,7 @@ class SPConv(LinearBase):
         y=y.reshape(self.output_shape, order='F')
         return y
 
-    def backward(self, xy, dy):
+    def backward(self, xy, dy, **kwargs):
         '''
         Parameters:
             :xy: (ndarray, ndarray),
@@ -199,7 +199,7 @@ class SPSP(SPConv):
         '''Dimension of input feature.'''
         return self.bias.shape[0]
 
-    def forward(self, x):
+    def forward(self, x, **kwargs):
         x=x.reshape(xpre+(-1,), order='F')
         y=self._fforward(x,csc_indptr=self.csc_indptr,csc_indices=self.csc_indices,fltr_data=_fltr_flatten,
                 bias=self.bias, max_nnz_row=_fltr_flatten.shape[-1])
@@ -247,7 +247,7 @@ class SPConvProd(LinearBase):
     def img_nd(self):
         return len(self.strides)
 
-    def forward(self, x):
+    def forward(self, x, **kwargs):
         '''
         Parameters:
             :x: ndarray, (num_batch, nfi, img_in_dims), input in 'F' order.

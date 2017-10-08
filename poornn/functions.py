@@ -9,7 +9,7 @@ from .lib.convprod import lib as fconvprod
 from .lib.relu import lib as frelu
 from .utils import scan2csc, tuple_prod, dtype2token, dtype_c2r, dtype_r2c, complex_backward, fsign
 
-__all__=['wrapfunc','Log2cosh','Sigmoid','Cosh','Sinh','Tan','Tanh','Sum','Mul','Mod','Mean','ReLU','ConvProd',
+__all__=['wrapfunc','Log2cosh','Logcosh','Sigmoid','Cosh','Sinh','Tan','Tanh','Sum','Mul','Mod','Mean','ReLU','ConvProd',
         'Pooling','DropOut','Sin','Cos','ArcTan','Exp','Log','SoftPlus','Power',
         'SoftMax','CrossEntropy','SoftMaxCrossEntropy','SquareLoss', 'Reshape','Transpose',
         'TypeCast', 'Cache', 'Filter', 'BatchNorm',
@@ -83,7 +83,7 @@ class Log2cosh(Function):
         super(Log2cosh, self).__init__(input_shape, input_shape, itype, **kwargs)
 
     @classmethod
-    def forward(self,x):
+    def forward(self,x,**kwargs):
         if np.ndim(x)==0:
             return scipy.log(2*np.cosh(x)) if abs(x.real)<=12 else np.sign(x.real)*x
         x=np.asarray(x)
@@ -101,6 +101,33 @@ class Log2cosh(Function):
         x, y = xy
         return EMPTY_VAR,np.tanh(x)*dy
 
+class Logcosh(Function):
+    '''
+    Function log(cosh(theta)).
+    '''
+    def __init__(self, input_shape, itype, **kwargs):
+        super(Logcosh, self).__init__(input_shape, input_shape, itype, **kwargs)
+
+    @classmethod
+    def forward(self,x,**kwargs):
+        if np.ndim(x)==0:
+            return scipy.log(np.cosh(x)) if abs(x.real)<=12 else np.sign(x.real)*x
+        x=np.asarray(x)
+        res=np.zeros_like(x)
+        m1=x.real>EXP_OVERFLOW
+        m2=x.real<-EXP_OVERFLOW
+        m3=~(m1|m2)
+        res[m1]=x[m1]-scipy.log(2)
+        res[m2]=-x[m2]-scipy.log(2)
+        res[m3]=scipy.log(np.cosh(x[m3]))
+        return res
+
+    @classmethod
+    def backward(self,xy,dy, **kwargs):
+        x, y = xy
+        return EMPTY_VAR,np.tanh(x)*dy
+
+
 class Sigmoid(Function):
     '''
     Function 1/(1+exp(-x))
@@ -109,7 +136,7 @@ class Sigmoid(Function):
         super(Sigmoid, self).__init__(input_shape, input_shape, itype)
 
     @classmethod
-    def forward(self,x):
+    def forward(self,x,**kwargs):
         #for ndarray
         y=np.zeros_like(x)
         m1=x.real<-EXP_OVERFLOW
@@ -135,7 +162,7 @@ class Sum(Function):
         output_shape = input_shape[:self.axis]+input_shape[self.axis+1:]
         super(Sum,self).__init__(input_shape, output_shape, itype)
 
-    def forward(self,x):
+    def forward(self,x,**kwargs):
         return np.sum(x,axis=self.axis)
     
     def backward(self, xy, dy, **kwargs):
@@ -158,7 +185,7 @@ class Mean(Function):
         output_shape = input_shape[:self.axis]+input_shape[self.axis+1:]
         super(Mean,self).__init__(input_shape, output_shape, itype)
 
-    def forward(self,x):
+    def forward(self,x,**kwargs):
         return np.mean(x,axis=self.axis)
     
     def backward(self, xy, dy, **kwargs):
@@ -196,7 +223,7 @@ class ReLU(Function):
         self._fforward=eval('frelu.forward_%s%s'%(mode,dtype_token))
         self._fbackward=eval('frelu.backward_%s%s'%(mode,dtype_token))
 
-    def forward(self, x):
+    def forward(self, x,**kwargs):
         y=self._fforward(x.ravel(order='F'),self.leak).reshape(self.output_shape, order='F')
         return y
 
@@ -235,7 +262,7 @@ class Pooling(Function):
     def img_nd(self):
         return len(self.kernel_shape)
 
-    def forward(self, x):
+    def forward(self, x,**kwargs):
         '''
         Parameters:
             :x: ndarray, (num_batch, nfi, img_in_dims), input in 'F' order.
@@ -291,7 +318,7 @@ class ConvProd(Function):
     def img_nd(self):
         return self.powers.ndim
 
-    def forward(self, x):
+    def forward(self, x,**kwargs):
         '''
         Parameters:
             :x: ndarray, (num_batch, nfi, img_in_dims), input in 'F' order.
@@ -337,7 +364,7 @@ class DropOut(Function):
         np.random.seed(self.seed)
         self.mask = np.random.random(self.input_shape[self.axis])<self.keep_rate
 
-    def forward(self, x):
+    def forward(self, x,**kwargs):
         '''
         Parameters:
             :x: ndarray, (num_batch, num_feature_in), in fortran order.
@@ -365,7 +392,7 @@ class SoftMax(Function):
         self.axis=axis
         super(SoftMax, self).__init__(input_shape, input_shape, itype)
 
-    def forward(self, x):
+    def forward(self, x,**kwargs):
         x=x-x.max(axis=self.axis, keepdims=True)
         rho=np.exp(x)
         return rho/rho.sum(axis=self.axis, keepdims=True)
@@ -389,7 +416,7 @@ class CrossEntropy(Function):
         output_shape = input_shape[:self.axis]+input_shape[self.axis+1:]
         super(CrossEntropy, self).__init__(input_shape, output_shape, itype, tags=dict(runtimes=['y_true']))
 
-    def forward(self, x):
+    def forward(self, x,**kwargs):
         '''
         Parameters:
             :x: ndarray, note 0 < x <= 1.
@@ -415,7 +442,7 @@ class SoftMaxCrossEntropy(Function):
         output_shape = input_shape[:axis]+input_shape[self.axis+1:]
         super(SoftMaxCrossEntropy, self).__init__(input_shape, output_shape, itype, tags=dict(runtimes=['y_true']))
 
-    def forward(self, x):
+    def forward(self, x,**kwargs):
         '''
         Parameters:
             :x: ndarray, note 0 < x <= 1.
@@ -444,7 +471,7 @@ class SquareLoss(Function):
         self.y_true = None
         super(SquareLoss, self).__init__(input_shape, input_shape, itype, tags=dict(runtimes=['y_true'],analytical=2))
 
-    def forward(self, x):
+    def forward(self, x,**kwargs):
         '''
         Parameters:
             :x: ndarray, note 0 < x <= 1.
@@ -462,7 +489,7 @@ class SquareLoss(Function):
         return EMPTY_VAR,((x-xt).conj()*dy.real*2) if is_complex else (2*(xy[0]-xt)*dy)
 
 class Reshape(Function):
-    def forward(self, x):
+    def forward(self, x,**kwargs):
         return x.reshape(self.output_shape, order='F')
 
     def backward(self, xy, dy, **kwargs):
@@ -473,7 +500,7 @@ class TypeCast(Function):
     def __init__(self, input_shape, itype, otype, **kwargs):
         super(TypeCast, self).__init__(input_shape, input_shape, itype, otype=otype)
 
-    def forward(self, x):
+    def forward(self, x,**kwargs):
         return np.asarray(x, dtype=self.otype, order='F')
 
     def backward(self, xy, dy, **kwargs):
@@ -489,7 +516,7 @@ class Transpose(Function):
         output_shape=tuple([input_shape[axis] for axis in self.axes])
         super(Transpose, self).__init__(input_shape, output_shape, itype)
 
-    def forward(self, x):
+    def forward(self, x,**kwargs):
         return x.transpose(self.axes)
 
     def backward(self, xy, dy, **kwargs):
@@ -503,7 +530,7 @@ class Cache(Function):
         self.forward_list = []
         self.backward_list = []
 
-    def forward(self, x):
+    def forward(self, x,**kwargs):
         self.forward_list.append(x)
         return x
     
@@ -539,7 +566,7 @@ class Filter(Function):
         #np.prod(np.ix_([np.exp(-1j*k*np.arange(ni))/ni for ki,ni in zip(momentum,size)]),axis=0)
         super(Filter, self).__init__(input_shape, output_shape, itype)
 
-    def forward(self, x):
+    def forward(self, x,**kwargs):
         y = x
         for axis, fltr in zip(self.axes[::-1], self.filters[::-1]):
             y = (y*fltr).sum(axis=axis)

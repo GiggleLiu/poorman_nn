@@ -17,6 +17,7 @@ from ..visualize import viznn
 
 random.seed(2)
 FLAGS = None
+data_cache = {}
 
 def build_dnn():
     '''deepnn builds the graph for a deep net for classifying digits.'''
@@ -72,10 +73,11 @@ def compute_gradient(weight_vec, info_dict):
     dnn=info_dict['dnn']
     dnn.set_variables(weight_vec)
     dnn.set_runtime_vars({'y_true':info_dict['y_true'], 'seed':random.randint(1,99999)})
-    ys = dnn.forward(info_dict['x_batch'],do_shape_check=True)
-    gradient_w, gradient_x = dnn.backward(ys, dy=ones_like(ys[-1]),do_shape_check=True)
+    x = info_dict['x_batch']
+    y = dnn.forward(x, do_shape_check=True,data_cache=data_cache)
+    gradient_w, gradient_x = dnn.backward((x,y), dy=ones_like(y),do_shape_check=True,data_cache=data_cache)
     info_dict['gradient_x'] = gradient_x
-    info_dict['ys'] = ys
+    info_dict['ys'] = data_cache['%s-ys'%id(dnn)]
     vec = gradient_w
     return vec
 
@@ -119,9 +121,9 @@ def main(_):
     #apply on test cases
     dnn.layers[7].keep_rate=1.
     dnn.set_runtime_vars({'y_true':mnist.test.labels, 'seed':random.randint(1,99999)})
-    ys = dnn.forward(asfortranarray(mnist.test.images).reshape([-1,1,28,28], order='F'))
+    ys = dnn.forward(asfortranarray(mnist.test.images).reshape([-1,1,28,28], order='F'), data_cache=data_cache)
     #ys = dnn.forward(mnist.test.images, mnist.test.labels)
-    analyse_result(ys, mnist.test.labels)
+    analyse_result(data_cache['%d-ys'%id(dnn)], mnist.test.labels)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
