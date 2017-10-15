@@ -6,7 +6,7 @@ import pdb
 from .core import ParamFunction, EMPTY_VAR
 from .utils import fsign, dtype_c2r, dtype_r2c
 
-__all__=['PReLU', 'Poly', 'Mobius', 'Georgiou1992', 'Gaussian']
+__all__=['PReLU', 'Poly', 'Mobius', 'Georgiou1992', 'Gaussian', 'Mul']
 
 class PReLU(ParamFunction):
     '''
@@ -203,3 +203,30 @@ class Gaussian(ParamFunction):
             dw.append(((xx*xx.conj()-sig**2).real/sig**3*ydy).sum())
         dx = -xx.conj()/sig**2*ydy
         return np.array(dw,dtype=self.dtype), dx
+
+class Mul(ParamFunction):
+    '''
+    Function f(x) = c*x
+    '''
+    __display_attrs__ = ['c', 'var_mask']
+
+    def __init__(self, input_shape, itype, c=1., var_mask=None):
+        if var_mask is None: var_mask = [True]
+        params = np.atleast_1d(c)
+        dtype = params.dtype.name
+        otype = np.find_common_type((dtype,itype),()).name
+
+        super(Mul,self).__init__(input_shape, input_shape, itype, dtype=dtype, otype=otype, params=params,
+                var_mask=np.atleast_1d(var_mask))
+
+    @property
+    def c(self): return self.params[0]
+
+    def forward(self, x, **kwargs):
+        return self.params[0]*x
+
+    def backward(self, xy, dy, **kwargs):
+        c = self.params[0]
+        dx = dy*c
+        dw = EMPTY_VAR if not self.var_mask[0] else np.array([(dy*xy[0]).sum()])
+        return dw, dx

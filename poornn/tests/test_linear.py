@@ -11,9 +11,10 @@ import torch.nn as nn
 from torch import autograd
 import torch
 
-from ..linears import Linear, Apdot, SPLinear
+from ..linears import *
 from ..checks import check_numdiff
 from ..utils import typed_randn
+from .. import functions
 
 def test_linear():
     random.seed(2)
@@ -36,10 +37,14 @@ def test_linear():
     for i in range(ntest):
         y2=sv.forward(xin_np)
     t2=time.time()
-    print( "Elapse old = %s, new = %s"%(t1-t0,t2-t1))
+    for i in range(ntest):
+        res3=xin_np.dot(sv.weight.T)+sv.bias
+    t3=time.time()
+    print( "Elapse old = %s, new = %s, numpy = %s"%(t1-t0,t2-t1,t3-t2))
     res1=y1.data.numpy()
     res2=y2
     assert_allclose(res1,res2,atol=1e-4)
+    assert_allclose(res1,res3,atol=1e-4)
 
     print( "Testing backward")
     dy=torch.randn(*y1.size())
@@ -84,6 +89,18 @@ def test_linear_complex():
     assert_allclose(sv.get_variables(),zeros(0))
     sv=Linear((num_batch, dim_in), 'complex128',weight, bias, var_mask=(False,False))
     assert_allclose(sv.get_variables(),zeros(0))
+
+def test_unitary():
+    num_batch=10
+    dim_in=40
+    dim_out=30
+    xin_np=asfortranarray(typed_randn('complex128',[num_batch,dim_in]))
+    sv=Unitary((num_batch, dim_in), 'complex128',weight=(dim_out,dim_in))
+    print( "Testing numdiff for %s"%sv)
+    net = ANN(layers = [sv])
+    net.add_layer(functions.Sum)
+    net.add_layer(functions.Abs2)
+    pdb.set_trace()
 
 def test_splinear():
     num_batch=2
@@ -189,11 +206,11 @@ def test_apdot_complex():
     print( "Testing numdiff for %s"%sv)
     assert_(all(check_numdiff(sv, num_check=100)))
 
-
 def test_all():
     random.seed(2)
     torch.manual_seed(2)
 
+    test_unitary()
     test_splinear()
     test_apdot_complex()
     test_linear_complex()

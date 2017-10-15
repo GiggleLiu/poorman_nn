@@ -244,18 +244,18 @@ def test_filter():
 def test_relu_c():
     dtype='complex128'
     func=ReLU((10,10),dtype, 0.1, mode='r')
-    assert_(all(check_numdiff(func)))
+    assert_(all(check_numdiff(func, tol=1e-2)))
     func2=ReLU((10,10),dtype, 0.1, mode='ri')
-    assert_(all(check_numdiff(func2)))
-    func3=ReLU((10,10),dtype, 0.0, mode='ri')
-    assert_(all(check_numdiff(func3)))
+    assert_(all(check_numdiff(func2, tol=1e-2)))
+    func3=ReLU((10,10),dtype, 1e-10, mode='ri')
+    assert_(all(check_numdiff(func3, tol=1e-2)))
 
 def test_relu_chain():
     dtype='complex128'
     from ..nets import ANN
     from ..linears import Linear
-    func1=Linear((10,10),dtype,typed_randn(dtype,(10,10)),bias=typed_randn(dtype,(10,)))
-    func2=ReLU((10,10),dtype, 0.1, mode='ri')
+    func1=Linear((5,5),dtype,typed_randn(dtype,(5,5)),bias=typed_randn(dtype,(5,)))
+    func2=ReLU((5,5),dtype, 0.1, mode='ri')
     ann = ANN([func1,func2])
     assert_(all(check_numdiff(ann)))
 
@@ -265,7 +265,7 @@ def test_relu_per():
         from torch.nn import functional as F
         import torch
     except:
-        pass
+        return
     x=torch.randn(N1,N2,N3)
     vx=torch.autograd.Variable(x)
     vx.requires_grad=True
@@ -282,12 +282,12 @@ def test_relu_per():
     assert_allclose(dx, vx.grad.data.numpy())
 
 def test_softmax_cross_per():
-    N1,N3=100,10
+    N1,N3=10,10
     try:
         from torch.nn import functional as F
         import torch
     except:
-        pass
+        return
     x=torch.randn(N1,N3)
     y_true=torch.from_numpy(random.randint(0,N3,N1))
     vy_true=torch.autograd.Variable(y_true)
@@ -336,7 +336,7 @@ def test_batchnorm():
     func=BatchNorm(input_shape=(-1,2), itype='complex128',axis=None)
     func.mean = array([[0,1j]])
     func.variance = array([[3,0.5]])
-    print('Test numdiff for %s.'%func)
+    print('Test numdiff for \n%s.'%func)
     assert_(all(check_numdiff(func)))
 
 def test_realimagconj():
@@ -344,6 +344,15 @@ def test_realimagconj():
         func=cls(input_shape=(-1,2), itype='complex128')
         print('Test numdiff for \n%s'%func)
         assert_(all(check_numdiff(func)))
+
+def test_softmaxnorm():
+    N1, N2 = 10, 6
+    f1=SoftMax(input_shape=(N1,N2),itype='float64',axis=1,scale=2.)
+    f2=Normalize(input_shape=(N1,N2),itype='complex128',axis=1,scale=2.)
+    f3=Normalize(input_shape=(N1,N2),itype='complex128',axis=None,scale=2.)
+    for func in [f1,f2,f3]:
+        print('Test numdiff for \n%s.'%func)
+        assert_(all(check_numdiff(func,tol=1e-2,eta_x = 1e-2j+1e-2 if func.itype[:7]=='complex' else None)))
 
 def test_all():
     random.seed(3)
@@ -353,6 +362,7 @@ def test_all():
     except:
         print('Skip Comparative Benchmark with Pytorch!')
 
+    test_softmaxnorm()
     test_batchnorm()
     test_realimagconj()
     test_filter()

@@ -308,17 +308,25 @@ class JointComplex(Container):
 class KeepSignFunc(Container):
     '''
     Function f(z) = h(|z|)*sign(z), h is a real function.
+
+    Parameters:
+        :is_real: bool, take real input or not.
     '''
-    def __init__(self, h):
+    def __init__(self, h, is_real=False):
         layers = [h]
+        self.is_real = is_real
         super(KeepSignFunc, self).__init__(layers, labels=None)
 
     @property
     def h(self): return self.layers[0]
     @property
-    def itype(self): return dtype_r2c(self.layers[0].itype)
+    def itype(self):
+        itype = self.layers[0].itype
+        return dtype_r2c(itype) if not self.is_real else itype
     @property
-    def otype(self): return dtype_r2c(self.layers[0].otype)
+    def otype(self):
+        otype = self.layers[0].otype
+        return dtype_r2c(otype) if not self.is_real else otype
     @property
     def input_shape(self): return self.layers[0].input_shape
     @property

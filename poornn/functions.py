@@ -12,7 +12,7 @@ from .utils import scan2csc, tuple_prod, dtype2token, dtype_c2r, dtype_r2c, comp
 __all__=['wrapfunc','Log2cosh','Logcosh','Sigmoid','Cosh','Sinh','Tan','Tanh','Sum','Mul','Mod','Mean','ReLU','ConvProd',
         'Pooling','DropOut','Sin','Cos','ArcTan','Exp','Log','SoftPlus','Power',
         'SoftMax','CrossEntropy','SoftMaxCrossEntropy','SquareLoss', 'Reshape','Transpose',
-        'TypeCast', 'Cache', 'Filter', 'BatchNorm',
+        'TypeCast', 'Cache', 'Filter', 'BatchNorm', 'Normalize',
         'Real','Imag','Conj','Abs','Abs2','Angle']
 
 def wrapfunc(func, dfunc, classname='GeneralFunc', attrs={}, docstring="",tags={}, real_out=False):
@@ -386,20 +386,21 @@ class SoftMax(Function):
     '''
     Soft max function applied on the last axis.
     '''
-    __display_attrs__ = ['axis']
+    __display_attrs__ = ['axis','scale']
 
-    def __init__(self, input_shape, itype, axis, **kwargs):
-        self.axis=axis
+    def __init__(self, input_shape, itype, axis, scale=1., **kwargs):
+        self.axis = axis
+        self.scale = scale
         super(SoftMax, self).__init__(input_shape, input_shape, itype)
 
     def forward(self, x,**kwargs):
         x=x-x.max(axis=self.axis, keepdims=True)
         rho=np.exp(x)
-        return rho/rho.sum(axis=self.axis, keepdims=True)
+        return self.scale*rho/rho.sum(axis=self.axis, keepdims=True)
 
     def backward(self, xy, dy, **kwargs):
         x,y = xy
-        return EMPTY_VAR,dy*y-(dy*y).sum(axis=self.axis, keepdims=True)*y
+        return EMPTY_VAR, (dy*y-(dy*y).sum(axis=self.axis, keepdims=True)*y/self.scale)
 
 class CrossEntropy(Function):
     '''
@@ -614,6 +615,34 @@ class BatchNorm(Function):
     def backward(self, xy, dy, **kwargs):
         x, y = xy
         return EMPTY_VAR, dy/np.sqrt(self.variance+self.eps)
+
+class Normalize(Function):
+    '''
+    Normalize data.
+
+    Attributes:
+        :axis: int, axis to calculate norm.
+        :scale: float, default 1.
+    '''
+    __display_attrs__ = ['axis','scale']
+
+    def __init__(self, input_shape, itype, axis, scale=1., **kwargs):
+        super(Normalize,self).__init__(input_shape, input_shape, itype, tags = {'analytical':3})
+
+        self.scale = scale
+        if axis is not None:
+            if axis > len(input_shape)-1: raise ValueError('invalid axis')
+            axis=axis%len(input_shape)
+        self.axis = axis
+
+    def forward(self, x, **kwargs):
+        return self.scale*x/np.linalg.norm(x,axis=self.axis, keepdims=True)
+
+    def backward(self, xy, dy, **kwargs):
+        x, y = xy
+        norm = np.linalg.norm(x,axis=self.axis, keepdims=True)
+        cum = (x*dy).sum(axis=self.axis, keepdims=True).real
+        return EMPTY_VAR, (dy/norm-x.conj()*cum/norm**3)*self.scale
 
 Sin = wrapfunc(np.sin, lambda xy, dy:np.cos(xy[0])*dy, classname='Sin',docstring="Function sin(x)")
 Sinh = wrapfunc(np.sinh, lambda xy, dy:np.cosh(xy[0])*dy, classname='Sinh',docstring="Function sinh(x)")

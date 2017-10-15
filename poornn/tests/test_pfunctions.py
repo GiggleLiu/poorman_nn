@@ -12,6 +12,12 @@ def test_prelu():
         print('Test numdiff for \n%s.'%func)
         assert_(all(check_numdiff(func)))
 
+def test_mul():
+    for var_mask in [True,False]:
+        func=Mul(input_shape=(-1,2), itype='float64',c=0.5, var_mask=var_mask)
+        print('Test numdiff for \n%s.'%func)
+        assert_(all(check_numdiff(func)))
+
 def test_poly():
     kernels = ['polynomial','chebyshev', 'legendre','laguerre','hermite','hermiteE']
     for factorial_rescale in [True,False]:
@@ -33,6 +39,7 @@ def test_mobiusgeogaussian():
 def test_all():
     random.seed(2)
     test_poly()
+    test_mul()
     test_prelu()
     test_mobiusgeogaussian()
 
