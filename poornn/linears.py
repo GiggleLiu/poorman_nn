@@ -131,7 +131,7 @@ class Unitary(Linear):
     Unitary Layer, f = x.dot(weight.T), with weight.dot(weight.T.conj()) = 1.
     '''
     def __init__(self, input_shape, itype, weight, var_mask=(True,), **kwargs):
-        if len(var_mask!=1):
+        if len(var_mask)!=1:
             raise ValueError('number of mask error!')
         if isinstance(weight,tuple):
             weight = typed_randn(kwargs.get('dtype',itype),weight)
@@ -139,15 +139,21 @@ class Unitary(Linear):
 
         if weight.shape[1]<weight.shape[0]:
             raise ValueError('output shape greater than input shape error!')
-        if not allclose(weight.dot(weight.T.conj()),np.eye(weight.shape[0])):
-            raise ValueError('non-unitary matrix error!')
-        super(Unitary, self).__init__(input_shape, itype=itype, weight=weight, bias=np.zeros(weight.shape[1],dtype=weight.dtype), var_mask=var_mask+(False,),**kwargs)
+        super(Unitary, self).__init__(input_shape, itype=itype, weight=weight, bias=np.zeros(weight.shape[0],dtype=weight.dtype), var_mask=var_mask+(False,),**kwargs)
+        self.check_unitary()
+
+    def check_unitary(self):
+        weight = self.weight
+        err = abs(weight.dot(weight.T.conj())-np.eye(weight.shape[0])).mean()
+        if err>1e-10:
+            raise ValueError('non-unitary matrix error, error = %s!'%err)
+        return err
 
     def set_variables(self, variables):
         W = self.weight
         if self.var_mask[0]:
-            dG = variables.reshape(W.shape) - W
-            dA = W.dot(dG.T.conj()) - dG.dot(W.T.conj())
-            B = np.eye(dG.shape[0]) + dA/2
+            dG = variables.reshape(W.shape,order='F') - W
+            dA = W.T.conj().dot(dG) - dG.T.conj().dot(W)
+            B = np.eye(dG.shape[1]) - dA/2
             Y = W.dot(B.T.conj()).dot(np.linalg.inv(B))
             self.weight[...] = Y

@@ -14,7 +14,6 @@ import torch
 from ..linears import *
 from ..checks import check_numdiff
 from ..utils import typed_randn
-from .. import functions
 
 def test_linear():
     random.seed(2)
@@ -89,18 +88,6 @@ def test_linear_complex():
     assert_allclose(sv.get_variables(),zeros(0))
     sv=Linear((num_batch, dim_in), 'complex128',weight, bias, var_mask=(False,False))
     assert_allclose(sv.get_variables(),zeros(0))
-
-def test_unitary():
-    num_batch=10
-    dim_in=40
-    dim_out=30
-    xin_np=asfortranarray(typed_randn('complex128',[num_batch,dim_in]))
-    sv=Unitary((num_batch, dim_in), 'complex128',weight=(dim_out,dim_in))
-    print( "Testing numdiff for %s"%sv)
-    net = ANN(layers = [sv])
-    net.add_layer(functions.Sum)
-    net.add_layer(functions.Abs2)
-    pdb.set_trace()
 
 def test_splinear():
     num_batch=2
@@ -210,7 +197,6 @@ def test_all():
     random.seed(2)
     torch.manual_seed(2)
 
-    test_unitary()
     test_splinear()
     test_apdot_complex()
     test_linear_complex()
