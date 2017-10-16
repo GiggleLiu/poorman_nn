@@ -1,5 +1,6 @@
 import numpy as np
 import scipy
+from scipy import fftpack
 from numbers import Number
 import pdb
 
@@ -9,7 +10,7 @@ from .lib.convprod import lib as fconvprod
 from .lib.relu import lib as frelu
 from .utils import scan2csc, tuple_prod, dtype2token, dtype_c2r, dtype_r2c, complex_backward, fsign
 
-__all__=['wrapfunc','Log2cosh','Logcosh','Sigmoid','Cosh','Sinh','Tan','Tanh','Sum','Mul','Mod','Mean','ReLU','ConvProd',
+__all__=['wrapfunc','Log2cosh','Logcosh','Sigmoid','Cosh','Sinh','Tan','Tanh','Sum','Mul','Mod','Mean','FFT','ReLU','ConvProd',
         'Pooling','DropOut','Sin','Cos','ArcTan','Exp','Log','SoftPlus','Power',
         'SoftMax','CrossEntropy','SoftMaxCrossEntropy','SquareLoss', 'Reshape','Transpose',
         'TypeCast', 'Cache', 'Filter', 'BatchNorm', 'Normalize',
@@ -197,6 +198,35 @@ class Mean(Function):
         dx = np.repeat(dy_,x.shape[self.axis],axis=self.axis)/x.shape[self.axis]
         return EMPTY_VAR, dx
 
+class FFT(Function):
+    '''
+    FFT/IFFT/DCT et. al. along specific axis.
+    '''
+    __display_attrs__ = ['kernel','axis']
+    def __init__(self,input_shape, itype, axis, kernel='fft', **kwargs):
+        if not hasattr(fftpack, kernel):
+            raise ValueError('FFT Kernel %s not found in scipy.fftpack!'%kernel)
+        dtype = (itype if itype[:7]=='complex' else dtype_r2c(itype)) if kernel in ['fft','ifft','fftn','ifftn','fft2','ifft2'] else itype
+        otype = np.find_common_type((dtype,itype),())
+        super(FFT,self).__init__(input_shape, input_shape, itype, dtype=dtype, otype=otype)
+
+        self.axis = axis
+        self.kernel = kernel
+
+    def forward(self,x,**kwargs):
+        func = eval('fftpack.%s'%self.kernel)
+        if hasattr(self.axis,'__iter__'):
+            return func(x,axes=self.axis)
+        else:
+            return func(x,axis=self.axis)
+    
+    def backward(self, xy, dy, **kwargs):
+        func = eval('fftpack.%s'%self.kernel)  # note that dft matrix is hermitian
+        if hasattr(self.axis,'__iter__'):
+            dx = func(dy,axes=self.axis)
+        else:
+            dx = func(dy,axis=self.axis)
+        return EMPTY_VAR, dx
 
 class ReLU(Function):
     '''

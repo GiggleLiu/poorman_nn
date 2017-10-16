@@ -5,10 +5,11 @@ from __future__ import division
 
 import numpy as np
 import pdb,time
+from scipy import sparse as sps
 
 from .lib.spconv import lib as fspconv
 from .lib.spsp import lib as fspsp
-from .utils import scan2csc, tuple_prod, spscan2csc, masked_concatenate, dtype2token
+from .utils import scan2csc, tuple_prod, spscan2csc, masked_concatenate, dtype2token, typed_randn
 from .linears import LinearBase
 
 __all__ = ['SPConv']
@@ -29,9 +30,12 @@ class SPConv(LinearBase):
         :csc_indices: 1darray, row indicator for input array.
         :weight_indices: 1darray, row indicator for filter array (if not contiguous).
     '''
-    __display_attrs__ = ['strides', 'boundary', 'kernel_shape', 'var_mask']
+    __display_attrs__ = ['strides', 'boundary', 'kernel_shape', 'is_unitary', 'var_mask']
 
-    def __init__(self, input_shape, itype, weight, bias, strides=None, boundary = "P", w_contiguous = True, var_mask=(1,1), **kwargs):
+    def __init__(self, input_shape, itype, weight, bias, strides=None, boundary = "P",\
+            w_contiguous = True, var_mask=(1,1), is_unitary=False, **kwargs):
+        if isinstance(weight,tuple):
+            weight = 0.1*typed_randn(kwargs.get('dtype',itype),weight)
         super(SPConv, self).__init__(input_shape, itype=itype, weight=weight, bias=bias, var_mask=var_mask)
 
         img_nd = self.weight.ndim-2
@@ -40,6 +44,7 @@ class SPConv(LinearBase):
         self.strides = tuple(strides)
         self.boundary = boundary
         self.w_contiguous = w_contiguous
+        self.is_unitary = is_unitary
 
         kernel_shape = self.weight.shape[2:]
         self.csc_indptr, self.csc_indices, self.img_out_shape = scan2csc(kernel_shape, input_shape[-img_nd:], strides, boundary)
@@ -64,6 +69,12 @@ class SPConv(LinearBase):
             self._fbackward=eval('fspconv.backward_contiguous%s'%dtype_token)
             self._fbackward1=eval('fspconv.backward1_contiguous%s'%dtype_token)
 
+        # make it unitary
+        self.is_unitary = is_unitary
+        if is_unitary:
+            self.be_unitary()
+            self.check_unitary()
+
     @property
     def img_nd(self):
         '''Dimension of input image.'''
@@ -82,6 +93,47 @@ class SPConv(LinearBase):
     @property
     def kernel_shape(self):
         return self.weight.shape[2:]
+
+    def be_unitary(self):
+        weight = self.weight.reshape(self.weight.shape[:2]+(-1,),order='F')
+        self.weight = np.asarray(np.transpose([np.linalg.qr(weight[:,i].T)[0].T \
+                for i in range(self.num_feature_in)],axes=(1,0,2)),order='F')
+        self.is_unitary = True
+
+    def check_unitary(self, tol=1e-10):
+        # check weight shape
+        if self.weight.shape[2]<self.weight.shape[0]:
+            raise ValueError('output shape greater than input shape error!')
+
+        # get unitary error
+        err = 0
+        for i in range(self.num_feature_in):
+            weight = self.weight[:,i]
+            err += abs(weight.dot(weight.T.conj())-np.eye(weight.shape[0])).mean()
+        if self.is_unitary and err>tol:
+            raise ValueError('non-unitary matrix error, error = %s!'%err)
+        return err
+
+    def set_variables(self, variables):
+        nw=self.weight.size if self.var_mask[0] else 0
+        var1, var2 = variables[:nw], variables[nw:]
+        weight_data = self.weight.data if sps.issparse(self.weight) else self.weight.ravel(order='F')
+        if self.is_unitary and self.var_mask[0]:
+            W = self.weight.reshape(self.weight.shape[:2]+(-1,), order='F')
+            dG = var1.reshape(W.shape,order='F') - W
+            # -dA = W.T.conj().dot(dG) - dG.T.conj().dot(W)
+            dA = np.einsum('ijk,kjl->ijl',W.T.conj(),dG)
+            dA = dA - dA.T.conj()
+            B = np.eye(dG.shape[2])[:,None] - dA/2
+            Binv = np.transpose(np.linalg.inv(np.transpose(B,axes=(1,0,2))),axes=(1,0,2))
+            #Y = W.dot(B.T.conj()).dot(np.linalg.inv(B))
+            Y = np.einsum('ijk,kjl->ijl',W,B.T.conj())
+            Y = np.einsum('ijk,kjl->ijl',Y,Binv)
+            self.weight[...] = Y
+        elif self.var_mask[0]:
+            weight_data[:] = var1
+        if self.var_mask[1]:
+            self.bias[:] = var2
 
     def forward(self, x, **kwargs):
         '''

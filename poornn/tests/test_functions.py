@@ -354,6 +354,15 @@ def test_softmaxnorm():
         print('Test numdiff for \n%s.'%func)
         assert_(all(check_numdiff(func,tol=1e-2,eta_x = 1e-2j+1e-2 if func.itype[:7]=='complex' else None)))
 
+def test_fft():
+    input_shape=(10,16)
+    for kernel,itype in zip(['fft','ifft','dct','fft'],['complex128','complex128','float64','float32']):
+        otype = itype
+        if kernel=='fft': otype='complex64'
+        for axis in [1]:
+            func = FFT(input_shape,itype,axis=axis)
+            assert_(all(check_numdiff(func)))
+
 def test_all():
     random.seed(3)
     try:
@@ -362,6 +371,7 @@ def test_all():
     except:
         print('Skip Comparative Benchmark with Pytorch!')
 
+    test_fft()
     test_softmaxnorm()
     test_batchnorm()
     test_realimagconj()
