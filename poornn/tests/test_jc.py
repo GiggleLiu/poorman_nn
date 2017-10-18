@@ -33,6 +33,7 @@ def test_jcsigmoid():
         assert_(all(check_numdiff(jc, num_check=100,tol=1e-2)))
 
 def test_keepsign():
+    random.seed(4)
     itype = 'float64'
     nfi = 8
     nfo = 8

@@ -12,6 +12,8 @@ from ..checks import check_numdiff
 from ..utils import typed_randn
 from .. import functions, nets, monitors
 
+random.seed(2)
+
 def test_unitary():
     num_batch=1
     dim_in=40
@@ -40,6 +42,7 @@ def test_unitary():
     assert_almost_equal(err,0)
 
 def test_unitary_conv():
+    random.seed(2)
     num_batch=1
     nfi=1
     dim_out=10
@@ -69,7 +72,6 @@ def test_unitary_conv():
 
 
 def test_all():
-    random.seed(2)
     test_unitary_conv()
     test_unitary()
 

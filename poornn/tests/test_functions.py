@@ -1,3 +1,4 @@
+import pytest
 from numpy import *
 from numpy.testing import dec,assert_,assert_raises,assert_almost_equal,assert_allclose
 import pdb,time
@@ -5,6 +6,13 @@ import pdb,time
 from ..functions import *
 from ..checks import check_numdiff
 from ..utils import typed_randn
+
+random.seed(2)
+try:
+    import torch
+    torch.manual_seed(2)
+except:
+    print('Skip Comparative Benchmark with Pytorch!')
 
 def test_sigmoidsoftplus():
     func=Sigmoid((-1,),itype='complex128')
@@ -328,7 +336,7 @@ def test_softmax_cross_per():
     assert_allclose(dx,dx_,atol=1e-5)
     assert_allclose(dx,vx.grad.data.numpy(),atol=1e-5)
     assert_(all(check_numdiff(f1, x_np)))
-    assert_(all(check_numdiff(f2, y1, var_dict=rd,tol=5e-3)))
+    assert_(all(check_numdiff(f2, y1, var_dict=rd,tol=1e-2)))
     assert_(all(check_numdiff(f3, x_np, var_dict=rd)))
     assert_(all(check_numdiff(f4, y2)))
 
@@ -363,14 +371,7 @@ def test_fft():
             func = FFT(input_shape,itype,axis=axis)
             assert_(all(check_numdiff(func)))
 
-def test_all():
-    random.seed(3)
-    try:
-        import torch
-        torch.manual_seed(3)
-    except:
-        print('Skip Comparative Benchmark with Pytorch!')
-
+def run_all():
     test_fft()
     test_softmaxnorm()
     test_batchnorm()
@@ -397,4 +398,5 @@ def test_all():
     test_log2cosh()
     test_sigmoidsoftplus()
 
-test_all()
+if __name__ == '__main__':
+    run_all()

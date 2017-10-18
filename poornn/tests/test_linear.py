@@ -7,15 +7,25 @@ from copy import deepcopy
 from numpy.testing import dec,assert_,assert_raises,assert_almost_equal,assert_allclose
 from scipy import sparse as sps
 import pdb,time
-import torch.nn as nn
-from torch import autograd
-import torch
 
 from ..linears import *
 from ..checks import check_numdiff
 from ..utils import typed_randn
 
+random.seed(2)
+try:
+    import torch
+    torch.manual_seed(2)
+except:
+    print('Skip Comparative Benchmark with Pytorch!')
+
 def test_linear():
+    try:
+        import torch.nn as nn
+        from torch import autograd
+        import torch
+    except:
+        return
     random.seed(2)
     num_batch=10
     nfi=1024
@@ -131,7 +141,12 @@ def test_splinear():
     assert_(all(check_numdiff(sv2, num_check=100)))
 
 def test_linear1():
-    random.seed(2)
+    try:
+        import torch.nn as nn
+        from torch import autograd
+        import torch
+    except:
+        return
     nfi=1024
     nfo=512
     ts=random.randn(1,nfi)
@@ -193,10 +208,7 @@ def test_apdot_complex():
     print( "Testing numdiff for %s"%sv)
     assert_(all(check_numdiff(sv, num_check=100)))
 
-def test_all():
-    random.seed(2)
-    torch.manual_seed(2)
-
+def run_all():
     test_splinear()
     test_apdot_complex()
     test_linear_complex()
@@ -204,4 +216,4 @@ def test_all():
     test_linear1()
 
 if __name__=='__main__':
-    test_all()
+    run_all()

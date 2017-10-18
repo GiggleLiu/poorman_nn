@@ -4,20 +4,27 @@ Tests for MPS and MPO
 from numpy import *
 from numpy.testing import dec,assert_,assert_raises,assert_almost_equal,assert_allclose
 from scipy import sparse as sps
-import torch
-import torch.nn.functional as F
-from torch.nn import Conv1d,Conv2d
-from torch import autograd
-import pdb,time
+import pdb,time,pytest
 
 from ..spconv import SPConv, SPSP
 from ..checks import check_numdiff
 from ..utils import typed_randn
 
 random.seed(2)
-torch.manual_seed(2)
+try:
+    import torch
+    torch.manual_seed(2)
+except:
+    print('Skip Comparative Benchmark with Pytorch!')
 
 def test_conv2d():
+    try:
+        import torch
+        import torch.nn.functional as F
+        from torch.nn import Conv1d,Conv2d
+        from torch import autograd
+    except:
+        return
     ts=arange(16, dtype='float32').reshape([1,4,4])
     #[ 0, 1, 2, 3]
     #[ 4, 5, 6, 7]
@@ -38,6 +45,13 @@ def test_conv2d():
     assert_allclose(res2,[[[[40,48],[72,80]],[[21,25],[37,41]]],[[[48,56],[80,88]],[[25,29],[41,45]]]])
 
 def test_conv2d_per():
+    try:
+        import torch
+        import torch.nn.functional as F
+        from torch.nn import Conv1d,Conv2d
+        from torch import autograd
+    except:
+        return
     num_batch=1
     dim_x=30
     dim_y=40
@@ -110,6 +124,13 @@ def test_conv2d_per():
     assert_(all(check_numdiff(sv, xin_np)))
 
 def test_conv1d_per():
+    try:
+        import torch
+        import torch.nn.functional as F
+        from torch.nn import Conv1d,Conv2d
+        from torch import autograd
+    except:
+        return
     num_batch=1
     dim_x=30
     K1=3
@@ -234,6 +255,7 @@ def test_conv2d_complex():
     assert_(all(check_numdiff(sv, num_check=100)))
     assert_(all(check_numdiff(sv2, num_check=100)))
 
+@pytest.mark.skip
 def test_spsp_complex():
     num_batch=1
     dim_x=10
@@ -305,8 +327,12 @@ def test_spsp_complex():
     assert_(all(check_numdiff(sv2, num_check=100)))
 
 
-#test_spsp_complex()
-test_conv2d_complex()
-test_conv2d()
-test_conv2d_per()
-test_conv1d_per()
+def run_all():
+    #test_spsp_complex()
+    test_conv2d_complex()
+    test_conv2d()
+    test_conv2d_per()
+    test_conv1d_per()
+
+if __name__ == '__main__':
+    run_all()
