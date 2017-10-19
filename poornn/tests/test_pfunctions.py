@@ -14,7 +14,7 @@ def test_prelu():
 
 def test_mul():
     for var_mask in [True,False]:
-        func=Mul(input_shape=(-1,2), itype='float64',c=0.5, var_mask=var_mask)
+        func=PMul(input_shape=(-1,2), itype='float64',c=0.5, var_mask=var_mask)
         print('Test numdiff for \n%s.'%func)
         assert_(all(check_numdiff(func)))
 

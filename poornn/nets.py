@@ -16,7 +16,7 @@ __all__=['ANN', 'ParallelNN', 'JointComplex']
 
 class ANN(Container):
     '''
-    Sequential Artificial Neural network,
+    Sequential Artificial Neural network.
     '''
     def __graphviz__(self, g, father=None):
         node = 'cluster-%s'%id(self)
@@ -72,12 +72,22 @@ class ANN(Container):
 
     def forward(self, x, data_cache=None, do_shape_check=False, **kwargs):
         '''
-        Parameters:
-            :x: ndarray, (num_batch, nfi, img_in_dims), in 'F' order.
-            :data_cache: dict,
+        Feed input to this feed forward network.
 
-        Return:
-            list, output in each layer.
+        Args:
+            x (ndarray): input in 'F' order.
+            data_cache (dict|None, default=None): a dict used to collect datas.
+            do_shape_check (bool): check shape of data flow if True.
+
+        Note:
+            `data_cache` should be pass to this method if you are about to call a subsequent `backward` method,
+            because backward need data_cache.
+
+            `'%d-ys'%id(self)` is used as the key to store run-time output of layers in this network.
+            `data_cache['%d-ys'%id(self)]` is a list with contents outputs in each layers generate in this forward run.
+
+        Returns:
+            list: output in each layer.
         '''
         ys=[]
         for layer in self.layers:
@@ -95,11 +105,14 @@ class ANN(Container):
         '''
         Compute gradients.
 
-        Parameters:
-            :xy: list, output in each layer.
+        Args:
+            xy (tuple): input and output
+            dy (ndarray): gradient of output defined as :math:`\partial J/\partial y`.
+            data_cache (dict): a dict with collected datas.
+            do_shape_check (bool): check shape of data flow if True.
 
-        Return:
-            list, gradients for vairables in layers.
+        Returns:
+            list: gradients for vairables in layers.
         '''
         dvs=[]
         x_broken = False
@@ -121,12 +134,21 @@ class ANN(Container):
 
     def add_layer(self, cls, label=None, **kwargs):
         '''
-        Add a new layer. *args and **kwargs specifies parameters excluding `input_shape` and `itype`.
-        input_shape inherit the output_shape of last layer, and itype inherit otype of last layer.
+        Add a new layer, comparing with `self.layers.append`
+            * `input_shape` of new layer is infered from `output_shape` of last layer.
+            * `itype` of new layer is infered from `otype` of last layer.
 
-        Parameters:
-            :cls: class, create a layer instance, take input_shape and itype as first and second parameters.
-            :label: str, label to index this layer.
+        Args:
+            cls (class): create a layer instance, take input_shape and itype as first and second parameters.
+            label (str|None, default=None): label to index this layer, leave `None` if indexing is not needed.
+            **kwargs: keyword arguments used by `cls.__init__`, excluding `input_shape` and `itype`.
+
+        Note:
+            if `self.num_layers` is 0, this function will raise an error,
+            because it fails to infer `input_shape` and `itype`.
+
+        Returns:
+            Layer: newly generated object.
         '''
         if len(self.layers)==0:
             raise AttributeError('Please make sure this network is non-empty before using @add_layer.')
@@ -141,12 +163,13 @@ class ANN(Container):
 
 class ParallelNN(Container):
     '''
-    Parallel Artificial Neural network,
+    Parallel Artificial Neural network.
+
+    Args:
+        axis (int, default=0): specify the additional axis on which outputs are packed.
 
     Attributes:
-        :itype: str, the most `advanced` data type used, like 'complex128' if both 'complex128' and 'float32' are used.
-        :axis: int, specify the additional axis.
-        :layers: list,
+        axis (int): specify the additional axis on which outputs are packed.
     '''
     def __init__(self, axis=0, layers=None, labels=None):
         super(ParallelNN,self).__init__(layers=layers, labels=labels)
@@ -204,11 +227,14 @@ class ParallelNN(Container):
 
     def forward(self, x, do_shape_check=False, **kwargs):
         '''
-        Parameters:
-            :x: ndarray, (num_batch, nfi, img_in_dims), in 'F' order.
+        Feed input, it will generate a new axis, and storge the outputs of layers parallel along this axis.
 
-        Return:
-            ndarray, output,
+        Args:
+            x (ndarray): input in 'F' order.
+            do_shape_check (bool): check shape of data flow if True.
+
+        Returns:
+            ndarray: output,
         '''
         ys = []
         for layer in self.layers:
@@ -224,11 +250,13 @@ class ParallelNN(Container):
         '''
         Compute gradients.
 
-        Parameters:
-            :xy: list, output in each layer.
+        Args:
+            xy (tuple): input and output
+            dy (ndarray): gradient of output defined as :math:`\partial J/\partial y`.
+            do_shape_check (bool): check shape of data flow if True.
 
-        Return:
-            list, gradients for vairables in layers.
+        Returns:
+            list: gradients for vairables in layers.
         '''
         x, y = xy
         dvs=[]
@@ -245,8 +273,21 @@ class ParallelNN(Container):
 
     def add_layer(self, cls, **kwargs):
         '''
-        Add a new layer. *args and **kwargs specifies parameters excluding `input_shape` and `itype`.
-        input_shape inherit the output_shape of last layer, and itype inherit otype of last layer.
+        Add a new layer, comparing with `self.layers.append`
+            * `input_shape` of new layer is infered from `input_shape` of first layer.
+            * `itype` of new layer is infered from `itype` of first layer.
+            * `otype` of new layer is infered from `otype` of first layer.
+
+        Args:
+            cls (class): create a layer instance, take input_shape and itype as first and second parameters.
+            **kwargs: keyword arguments used by `cls.__init__`, excluding `input_shape` and `itype`.
+
+        Note:
+            if `self.num_layers` is 0, this function will raise an error,
+            because it fails to infer `input_shape`, `itype` and `otype`.
+
+        Returns:
+            Layer: newly generated object.
         '''
         if len(self.layers)==0:
             raise AttributeError('Please make sure this network is non-empty before using @add_layer.')
@@ -259,16 +300,26 @@ class ParallelNN(Container):
 
 class JointComplex(Container):
     '''
-    Function f(z) = h(x) + 1j*g(y), h and g are real functions.
+    Function :math:`f(z) = h(x) + ig(y)`, where :math:`h` and :math:`g` are real functions.
+    JointComplex Container can be used to generate complex layers, but its non-holomophic (`analytical` type 3).
+
+    Args:
+        real (Layer): layer for real part.
+        imag (Layer): layer for imaginary part.
     '''
-    def __init__(self, real, imag, labels=None):
+    def __init__(self, real, imag):
         layers = [real, imag]
-        super(JointComplex, self).__init__(layers, labels)
+        super(JointComplex, self).__init__(layers, labels=None)
 
     @property
-    def real(self):return self.layers[0]
+    def real(self):
+        '''the real part layer.'''
+        return self.layers[0]
     @property
-    def imag(self): return self.layers[1]
+    def imag(self):
+        '''the imaginary part layer.'''
+        return self.layers[1]
+
     @property
     def itype(self): return dtype_r2c(self.layers[0].itype)
     @property
@@ -307,26 +358,38 @@ class JointComplex(Container):
 
 class KeepSignFunc(Container):
     '''
-    Function f(z) = h(|z|)*sign(z), h is a real function.
+    Function :math:`f(z) = h(|z|)*sign(z)`, where :math:`h` is a real function.
+    KeepSignFunc Container inherit sign from input, so it must have same input and ouput dimension.
+    It can also be used to generate complex layers, but its non-holomophic (`analytical` type 3).
 
-    Parameters:
-        :is_real: bool, take real input or not.
+    Args:
+        is_real (bool, default=False): input is real if True.
+
+    Attributes:
+        is_real (bool): input is real if True.
     '''
     def __init__(self, h, is_real=False):
+        from .checks import check_shape_match
         layers = [h]
         self.is_real = is_real
+        check_shape_match(h.input_shape, h.output_shape)
         super(KeepSignFunc, self).__init__(layers, labels=None)
 
     @property
-    def h(self): return self.layers[0]
+    def h(self):
+        '''layer applied on amplitude.'''
+        return self.layers[0]
+
     @property
     def itype(self):
         itype = self.layers[0].itype
         return dtype_r2c(itype) if not self.is_real else itype
+
     @property
     def otype(self):
         otype = self.layers[0].otype
         return dtype_r2c(otype) if not self.is_real else otype
+
     @property
     def input_shape(self): return self.layers[0].input_shape
     @property

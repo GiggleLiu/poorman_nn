@@ -1,4 +1,4 @@
-functions
+derivatives
 ========
 
 .. toctree::
@@ -7,7 +7,7 @@ functions
 Module contents
 ---------------
 
-.. automodule:: poornn.functions
+.. automodule:: poornn.derivatives
     :members:
     :special-members: __init__
     :imported-members:

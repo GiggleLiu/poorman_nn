@@ -9,7 +9,7 @@ extensible.
 Contents
 	* :ref:`tutorial`: Tutorial containing instructions on how to get started with Layers.
 	* :ref:`examples`: Example implementations of mnist networks.
-	* :ref:`code_doc`: The code documentation of Layers.
+	* :ref:`api`: The code documentation of Layers.
 
 .. toctree::
 	:maxdepth: 2

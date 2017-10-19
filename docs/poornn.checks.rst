@@ -1,4 +1,4 @@
-functions
+checks
 ========
 
 .. toctree::
@@ -7,7 +7,7 @@ functions
 Module contents
 ---------------
 
-.. automodule:: poornn.functions
+.. automodule:: poornn.checks
     :members:
     :special-members: __init__
     :imported-members:

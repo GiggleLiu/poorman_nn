@@ -16,12 +16,17 @@ __all__=['LinearBase', 'Linear', 'SPLinear', 'Apdot']
 
 class LinearBase(Layer):
     '''
-    Linear Layer.
+    Base of Linear Layer.
+
+    Args:
+        weight (ndarray/matrix): weights in a matrix.
+        bias (1darray|None): bias of shape (fout,), zeros if None.
+        var_mask (tuple<bool>, len=2, default=(True,True)): variable mask for weight and bias.
 
     Attributes:
-        :input_shape: two types allowed, (num_batch, weight.shape[1]), or (weight.shape[1],)
-        :weight: 2darray, (fout, fin), in fortran order.
-        :bias: 1darray/None, bias of shape (fout,), zeros if None.
+        weight (ndarray/matrix): weights in a matrix.
+        bias (1darray|None): bias of shape (fout,), zeros if None.
+        var_mask (tuple<bool>, len=2): variable mask for weight and bias.
     '''
     __display_attrs__ = ['var_mask']
     def __init__(self, input_shape, itype, weight, bias, var_mask=(1,1)):
@@ -57,7 +62,14 @@ class LinearBase(Layer):
 
 class Linear(LinearBase):
     '''
-    Dense Linear Layer, f = x.dot(weight.T) + bias
+    Dense Linear Layer, :math:`f = x\cdot W^\dagger + b`
+
+    Args:
+        is_unitary (bool, default=False): keep unitary if True,
+        the way to keep unitary during evolution will overload `set_variables` method.
+
+    Attributes:
+        is_unitary (bool): keep unitary if True, unitary will overload `set_variables` method.
     '''
     __display_attrs__ = ['var_mask','is_unitary']
 
@@ -91,10 +103,20 @@ class Linear(LinearBase):
         return dvar, dx.reshape(self.input_shape, order='F')
 
     def be_unitary(self):
+        '''make weight unitary through qr decomposition.'''
         self.weight = np.linalg.qr(self.weight.T)[0].T
         self.is_unitary = True
 
     def check_unitary(self, tol=1e-10):
+        '''
+        check weight is unitary or not, if not, raise an exception.
+
+        Args:
+            tol (float, default=1e-10): the tolerence.
+
+        Returns:
+            float: error rate.
+        '''
         weight = self.weight
         # check weight shape
         if self.weight.shape[1]<self.weight.shape[0]:
@@ -126,8 +148,9 @@ class Linear(LinearBase):
 
 
 class Apdot(LinearBase):
-    '''product layer.'''
-
+    '''
+    Apdot swiches roles between multiply and add in linear layer.
+    '''
     def forward(self, x, **kwargs):
         if x.ndim==1:
             x=x[np.newaxis]
@@ -148,13 +171,9 @@ class Apdot(LinearBase):
 
 class SPLinear(LinearBase):
     '''
-    Attributes:
-        :input_shape: (batch, feature_in), or (feature_in,)
-        :weight: csr_matrix, with shape (feature_out, feature_in,)
-        :bias: 1darray, (feature_out), in fortran order.
-        :strides: tuple, displace for convolutions.
+    Sparse Linear Layer, weight now is a sparse matrix..
     '''
-    def __init__(self, input_shape, itype, weight, bias, strides=None, var_mask=(1,1), **kwargs):
+    def __init__(self, input_shape, itype, weight, bias, var_mask=(1,1), **kwargs):
         if input_shape[-1] != weight.shape[1]:
             raise ValueError('Shape Mismatch!')
         super(SPLinear, self).__init__(input_shape, itype=itype, weight=weight, bias=bias, var_mask=var_mask)

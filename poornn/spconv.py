@@ -16,19 +16,32 @@ __all__ = ['SPConv']
 
 class SPConv(LinearBase):
     '''
-    Attributes:
-        :input_shape: (batch, feature_in, img_x, img_y ...), or (feature_in, img_x, img_y ...)
-        :weight: ndarray, (feature_out, feature_in, kernel_x, ...), in fortran order.
-        :bias: 1darray, (feature_out), in fortran order.
-        :strides: tuple, displace for convolutions.
-        :boudnary: choice('P', 'O').
+    Convolution layer.
+
+    Args:
+        weight (ndarray): dimensions are aranged as (feature_out, feature_in, kernel_x, ...), in 'F' order.
+        bias (1darray): length of num_feature_out.
+        strides (tuple, default=(1,1,...)): displace for convolutions.
+        boudnary ('P'|'O', default='P'): boundary type,
             * 'P', periodic boundary condiction.
             * 'O', open boundary condition.
+        is_unitary (bool, default=False): keep unitary if True, here, unitary is defined in the map `U: img_in -> feature_out`.
+        var_mask (tuple<bool>, len=2, default=(True,True)): variable mask for weight and bias.
 
-    Attributes (Derived):
-        :csc_indptr: 1darray, column pointers for convolution matrix.
-        :csc_indices: 1darray, row indicator for input array.
-        :weight_indices: 1darray, row indicator for filter array (if not contiguous).
+    Attributes:
+        weight (ndarray): dimensions are aranged as (feature_out, feature_in, kernel_x, ...), in 'F' order.
+        bias (1darray): length of num_feature_out.
+        strides (tuple): displace for convolutions.
+        boudnary ('P'|'O'): boundary type,
+            * 'P', periodic boundary condiction.
+            * 'O', open boundary condition.
+        is_unitary (bool): keep unitary if True, here, unitary is defined in the map `U: img_in -> feature_out`.
+        var_mask (tuple<bool>, len=2): variable mask for weight and bias.
+
+        (Derived):
+        csc_indptr (1darray): column pointers for convolution matrix.
+        csc_indices (1darray): row indicator for input array.
+        weight_indices (1darray): row indicator for filter array (if not contiguous).
     '''
     __display_attrs__ = ['strides', 'boundary', 'kernel_shape', 'is_unitary', 'var_mask']
 
@@ -137,9 +150,9 @@ class SPConv(LinearBase):
 
     def forward(self, x, **kwargs):
         '''
-        Parameters:
-            :x: ndarray, (num_batch, nfi, img_in_dims), input in 'F' order.
-        Return:
+        Args:
+            x (ndarray): (num_batch, nfi, img_in_dims), input in 'F' order.
+        Returns:
             ndarray, (num_batch, nfo, img_out_dims), output in 'F' order.
         '''
         x_nd, img_nd = x.ndim, self.img_nd
@@ -159,14 +172,14 @@ class SPConv(LinearBase):
 
     def backward(self, xy, dy, **kwargs):
         '''
-        Parameters:
-            :xy: (ndarray, ndarray),
+        Args:
+            xy ((ndarray, ndarray)):
                 * x -> (num_batch, nfi, img_in_dims), input in 'F' order.
                 * y -> (num_batch, nfo, img_out_dims), output in 'F' order.
-            :dy: ndarray, (num_batch, nfo, img_out_dims), gradient of output in 'F' order.
-            :mask: booleans, (do_xgrad, do_wgrad, do_bgrad).
+            dy (ndarray): (num_batch, nfo, img_out_dims), gradient of output in 'F' order.
+            mask (booleans): (do_xgrad, do_wgrad, do_bgrad).
 
-        Return:
+        Returns:
             (dweight, dbias), dx
         '''
         x,y = xy
@@ -195,15 +208,15 @@ class SPConv(LinearBase):
 class SPSP(SPConv):
     '''
     Attributes:
-        :input_shape: (batch, feature_in, img_x, img_y, ...), or (feature_in, img_x, img_y, ...)
-        :cscmat: csc_matrix, with row indices (feature_in, img_x, img_y, ...), and column indices (feature_out, img_x', img_y', ...)
-        :bias: 1darray, (feature_out), in fortran order.
-        :strides: tuple, displace for convolutions.
+        input_shape ((batch, feature_in, img_x, img_y, ...), or (feature_in, img_x, img_y): ...)
+        cscmat (csc_matrix): with row indices (feature_in, img_x, img_y, ...), and column indices (feature_out, img_x', img_y', ...)
+        bias (1darray): (feature_out), in fortran order.
+        strides (tuple): displace for convolutions.
 
     Attributes (Derived):
-        :csc_indptr: 1darray, column pointers for convolution matrix.
-        :csc_indices: 1darray, row indicator for input array.
-        :weight_indices: 1darray, row indicator for filter array (if not contiguous).
+        csc_indptr (1darray): column pointers for convolution matrix.
+        csc_indices (1darray): row indicator for input array.
+        weight_indices (1darray): row indicator for filter array (if not contiguous).
     '''
     def __init__(self, input_shape, itype, cscmat, bias, strides=None, var_mask=(1,1)):
         self.cscmat = cscmat
@@ -301,10 +314,10 @@ class SPConvProd(LinearBase):
 
     def forward(self, x, **kwargs):
         '''
-        Parameters:
-            :x: ndarray, (num_batch, nfi, img_in_dims), input in 'F' order.
+        Args:
+            x (ndarray): (num_batch, nfi, img_in_dims), input in 'F' order.
 
-        Return:
+        Returns:
             ndarray, (num_batch, nfo, img_out_dims), output in 'F' order.
         '''
         x_nd, img_nd = x.ndim, self.img_nd

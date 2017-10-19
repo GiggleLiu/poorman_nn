@@ -1,4 +1,4 @@
-functions
+nets
 ========
 
 .. toctree::
@@ -7,7 +7,7 @@ functions
 Module contents
 ---------------
 
-.. automodule:: poornn.functions
+.. automodule:: poornn.nets
     :members:
     :special-members: __init__
     :imported-members:

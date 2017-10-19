@@ -9,9 +9,9 @@ def viznn(nn, filename=None):
     '''
     Visualize a neural network.
 
-    Parameters:
-        :nn: <NN>,
-        :filename: str, to filename to save, default is "G.sv"
+    Args:
+        nn (<NN>):
+        filename (str): to filename to save, default is "G.sv"
     '''
     from pygraphviz import AGraph
     g=AGraph(directed=True, rankdir='TD', compound=True)

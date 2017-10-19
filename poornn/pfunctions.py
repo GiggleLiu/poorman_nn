@@ -6,11 +6,31 @@ import pdb
 from .core import ParamFunction, EMPTY_VAR
 from .utils import fsign, dtype_c2r, dtype_r2c
 
-__all__=['PReLU', 'Poly', 'Mobius', 'Georgiou1992', 'Gaussian', 'Mul']
+__all__=['PReLU', 'Poly', 'Mobius', 'Georgiou1992', 'Gaussian', 'PMul']
 
 class PReLU(ParamFunction):
     '''
-    Parametric ReLU.
+    Parametric ReLU,
+
+    .. math::
+        :nowrap:
+
+        \\begin{align}
+        f(x)=\\text{relu}(x)=\\begin{cases}
+                x, &\Re[x]>0\\\\
+                \\text{leak}\cdot x,&\Re[x]<0
+                \end{cases}
+        \\end{align}
+
+    where leak is a trainable parameter if var_mask[0] is True.
+
+    Args:
+        leak (float, default=0.1): leakage,
+        var_mask (1darray<bool>, default=[True]): variable mask
+
+    Attributes:
+        leak (float): leakage,
+        var_mask (1darray<bool>): variable mask
     '''
     __display_attrs__ = ['leak']
 
@@ -51,13 +71,24 @@ class Poly(ParamFunction):
     Ploynomial function layer.
 
         e.g. for polynomial kernel, we have 
-            * f(x) = \sum_i params[i]*x^i/i!  (factorial_rescale == True)
-            * f(x) = \sum_i params[i]*x^i  (factorial_rescale == False)
+            * :math:`f(x) = \sum\limits_i \\text{params}[i]x^i/i!`  (factorial_rescale is True)
+            * :math:`f(x) = \sum\limits_i \\text{params}[i]x^i`  (factorial_rescale is False)
+
+    Args:
+        kernel (str, default='polynomial'): the kind of polynomial serie expansion, see `Poly.kernel_dict for detail.`
+        factorial_rescale (bool, default=False): rescale high order factors to avoid overflow.
+        var_mask (1darray<bool>, default=(True,True,...)): variable mask
+
+    Attributes:
+        kernel (str): the kind of polynomial serie expansion, see `Poly.kernel_dict for detail.`
+        factorial_rescale (bool): rescale high order factors to avoid overflow.
+        var_mask (1darray<bool>): variable mask
     '''
     __display_attrs__ = ['kernel', 'max_order', 'var_mask', 'factorial_rescale']
 
     kernel_dict = {'polynomial':Polynomial,'chebyshev':Chebyshev,
             'legendre':Legendre,'laguerre':Laguerre,'hermite':Hermite,'hermiteE':HermiteE}
+    '''dict of available kernels, with values target functions.'''
 
     def __init__(self, input_shape, itype, params, kernel='polynomial', var_mask=None, factorial_rescale=False):
         # check input data
@@ -70,6 +101,7 @@ class Poly(ParamFunction):
 
     @property
     def max_order(self):
+        '''int: maximum order appeared.'''
         return len(self.params)-1
 
     def forward(self, x, **kwargs):
@@ -94,9 +126,9 @@ class Poly(ParamFunction):
 
 class Mobius(ParamFunction):
     '''
-    Mobius transformation, f(x) = (z-a)(b-c)/(z-c)(b-a)
+    Mobius transformation, :math:`f(x) = \\frac{(z-a)(b-c)}{(z-c)(b-a)}`
     
-    a, b, c map to 0, 1 Inf respectively.
+    :math:`a, b, c` map to :math:`0, 1, \infty` respectively.
     '''
     __display_attrs__ = ['var_mask']
 
@@ -126,14 +158,14 @@ class Mobius(ParamFunction):
 
 class Georgiou1992(ParamFunction):
     '''
-    Function f(x) = x/(c+|x|/r)
+    Function :math:`f(x) = \\frac{x}{c+|x|/r}`
     '''
     __display_attrs__ = ['c', 'r', 'var_mask']
 
     def __init__(self, input_shape, itype, params, var_mask=None):
         params = np.asarray(params)
         if np.iscomplexobj(params):
-            raise ValueError('Parameters c, r for %s should not be complex!'%self.__class__.__name__)
+            raise ValueError('Args c, r for %s should not be complex!'%self.__class__.__name__)
         if params[1] == 0:
             raise ValueError('r = 0 get!')
 
@@ -142,6 +174,7 @@ class Georgiou1992(ParamFunction):
 
     @property
     def c(self): return self.params[0]
+
     @property
     def r(self): return self.params[1]
 
@@ -165,7 +198,8 @@ class Georgiou1992(ParamFunction):
 
 class Gaussian(ParamFunction):
     '''
-    Function f(x) = x/(c+|x|/r)
+    Function :math:`f(x) = \\frac{1}{\sqrt{2\pi}\sigma}\exp(-\\frac{\\|x-\mu\\|^2}{2\sigma^2})`,
+    where :math:`\mu,\sigma` are mean and variance respectively.
     '''
     __display_attrs__ = ['mean', 'variance', 'var_mask']
 
@@ -204,9 +238,15 @@ class Gaussian(ParamFunction):
         dx = -xx.conj()/sig**2*ydy
         return np.array(dw,dtype=self.dtype), dx
 
-class Mul(ParamFunction):
+class PMul(ParamFunction):
     '''
-    Function f(x) = c*x
+    Function :math:`f(x) = cx`, where c is trainable if var_mask[0] is True.
+
+    Args:
+        c (number, default=1.0): multiplier.
+
+    Attributes:
+        c (number): multiplier.
     '''
     __display_attrs__ = ['c', 'var_mask']
 
@@ -216,7 +256,7 @@ class Mul(ParamFunction):
         dtype = params.dtype.name
         otype = np.find_common_type((dtype,itype),()).name
 
-        super(Mul,self).__init__(input_shape, input_shape, itype, dtype=dtype, otype=otype, params=params,
+        super(PMul,self).__init__(input_shape, input_shape, itype, dtype=dtype, otype=otype, params=params,
                 var_mask=np.atleast_1d(var_mask))
 
     @property

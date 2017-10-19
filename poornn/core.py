@@ -9,41 +9,64 @@ import pdb
 
 from .utils import _connect, dtype2token, dtype_c2r
 
-__all__=['Layer','Function', 'ParamFunction', 'Monitor', 'EXP_OVERFLOW', 'EMPTY_VAR', 'AnalyticityError', 'DEFAULT_TAGS']
+__all__=['Layer','Function', 'ParamFunction', 'Monitor', 'EXP_OVERFLOW', 'EMPTY_VAR', 'AnalyticityError', 'DEFAULT_TAGS', 'TAG_LIST']
 
+TAG_LIST = ['runtimes', 'is_inplace', 'analytical']
 '''
 List of tags:
-    :runtimes: list of str, runtime variables, that change during each forward, [] by default.
-    :is_inplace: bool, True if the output is made by changing input inplace, False by default.
-    :analytical: int,
+    runtimes (list of str, runtime variables, that change during each forward): [] by default.
+    is_inplace (bool): True if the output is made by changing input inplace, False by default.
+    analytical (int):
+
         * 1, yes (default)
         * 2, yes for float, no for complex, complex output for real output.
         * 3, yes for float, no for complex, complex output for complex input.
         * 4, no
 '''
-TAG_LIST = ['runtimes', 'is_inplace', 'analytical']
 
 EXP_OVERFLOW = 12
+'''exp(x>EXP_OVERFLOW) should be taken special care of in order avoid overflow.'''
+
 EMPTY_VAR = np.zeros([0], dtype='float32')
+'''Empty variable, length - 0 1d array of dtype 'float32'.'''
+
 DEFAULT_TAGS = {
             'runtimes':[],
             'is_inplace': False,
             'analytical': 1,
         }
+'''The default tags, a layer without tags attributes will take this set of tags.
+
+    * no runtime variables,
+    * changes for flow are not inplace (which will destroy integrity of flow history).
+    * analytical (for complex numbers, holomophic).
+'''
 
 class Layer(object):
     '''
     A single layer in Neural Network.
 
+    Args:
+        input_shape (tuple): input shape of this layer.
+        output_shape (tuple): output_shape of this layer.
+        itype (str): input data type.
+        dtype (str, default=`itype`): variable data type.
+        otype (str, default=?): output data type, if not provided, it will be set to itype, unless its 'analytical' tags is 2.
+        tags (dict, default=`poornn.core.DEFAULT_TAGS`): tags used to describe this layer, refer `poornn.core.TAG_LIST` for detail.
+            It change tags based on template `poornn.core.DEFAULT_TAGS`.
+
     Attributes:
-        :input_shape: tuple,
-        :output_shape: tuple,
-        :itype: str, input data type.
-        :otype: str, output data type.
-        :tags: dict, runtime variables, is inplace(change input) function or not.
+        input_shape (tuple): input shape of this layer.
+        output_shape (tuple): output_shape of this layer.
+        itype (str): input data type.
+        dtype (str): variable data type.
+        otype (str): output data type.
+        tags (dict): tags used to describe this layer, refer poornn.core.TAG_LIST for detail.
     '''
 
     __metaclass__ = ABCMeta
+    __display_attrs__ = []
+    '''except input_shape/output_shape and itype/dtype/otype, attributes that shown in print and graphviz.'''
 
     def __init__(self, input_shape, output_shape, itype, dtype=None, otype=None, tags=None):
         self.input_shape = input_shape
@@ -95,6 +118,9 @@ class Layer(object):
     def set_runtime_vars(self, var_dict={}):
         '''
         Set runtime variables for layers.
+
+        Args:
+            var_dict (dict): the runtime variables dict.
         '''
         for key in self.tags['runtimes']:
             if not key in var_dict:
@@ -106,11 +132,11 @@ class Layer(object):
         '''
         Forward propagration to evaluate F(x).
 
-        Parameters:
-            :x: ndarray, input array.
-            :runtime_vars: dict, runtime variables.
+        Args:
+            x (ndarray): input array.
+            runtime_vars (dict): runtime variables.
 
-        Return:
+        Returns:
             ndarray, output array y.
         '''
         pass
@@ -120,13 +146,13 @@ class Layer(object):
         '''
         Back propagation.
 
-        Parameters:
-            :xy: tuple of ndarray, input/output array.
-            :dy: ndarray, derivative of cost with respect to output array.
-            :mask: tuple, (do_wgrad, do_xgrad)
+        Args:
+            xy (tuple<ndarray>, len=2): input and output array.
+            dy (ndarray): gradient of output defined as :math:`\partial J/\partial y`.
+            mask (tuple): (do_wgrad, do_xgrad)
 
-        Return:
-            (ndarray, ndarray), \partial J/\partial V_f and \partial J/\partial x.
+        Returns:
+            (ndarray, ndarray), :math:`\partial J/\partial w` and :math:`\partial J/\partial x`, where w is a layer variable.
         '''
         pass
 
@@ -135,7 +161,7 @@ class Layer(object):
         '''
         Get current variables.
 
-        Return:
+        Returns:
             1darray,
         '''
         pass
@@ -145,15 +171,15 @@ class Layer(object):
         '''
         Change current variables.
 
-        Parameters:
-            :variables: 1darray,
+        Args:
+            variables (1darray):
         '''
         pass
 
     @property
     @abstractmethod
     def num_variables(self):
-        '''Number of variables.'''
+        '''number of variables.'''
         pass
 
 class Function(Layer):
@@ -164,17 +190,30 @@ class Function(Layer):
         return self.forward(x)
 
     def get_variables(self):
+        '''Get variables, return empty (1d but with length - 0) array.'''
         return EMPTY_VAR
 
     def set_variables(self,*args,**kwargs):
+        '''passed.'''
         pass
 
     @property
     def num_variables(self):
+        '''number of variables, which is fixed to 0.'''
         return 0
 
 class ParamFunction(Layer):
-    '''Function layer with params as variables and var_mask as variable mask.'''
+    '''
+    Function layer with params as variables and var_mask as variable mask.
+
+    Args:
+        params (1darray): variables used in this functions.
+        var_mask (1darray<bool>, default=(True,True,...)): mask for params, a param is regarded as a constant if its mask is False.
+
+    Attributes:
+        params (1darray): variables used in this functions.
+        var_mask (1darray<bool>): mask for params, a param is regarded as a constant if its mask is False.
+    '''
     __metaclass__ = ABCMeta
 
     def __init__(self, input_shape, output_shape, itype, params, var_mask, **kwargs):
@@ -211,8 +250,12 @@ class Container(Layer):
     Function layer with no variables.
 
     Attributes:
-        :layers: list,
-        :do_shape_check: bool,
+        layers (list<Layer>): layers.
+        labels (list<str>): labels for layers, used for query.
+
+    Attributes:
+        layers (list<Layer>, default=[]): layers.
+        labels (list<str>, default=[]): labels for layers, used for query.
     '''
     __metaclass__ = ABCMeta
 
@@ -239,10 +282,12 @@ class Container(Layer):
 
     @property
     def num_layers(self):
+        '''number of layers.'''
         return len(self.layers)
 
     @property
     def tags(self):
+        '''tags for this container, which is infered from layers.'''
         runtimes = []
         analytical = 1
         is_inplace = False
@@ -264,34 +309,40 @@ class Container(Layer):
     @property
     @abstractmethod
     def itype(self):
+        '''input data type, which is infered from layers.'''
         pass
 
     @property
     @abstractmethod
     def otype(self):
+        '''output data type, which is infered from layers.'''
         pass
 
     @property
     @abstractmethod
     def input_shape(self):
+        '''input data shape, which is infered from layers.'''
         pass
 
     @property
     @abstractmethod
     def output_shape(self):
+        '''output data shape, which is infered from layers.'''
         pass
 
     @property
     def dtype(self):
+        '''inner variable data shape, which is infered from layers.'''
         if self.num_layers==0:
             raise AttributeError('Can not infer dtype from empty network.')
         return np.find_common_type([layer.dtype for layer in self.layers],()).name
 
     def check_connections(self):
+        '''Check whether connections of layers in this Container are valid.'''
         pass
 
     def get_runtimes(self):
-        '''Show requested runtime variables'''
+        '''Show runtime variables used in this Container.'''
         rd = {}
         for layer in layers:
             for key in layer.tags['runtimes']:
@@ -304,6 +355,9 @@ class Container(Layer):
     def set_runtime_vars(self, var_dict):
         '''
         Set runtime variables.
+
+        Args:
+            var_dict (dict): the runtime variables dict.
         '''
         for layer in self.layers:
             layer.set_runtime_vars(var_dict)
@@ -316,8 +370,8 @@ class Container(Layer):
         '''
         Load data from an array.
         
-        Parameters:
-            :v: 1darray, variables.
+        Args:
+            v (1darray): variables.
         '''
         start=0
         for layer in self.layers:
@@ -327,17 +381,34 @@ class Container(Layer):
 
     @property
     def num_variables(self):
+        '''int: number of variables.'''
         return np.sum([layer.num_variables for layer in self.layers])
 
 class Monitor(Function):
+    '''
+    A special layer used to monitor a flow, it operate on but do not change the flow.
+    '''
     __metaclass__ = ABCMeta
 
     @abstractmethod
     def monitor_forward(self, x):
+        '''
+        Monitor function used in forward,
+
+        Args:
+            x (ndarray): forward data.
+        '''
         pass
 
     @abstractmethod
     def monitor_backward(self, xy, dy, **kwargs):
+        '''
+        Monitor function used in backward,
+
+        Args:
+            xy (ndarray): (input, output(same as input)) data.
+            dy (ndarray): gradient.
+        '''
         pass
 
     def forward(self, x, **kwargs):
@@ -349,4 +420,5 @@ class Monitor(Function):
         return EMPTY_VAR, dy
 
 class AnalyticityError(Exception):
+    '''Behavior conflict with the analytical type of a layer.'''
     pass

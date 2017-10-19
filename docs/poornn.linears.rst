@@ -1,4 +1,4 @@
-functions
+linears
 ========
 
 .. toctree::
@@ -7,7 +7,7 @@ functions
 Module contents
 ---------------
 
-.. automodule:: poornn.functions
+.. automodule:: poornn.linears
     :members:
     :special-members: __init__
     :imported-members:

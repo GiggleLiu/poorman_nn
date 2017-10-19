@@ -1,4 +1,4 @@
-.. _code_doc:
+.. _api:
 
 Code Documentation
 ==================
@@ -11,5 +11,14 @@ For a detailed documentation of a subpackage or module, click on its name below:
     :maxdepth: 1
     :titlesonly:
     
+    poornn.core
+    poornn.checks
+    poornn.nets
+    poornn.linears
+    poornn.spconv
     poornn.functions
+    poornn.pfunctions
+    poornn.derivatives
+    poornn.monitors
+    poornn.utils
 

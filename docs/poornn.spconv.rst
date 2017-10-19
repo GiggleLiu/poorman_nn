@@ -1,4 +1,4 @@
-functions
+spconv
 ========
 
 .. toctree::
@@ -7,7 +7,7 @@ functions
 Module contents
 ---------------
 
-.. automodule:: poornn.functions
+.. automodule:: poornn.spconv
     :members:
     :special-members: __init__
     :imported-members:

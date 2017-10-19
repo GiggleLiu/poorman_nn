@@ -1,4 +1,4 @@
-functions
+monitors
 ========
 
 .. toctree::
@@ -7,7 +7,7 @@ functions
 Module contents
 ---------------
 
-.. automodule:: poornn.functions
+.. automodule:: poornn.monitors
     :members:
     :special-members: __init__
     :imported-members:

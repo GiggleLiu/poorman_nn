@@ -12,7 +12,15 @@ __all__=['dec_check_shape', 'check_numdiff', 'generate_randx',
 def dec_check_shape(pos):
     '''
     Check the shape of layer's method.
-    Return a decorator.
+
+    Args:
+        pos (tuple): the positions of arguments to check shape.
+
+    Note:
+        BUGGY.
+
+    Returns:
+        func: a decorator.
     '''
     def real_decorator(f):
         def wrapper(*args, **kwargs):
@@ -41,7 +49,16 @@ def dec_check_shape(pos):
 
 def check_shape_forward(f):
     '''
-    Check the shape of layer's method.
+    Check the shape of layer's forward method.
+
+    Args:
+        f (func): forward method.
+
+    Note:
+        BUGGY.
+
+    Returns:
+        func: function decorator.
     '''
     def wrapper(*args, **kwargs):
         #x, y, dy
@@ -55,7 +72,16 @@ def check_shape_forward(f):
 
 def check_shape_backward(f):
     '''
-    Check the shape of layer's method.
+    Check the shape of layer's backward method.
+
+    Args:
+        f (func): backward method.
+
+    Note:
+        BUGGY.
+
+    Returns:
+        func: function decorator.
     '''
     def wrapper(*args, **kwargs):
         #x, y, dy
@@ -74,7 +100,21 @@ def check_shape_backward(f):
     return wrapper
 
 def check_numdiff(layer, x=None, num_check=10, eta_x=None, eta_w=None, tol=1e-3, var_dict={}):
-    '''Random Numerical Differentiation check.'''
+    '''
+    Random Numerical Differentiation check.
+    
+    Args:
+        layer (Layer): the layer under check.
+        x (ndarray|None, default=None): input data, randomly generated if is None.
+        num_check (int, default=10): number of random derivative checks for both inputs and weights.
+        eta_x (number, default=0.005 if float else 0.003+0.004j): small change on input, in order to obtain numerical difference.
+        eta_w (number, default=0.005 if float else 0.003+0.004j): small change on weight, in order to obtain numerical difference.
+        tol (float, default=1e-3): tolerence, relative difference allowed with respect to max(\|eta\|, \|gradient\|).
+        var_dict (dict, default={}): feed runtime variables if needed.
+
+    Return:
+        list<bool>: test results, True for passed else False.
+    '''
     cache = {}
     analytical = get_tag(layer, 'analytical')
     if analytical == 4:
@@ -198,11 +238,11 @@ def check_shape_match(shape_get, shape_desire):
     '''
     check whether shape_get matches shape_desire.
 
-    Parameters:
-        :shape_get: tuple, obtained shape.
-        :shape_desire: tuple, desired shape.
+    Args:
+        shape_get (tuple): obtained shape.
+        shape_desire (tuple): desired shape.
 
-    Return:
+    Returns:
         tuple, the shape with more details.
     '''
     #match None shapes
@@ -234,10 +274,10 @@ def get_complex_checker_net(layer, out_layer):
     Add a Abs layer after this layer for type-3 analytical network,
     so that in can be tested.
 
-    Parameters:
-        :layer: <Layer>,
+    Args:
+        layer (<Layer>):
 
-    Return:
+    Returns:
         ANN,
     '''
     from .nets import ANN

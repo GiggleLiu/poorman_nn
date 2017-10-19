@@ -8,18 +8,31 @@ __all__=['take_slice', 'scan2csc', 'typed_random', 'typed_randn', 'typed_uniform
         'masked_concatenate', 'dtype2token', 'dtype_c2r', 'dtype_r2c', 'complex_backward', 'fsign']
 
 def take_slice(arr,sls,axis):
-    '''take using slices.'''
+    '''
+    take slices along specific axis.
+
+    Args:
+        arr (ndarray): target array.
+        sls (slice): the target sector.
+        axis (int): the target axis.
+
+    Returns:
+        ndarray: result array.
+    '''
     return arr[(slice(None),)*axis+(sls,)]
 
 def scan2csc(kernel_shape, img_in_shape, strides, boundary):
     '''
     Scan target shape with filter, and transform it into csc_matrix.
 
-    Parameters:
-        :kernel_shape: tuple,
-        :img_in_shape: tuple,
-        :strides: tuple,
-        :boundary: str,
+    Args:
+        kernel_shape (tuple): shape of kernel.
+        img_in_shape (tuple): shape of image dimension.
+        strides (tuple): strides for image dimensions.
+        boundary ('P'|'O'): boundary condition.
+
+    Returns:
+        (1darray, 1darray, tuple): indptr for csc maitrx, indices of csc matrix, output image shape.
     '''
     if len(img_in_shape)!=len(strides) or len(kernel_shape)!=len(strides):
         raise ValueError("Dimension Error! (%d, %d, %d)"%(len(strides),len(img_in_shape),len(kernel_shape)))
@@ -57,6 +70,17 @@ def scan2csc(kernel_shape, img_in_shape, strides, boundary):
     return csc_indptr, csc_indices, img_out_shape
 
 def spscan2csc(cscmat, strides):
+    '''
+    Scan target shape with csc matrix, and transform it into a larger csc matrix,
+    boundary condition must be periodic.
+
+    Args:
+        cscmat (scipy.sparse.csc_maitrx): the kernel matrix.
+        strides (tuple): strides for image dimensions.
+
+    Returns:
+        (1darray, 1darray, tuple): indptr for csc maitrx, indices of csc matrix, output image shape.
+    '''
     if len(img_in_shape)!=len(strides):
         raise ValueError("Dimension Error! (%d, %d)"%(len(strides),len(img_in_shape)))
 
@@ -85,23 +109,17 @@ def spscan2csc(cscmat, strides):
     csc_indices=np.int32(csc_indices)
     return csc_indptr, csc_indices, img_out_shape
 
-
-def pack_variables(variables):
-    '''Pack tuple of variables to vector.'''
-    shapes = [v.shape for v in variables]
-    return np.concatenate([v.ravel(order='F') for v in variables]), shapes
-
-def unpack_variables(vec, shapes):
-    '''Unpack vector to tuple of variables.'''
-    start = 0
-    variables = []
-    for shape in shapes:
-        end = start+tuple_prod(shape)
-        variables.append(vec[start:end].reshape(shape, order='F'))
-        start=end
-    return variables
-
 def typed_random(dtype, shape):
+    '''
+    generate a random numbers with specific data type.
+
+    Args:
+        dtype (str): data type.
+        shape (tuple): shape of desired array.
+
+    Returns:
+        ndarray: random array in 'F' order.
+    '''
     #fix shape with dummy index.
     shp=[si if si>=0 else np.random.randint(1,21) for si in shape]
 
@@ -114,7 +132,14 @@ def typed_random(dtype, shape):
 
 def typed_randn(dtype, shape):
     '''
-    Typed random normal distributions, in fortran order.
+    generate a normal distributed random numbers with specific data type.
+
+    Args:
+        dtype (str): data type.
+        shape (tuple): shape of desired array.
+
+    Returns:
+        ndarray: random array in 'F' order.
     '''
     #fix shape with dummy index.
     shp=[si if si>=0 else np.random.randint(1,21) for si in shape]
@@ -128,7 +153,14 @@ def typed_randn(dtype, shape):
 
 def typed_uniform(dtype, shape, low=-1., high=1.):
     '''
-    Typed random normal distributions, in fortran order.
+    generate a uniformly distributed random numbers with specific data type.
+
+    Args:
+        dtype (str): data type.
+        shape (tuple): shape of desired array.
+
+    Returns:
+        ndarray: random array in 'F' order.
     '''
     #fix shape with dummy index.
     shp=[si if si>=0 else np.random.randint(1,21) for si in shape]
@@ -142,13 +174,13 @@ def typed_uniform(dtype, shape, low=-1., high=1.):
 
 def tuple_prod(tp):
     '''
-    Product of a tuple of numbers.
+    product over a tuple of numbers.
 
-    Parameters:
-        :tp: tuple,
+    Args:
+        tp (tuple): the target tuple to product over.
 
-    Return:
-        number,
+    Returns:
+        number: product of tuple.
     '''
     res = 1
     for item in tp:
@@ -156,13 +188,22 @@ def tuple_prod(tp):
     return res
 
 def masked_concatenate(vl, mask):
-    '''concatenate multiple arrays only with those masked.'''
+    '''
+    concatenate multiple arrays with mask True.
+
+    Args:
+        vl (list<ndarray>): arrays.
+        mask (list<bool>): masks for arrays.
+
+    Returns:
+        ndarray: result array.
+    '''
     vl_ = [item for item,maski in zip(vl, mask) if maski]
     dvar=np.concatenate(vl_) if len(vl_)!=0 else np.zeros([0], dtype=vl[0].dtype)
     return dvar
 
 def _connect(g, start, end, arr_shape, dtype, pos='mid'):
-    '''Utility for Connecting two nodes'''
+    '''utility for Connecting graphviz nodes'''
     if start is None or end is None: return
     kwargs = {}
     def get_node(nodes):
@@ -187,7 +228,15 @@ def _connect(g, start, end, arr_shape, dtype, pos='mid'):
 <font point-size="10px">%s</font><br align="center"/>>'%(arr_shape, dtype), **kwargs)
 
 def dtype2token(dtype):
-    '''Parse data type to token.'''
+    '''
+    Parse data type to token.
+    
+    Args:
+        dtype ('float32'|'float64'|'complex64'|'complex128'): data type.
+
+    Returns:
+        str: 's'|'d'|'c'|'z'
+    '''
     if dtype=='complex128':
         dtype_token = 'z'
     elif dtype=='complex64':
@@ -202,7 +251,15 @@ def dtype2token(dtype):
     return dtype_token
 
 def dtype_c2r(complex_dtype):
-    '''Get corresponding real data type from complex data type'''
+    '''
+    Get corresponding real data type from complex data type.
+    
+    Args:
+        dtype ('complex64'|'complex128'): data type.
+
+    Returns:
+        str: ('float32'|'float64')
+    '''
     if complex_dtype=='complex128':
         return 'float64'
     elif complex_dtype=='complex64':
@@ -211,7 +268,14 @@ def dtype_c2r(complex_dtype):
         raise ValueError('Complex data type %s not valid'%complex_dtype)
 
 def dtype_r2c(real_dtype):
-    '''Get corresponding complex data type from real data type'''
+    '''
+    Get corresponding complex data type from real data type
+    Args:
+        dtype ('float32'|'float64'): data type.
+
+    Returns:
+        str: ('complex64'|'complex128')
+    '''
     if real_dtype=='float64':
         return 'complex128'
     elif real_dtype=='float32':
@@ -220,7 +284,16 @@ def dtype_r2c(real_dtype):
         raise ValueError('Real data type %s not valid'%real_dtype)
 
 def get_tag(layer, tag):
-    '''Get tag from a layer.'''
+    '''
+    Get tag from a layer,
+
+    Args:
+        layer (Layer): target layer.
+        tag ('runtimes'|'is_inplace'|'tags'): the desired tag.
+
+    Returns:
+        object: tag information for layer.
+    '''
     if hasattr(layer, 'tags') and tag in layer.tags:
         return layer.tags[tag]
     else:
@@ -231,7 +304,16 @@ def get_tag(layer, tag):
             raise KeyError('Can not find Tag %s'%tag)
 
 def complex_backward(dz,dzc):
-    '''Complex backward.'''
+    '''
+    Complex propagation rule.
+
+    Args:
+        dz (ndarray): :math:`\partial J/\partial z`
+        dzc (ndarray): :math:`\partial J/\partial z^*`
+
+    Returns:
+        func: backward function that take xy and dy as input.
+    '''
     def backward(xy,dy,**kwargs):
         x, y = xy
         if dz is None:
@@ -243,7 +325,18 @@ def complex_backward(dz,dzc):
     return backward
 
 def fsign(x):
-    '''sign function that work properly for complex numbers.'''
+    '''
+    sign function that work properly for complex numbers :math:`x/|x|`,
+
+    Args:
+        x (ndarray): input array.
+
+    Returns:
+        ndarray: sign of x.
+
+    Note:
+        if x is 0, return 0.
+    '''
     order = 'F' if np.isfortran(x) else 'C'
     return eval('futils.fsign_%s'%dtype2token(x.dtype.name))(x.ravel(order=order)).reshape(x.shape,order=order)
 
