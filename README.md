@@ -2,7 +2,7 @@
 Neural Network framework for researchers.
 
 ## Warning
-* under development, no cuda support for the momentum
+* under development, no cuda support for this momentum
 
 ## Features
 
@@ -13,15 +13,25 @@ Neural Network framework for researchers.
 * easy for extension, using interfaces to unify layers, which means layers are standalone modules.
 
 ## Install
-clone this repository and run
+Clone this repository and run
 
 ```bash
-    python setup.py install
+    $ cd poornn
+    $ pip install -r requirements.txt
+    $ python setup.py install
+```
+**pygraphviz** is needed in order to activate network visualization. Its tutorial page is
+http://pygraphviz.github.io/documentation/pygraphviz-1.4rc1/tutorial.html#start-up
+
+## Run Tests
+```bash
+    $ pytest
 ```
 
-## Run convolutional mnist test
+Convolutional mnist test (need install tensorflow to provide mnist database)
 
 ```bash
-    cd tests
-    python test_mnist.py
+    $ python -m poornn.tests.test_mnist.py
 ```
+
+## Documentation

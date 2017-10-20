@@ -25,19 +25,19 @@ __all__ = ['wrapfunc', 'Log2cosh', 'Logcosh', 'Sigmoid',
 def wrapfunc(func, dfunc, classname='GeneralFunc', attrs={},
              docstring="", tags={}, real_out=False):
     '''
-    Wrap a function into a Functiona layer.
+    wrap a function and its backward counterpart into a :class:`poornn.core.Function` layer.
 
     Args:
         func (func): forward function, take input (x, attrs) as parameters.
-        dfunc (func): derivative function,
-            take input/output (x, y, **attrs) as parameters.
+        dfunc (func): derivative function, \
+take input/output (x, y, \*\*attrs) as parameters.
         classname (str): function classname,
         attrs (dict): attributes, and default input parameters.
-        docstring (str):
-        tags (dict): tags for this function,
-            see `poornn.core.TAG_LIST` for detail.
-        real_out (bool): output data type is real for any input data type
-            if True.
+        docstring (str): the docstring of new class.
+        tags (dict): tags for this function, \
+see `poornn.core.TAG_LIST` for detail.
+        real_out (bool): output data type is real for \
+any input data type if True.
 
     Returns:
         class: a dynamically generated layer type.
@@ -185,7 +185,7 @@ class Sigmoid(Function):
 
 class Sum(Function):
     '''
-    np.sum along specific axis.
+    np.sum along :data:`axis`.
 
     Args:
         axis (int): the axis along which to sum over.
@@ -218,7 +218,7 @@ class Sum(Function):
 
 class Mean(Function):
     '''
-    np.mean along specific axis.
+    np.mean along :data:`axis`.
 
     Args:
         axis (int): the axis along which to operate.
@@ -252,7 +252,7 @@ class Mean(Function):
 
 class FFT(Function):
     '''
-    scipy.fftpack.[fft|ifft|dct|idct|...] along specific axis.
+    scipy.fftpack.[fft|ifft|dct|idct|...] along :data:`axis`.
 
     Args:
         axis (int): the axis along which to operate.
@@ -301,7 +301,7 @@ class ReLU(Function):
     ReLU, for mode='ri',
 
     .. math::
-        : nowrap:
+        :nowrap:
 
         \\begin{align}
         f(x)=\\text{relu}(x)=\\begin{cases}
@@ -315,7 +315,7 @@ class ReLU(Function):
     for mode='r',
 
     .. math::
-        : nowrap:
+        :nowrap:
 
         \\begin{align}
         f(x)=\\text{relu}(x)=\\begin{cases}
@@ -380,10 +380,10 @@ class Pooling(Function):
         mode (str): the strategy used for pooling.
 
     Note:
-        For input array x, axes are aranged as (num_batch, nfi, img_in_dims),
-            stored in 'F' order.
-        For output array y, axes are aranged as (num_batch, nfo, img_out_dims),
-            stored in 'F' order.
+        For input array x, axes are aranged as (num_batch, nfi, img_in_dims), \
+stored in 'F' order.
+        For output array y, axes are aranged as \
+(num_batch, nfo, img_out_dims), stored in 'F' order.
 
         For complex numbers, what does max pooling looks like?
     '''
@@ -456,10 +456,10 @@ class ConvProd(Function):
         boundary ('P'|'O'): Periodic/Open boundary condition.
 
     Note:
-        For input array x, axes are aranged as (num_batch, nfi, img_in_dims),
-            stored in 'F' order.
-        For output array y, axes are aranged as (num_batch, nfo, img_out_dims),
-            stored in 'F' order.
+        For input array x, axes are aranged as (num_batch, \
+nfi, img_in_dims), stored in 'F' order.
+        For output array y, axes are aranged as (num_batch, nfo, \
+img_out_dims), stored in 'F' order.
     '''
     __display_attrs__ = ['powers', 'strides', 'boundary']
 
@@ -580,7 +580,7 @@ class SoftMax(Function):
     '''
     Soft max function
     :math:`f(x)=\\text{scale}\cdot\\frac{\exp(x)}{\sum \exp(x)}`,
-    with the sum performed over specified axis.
+    with the sum performed over :data:`axis`.
 
     Args:
         axis (int): the axis along which to operate.
@@ -613,7 +613,7 @@ class CrossEntropy(Function):
     '''
     Cross Entropy :math:`f(x)=\sum\\text{y_true}\log(x)`,
         with y_true the true labels,
-        and the sum is performed over specified axis.
+        and the sum is performed over :data:`axis`.
 
     Args:
         axis (int): the axis along which to operate.
@@ -653,7 +653,7 @@ class SoftMaxCrossEntropy(Function):
     '''
     Soft Max & Cross Entropy :math:`f(x)=\sum \\text{y_true}\log(q)`,
     with y_true the true labels, and :math:`q=\\frac{\exp(x)}{\sum \exp(x)}`,
-    where the sum is performed over specified axis.
+    where the sum is performed over :data:`axis`.
 
     Args:
         axis (int): the axis along which to operate.
@@ -677,9 +677,9 @@ class SoftMaxCrossEntropy(Function):
 
     def forward(self, x, **kwargs):
         if self.y_true is None:
-            raise AttributeError('Please initialize variable\
-                                 y_true(use @set_runtime_vars)\
-                                 before using a runtime layer % s!' % self)
+            raise AttributeError('Please initialize variable \
+y_true(use @set_runtime_vars) \
+before using a runtime layer % s!' % self)
         x = x - x.max(axis=self.axis, keepdims=True)
         rho = np.exp(x)
         Z = rho.sum(axis=self.axis, keepdims=True)
@@ -697,8 +697,8 @@ class SoftMaxCrossEntropy(Function):
 
 class SquareLoss(Function):
     '''
-    Square Loss :math:`f(x)=(x-\\text{y_true})^2`. With p the true labels,
-        requres runtime variable 'y_true'.
+    Square Loss :math:`f(x)=(x-\\text{y_true})^2`. With p the true labels, \
+requres runtime variable 'y_true'.
 
     Attributes:
         y_true (ndarray): the 'correct' output.
@@ -712,9 +712,8 @@ class SquareLoss(Function):
 
     def forward(self, x, **kwargs):
         if self.y_true is None:
-            raise AttributeError('Please initialize variable\
-                                 y_true(use @set_runtime_vars)\
-                                 before using a runtime layer % s!' % self)
+            raise AttributeError('Please initialize variable \
+y_true(use @set_runtime_vars) before using a runtime layer % s!' % self)
         diff = x - self.y_true
         return (diff.conj() * diff).real
 
@@ -792,18 +791,18 @@ class Transpose(Function):
 class Filter(Function):
     '''
     Momentum Filter, single component fourier transformation.
-    :math:`f(x)=\sum\limits_{n = 0}^{N-1}\exp(-i\pi k n/N)\cdot x[n]`,
-        with index :math:`n` iterate over specified axes.
+    :math:`f(x)=\sum\limits_{n = 0}^{N-1}\exp(-i\pi k n/N)\cdot x[n]`, \
+with index :math:`n` iterate over :data:`axes`.
 
     Args:
         momentum (1darray): the desired momentum.
-        axes (tuple): lattice axes over which to filter
-            out the desired momentum.
+        axes (tuple): lattice axes over which to filter \
+out component with the desired momentum.
 
     Attributes:
         momentum (1darray): the desired momentum.
-        axes (tuple): lattice axes over which to filter
-            out the desired momentum.
+        axes (tuple): lattice axes over which to filter \
+out component with the desired momentum.
     '''
     __display_attrs__ = ['momentum', 'axes']
 
@@ -858,9 +857,9 @@ class BatchNorm(Function):
         eps (float, default = 1e-8): small number to avoid division to 0.
 
     Attributes:
-        axis (int|None): batch axis over which to calculate norm,
-        if it is None, we don't use any axis as batch,
-        instead, we need to set mean and variance manually.
+        axis (int|None): batch axis over which to calculate norm, \
+if it is None, we don't use any axis as batch, \
+instead, we need to set mean and variance manually.
         eps (float): small number to avoid division to 0.
 
     Note:
@@ -895,8 +894,8 @@ class BatchNorm(Function):
 
 class Normalize(Function):
     '''
-    Normalize data, :math:`f(x)=\\text{scale}\cdot x/\\|x\\|`,
-    where the norm is performed over specific axis.
+    Normalize data, :math:`f(x)=\\text{scale}\cdot x/\\|x\\|`, \
+where the norm is performed over :data:`axis`.
 
     Args:
         axis (int): axis over which to calculate norm.
@@ -962,7 +961,7 @@ Log = wrapfunc(scipy.log, lambda xy, dy: dy / xy[0],
 SoftPlus = wrapfunc(lambda x: scipy.log(1 + np.exp(x)),
                     lambda xy, dy: dy * Sigmoid.forward(xy[0]),
                     classname='SoftPlus',
-                    docstring="Function log(1+exp(x))")
+                    docstring="Function :math:`log(1+exp(x))`")
 
 Conj = wrapfunc(np.conj, lambda xy, dy: dy.conj(),
                 classname='Conj',

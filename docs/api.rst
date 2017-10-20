@@ -21,4 +21,5 @@ For a detailed documentation of a subpackage or module, click on its name below:
     poornn.derivatives
     poornn.monitors
     poornn.utils
+    poornn.visualize
 

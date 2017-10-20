@@ -1,3 +1,5 @@
+.. _poorn.core:
+
 core
 ========
 
@@ -10,4 +12,6 @@ Module contents
 .. automodule:: poornn.core
     :members:
     :special-members: __init__
+    :show-inheritance:
+    :inherited-members:
     :imported-members:

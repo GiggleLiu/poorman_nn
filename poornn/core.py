@@ -9,14 +9,19 @@ import pdb
 
 from .utils import _connect, dtype2token, dtype_c2r
 
-__all__=['Layer','Function', 'ParamFunction', 'Monitor', 'EXP_OVERFLOW', 'EMPTY_VAR', 'AnalyticityError', 'DEFAULT_TAGS', 'TAG_LIST']
+__all__ = ['Layer', 'Function', 'ParamFunction', 'Monitor', 'EXP_OVERFLOW',
+           'EMPTY_VAR', 'AnalyticityError', 'DEFAULT_TAGS', 'TAG_LIST']
 
 TAG_LIST = ['runtimes', 'is_inplace', 'analytical']
 '''
 List of tags:
-    runtimes (list of str, runtime variables, that change during each forward): [] by default.
-    is_inplace (bool): True if the output is made by changing input inplace, False by default.
-    analytical (int):
+
+    * 'runtimes' (list<str>, default=[]): 
+        runtime variables that should be supplied during each run.
+    * 'is_inplace' (bool, default=False): 
+        True if the output is made by changing input inplace.
+    * 'analytical' (int): 
+        the analyticaity of a layer. A table of legal values,
 
         * 1, yes (default)
         * 2, yes for float, no for complex, complex output for real output.
@@ -25,22 +30,26 @@ List of tags:
 '''
 
 EXP_OVERFLOW = 12
-'''exp(x>EXP_OVERFLOW) should be taken special care of in order avoid overflow.'''
+'''
+exp(x>EXP_OVERFLOW) should be taken special care of in order avoid overflow.
+'''
 
 EMPTY_VAR = np.zeros([0], dtype='float32')
-'''Empty variable, length - 0 1d array of dtype 'float32'.'''
+'''Empty variable, 1d array of dtype 'float32' and length 0.'''
 
 DEFAULT_TAGS = {
-            'runtimes':[],
-            'is_inplace': False,
-            'analytical': 1,
-        }
-'''The default tags, a layer without tags attributes will take this set of tags.
+    'runtimes': [],
+    'is_inplace': False,
+    'analytical': 1,
+}
+'''
+A layer without tags attributes will take this set of tags.
 
     * no runtime variables,
-    * changes for flow are not inplace (which will destroy integrity of flow history).
+    * changes for flow are not inplace (otherwise it will destroy integrity of flow history).
     * analytical (for complex numbers, holomophic).
 '''
+
 
 class Layer(object):
     '''
@@ -50,10 +59,12 @@ class Layer(object):
         input_shape (tuple): input shape of this layer.
         output_shape (tuple): output_shape of this layer.
         itype (str): input data type.
-        dtype (str, default=`itype`): variable data type.
-        otype (str, default=?): output data type, if not provided, it will be set to itype, unless its 'analytical' tags is 2.
-        tags (dict, default=`poornn.core.DEFAULT_TAGS`): tags used to describe this layer, refer `poornn.core.TAG_LIST` for detail.
-            It change tags based on template `poornn.core.DEFAULT_TAGS`.
+        dtype (str, default=:data:`itype`): variable data type.
+        otype (str, default=?): output data type, if not provided,
+            it will be set to itype, unless its 'analytical' tags is 2.
+        tags (dict, default=:data:`poornn.core.DEFAULT_TAGS`): tags used \
+to describe this layer, refer :data:`poornn.core.TAG_LIST` for detail. \
+It change tags based on template :data:`poornn.core.DEFAULT_TAGS`.
 
     Attributes:
         input_shape (tuple): input shape of this layer.
@@ -61,55 +72,69 @@ class Layer(object):
         itype (str): input data type.
         dtype (str): variable data type.
         otype (str): output data type.
-        tags (dict): tags used to describe this layer, refer poornn.core.TAG_LIST for detail.
+        tags (dict): tags used to describe this layer, \
+refer :data:`poornn.core.TAG_LIST` for detail.
     '''
 
     __metaclass__ = ABCMeta
     __display_attrs__ = []
-    '''except input_shape/output_shape and itype/dtype/otype, attributes that shown in print and graphviz.'''
+    '''
+    except :attr:`input_shape`/:attr:`output_shape` \
+and :attr:`itype`/:attr:`dtype`/:attr:`otype`, \
+attributes that will be displayed in print and graphviz.
+    '''
 
-    def __init__(self, input_shape, output_shape, itype, dtype=None, otype=None, tags=None):
+    def __init__(self, input_shape, output_shape,
+                 itype, dtype=None, otype=None, tags=None):
         self.input_shape = input_shape
         self.output_shape = output_shape
         self.itype = itype
-        if dtype is None: dtype = itype
-        self.dtype=dtype
+        if dtype is None:
+            dtype = itype
+        self.dtype = dtype
 
         # set tags
         self.tags = dict(DEFAULT_TAGS)
         if tags is not None:
             for k, v in tags.items():
                 if k not in TAG_LIST:
-                    print('You have used a user defined tag %s'%k)
+                    print('You have used a user defined tag %s' % k)
                 self.tags[k] = v
 
         if otype is None:
-            if self.tags['analytical']==2:
-                otype = dtype_c2r(itype) if itype[:7]=='complex' else itype
+            if self.tags['analytical'] == 2:
+                otype = dtype_c2r(itype) if itype[:7] == 'complex' else itype
             else:
                 otype = itype
-        self.otype=otype
+        self.otype = otype
 
     def __str__(self, offset=0):
-        s = ' '*offset+self.__repr__()
-        if hasattr(self,'__display_attrs__'):
+        s = ' ' * offset + self.__repr__()
+        if hasattr(self, '__display_attrs__'):
             for attr in self.__display_attrs__:
-                s+='\n'+' '*offset+'  - %s = %s'%(attr, getattr(self,attr))
+                s += '\n' + ' ' * offset + \
+                    '  - %s = %s' % (attr, getattr(self, attr))
         return s
 
     def __repr__(self, offset=0):
-        return '<%s|%s>: %s|%s -> %s|%s'%(self.__class__.__name__,dtype2token(self.dtype),self.input_shape,
-                dtype2token(self.itype),self.output_shape,dtype2token(self.otype))
+        return '<%s|%s>: %s|%s -> %s|%s' % (self.__class__.__name__,
+                                            dtype2token(
+                                                self.dtype), self.input_shape,
+                                            dtype2token(self.itype),
+                                            self.output_shape,
+                                            dtype2token(self.otype))
 
     def __graphviz__(self, g, father=None):
-        node_token = '%s'%id(self)
-        label = '<%s<br/>'%(self.__class__.__name__)
-        attrs = ['itype']
+        node_token = '%s' % id(self)
+        label = '<%s<br/>' % (self.__class__.__name__)
+        attrs = ['dtype']
         if hasattr(self, '__display_attrs__'):
             attrs.extend(self.__display_attrs__)
         for attr in attrs:
-            label+='<font color="#225566" point-size="10px"> %s = %s</font><br align="left"/>'%(attr, getattr(self,attr))
-        label+='>'
+            label += '<font color="#225566" point-size="10px">\
+                    %s = %s</font><br align="left"/>' % (
+                attr, getattr(self, attr))
+        label += '>'
         g.add_node(node_token, label=label, shape='box')
         node = g.get_node(node_token)
         _connect(g, father, node, self.input_shape, self.itype)
@@ -123,14 +148,16 @@ class Layer(object):
             var_dict (dict): the runtime variables dict.
         '''
         for key in self.tags['runtimes']:
-            if not key in var_dict:
-                raise KeyError('Variable `%s` not found, which is required by %s'%(key, self))
+            if key not in var_dict:
+                raise KeyError(
+                    'Variable `%s` not found, which is required by %s' % (
+                        key, self))
             self.__setattr__(key, var_dict[key])
 
     @abstractmethod
-    def forward(self,x, **kwargs):
+    def forward(self, x, **kwargs):
         '''
-        Forward propagration to evaluate F(x).
+        forward propagration to evaluate :math:`y=f(x)`.
 
         Args:
             x (ndarray): input array.
@@ -142,17 +169,21 @@ class Layer(object):
         pass
 
     @abstractmethod
-    def backward(self,xy,dy,mask=(1,1)):
+    def backward(self, xy, dy, mask=(1, 1)):
         '''
-        Back propagation.
+        back propagation to get :math:`\\frac{\partial J(w,x)}{\partial w}` \
+and :math:`\\frac{\partial J(w,x)}{\partial x}`, where :math:`J` and :math:`w` \
+are cost function and variables respectively.
 
         Args:
             xy (tuple<ndarray>, len=2): input and output array.
-            dy (ndarray): gradient of output defined as :math:`\partial J/\partial y`.
+            dy (ndarray): gradient of output defined as \
+:math:`\partial J/\partial y`.
             mask (tuple): (do_wgrad, do_xgrad)
 
         Returns:
-            (ndarray, ndarray), :math:`\partial J/\partial w` and :math:`\partial J/\partial x`, where w is a layer variable.
+            (ndarray, ndarray), :math:`\partial J/\partial w` and \
+:math:`\partial J/\partial x`.
         '''
         pass
 
@@ -182,18 +213,19 @@ class Layer(object):
         '''number of variables.'''
         pass
 
+
 class Function(Layer):
     '''Function layer with no variables.'''
     __metaclass__ = ABCMeta
 
-    def __call__(self,x):
+    def __call__(self, x):
         return self.forward(x)
 
     def get_variables(self):
         '''Get variables, return empty (1d but with length - 0) array.'''
         return EMPTY_VAR
 
-    def set_variables(self,*args,**kwargs):
+    def set_variables(self, *args, **kwargs):
         '''passed.'''
         pass
 
@@ -202,24 +234,28 @@ class Function(Layer):
         '''number of variables, which is fixed to 0.'''
         return 0
 
+
 class ParamFunction(Layer):
     '''
     Function layer with params as variables and var_mask as variable mask.
 
     Args:
         params (1darray): variables used in this functions.
-        var_mask (1darray<bool>, default=(True,True,...)): mask for params, a param is regarded as a constant if its mask is False.
+        var_mask (1darray<bool>, default=(True,True,...)): mask for params, \
+a param is regarded as a constant if its mask is False.
 
     Attributes:
         params (1darray): variables used in this functions.
-        var_mask (1darray<bool>): mask for params, a param is regarded as a constant if its mask is False.
+        var_mask (1darray<bool>): mask for params, \
+a param is regarded as a constant if its mask is False.
     '''
     __metaclass__ = ABCMeta
 
-    def __init__(self, input_shape, output_shape, itype, params, var_mask, **kwargs):
+    def __init__(self, input_shape, output_shape, itype,
+                 params, var_mask, **kwargs):
         self.params = np.atleast_1d(params)
         if var_mask is None:
-            var_mask = np.ones(len(params),dtype='bool')
+            var_mask = np.ones(len(params), dtype='bool')
         else:
             var_mask = np.asarray(var_mask, dtype='bool')
         self.var_mask = np.atleast_1d(var_mask)
@@ -228,10 +264,14 @@ class ParamFunction(Layer):
             self.params = self.params.astype(dtype)
         else:
             dtype = self.params.dtype.name
-        otype = kwargs.pop('otype', np.find_common_type((dtype, itype),()).name)
-        super(ParamFunction,self).__init__(input_shape, output_shape, itype, dtype = dtype, otype=otype, **kwargs)
+        otype = kwargs.pop(
+            'otype', np.find_common_type((dtype, itype), ()).name)
+        super(ParamFunction, self).__init__(input_shape,
+                                            output_shape, itype,
+                                            dtype=dtype, otype=otype,
+                                            **kwargs)
 
-    def __call__(self,x):
+    def __call__(self, x):
         return self.forward(x)
 
     def get_variables(self):
@@ -260,25 +300,32 @@ class Container(Layer):
     __metaclass__ = ABCMeta
 
     def __init__(self, layers=None, labels=None):
-        if layers is None: layers = []
-        if labels is None: labels = []
+        if layers is None:
+            layers = []
+        if labels is None:
+            labels = []
         self.layers = layers
-        self.__layer_dict__ = dict(zip(labels,layers))
+        self.__layer_dict__ = dict(zip(labels, layers))
 
-        # itype, dtype, otype, input_shape and output_shape are defined as properties.
+        # itype, dtype, otype, input_shape and
+        # output_shape are defined as properties.
 
-        #check connections
+        # check connections
         self.check_connections()
 
     def __str__(self, offset=0):
-        s = ' '*offset+self.__repr__()
+        s = ' ' * offset + self.__repr__()
         for layer in self.layers:
-            s+='\n'+layer.__str__(offset=offset+4)
+            s += '\n' + layer.__str__(offset=offset + 4)
         return s
 
     def __repr__(self, offset=0):
-        return '<%s|%s>: %s|%s -> %s|%s'%(self.__class__.__name__,dtype2token(self.dtype),self.input_shape,
-                dtype2token(self.itype),self.output_shape,dtype2token(self.otype))
+        return '<%s|%s>: %s|%s -> %s|%s' % (self.__class__.__name__,
+                                            dtype2token(
+                                                self.dtype), self.input_shape,
+                                            dtype2token(self.itype),
+                                            self.output_shape,
+                                            dtype2token(self.otype))
 
     @property
     def num_layers(self):
@@ -287,19 +334,20 @@ class Container(Layer):
 
     @property
     def tags(self):
-        '''tags for this container, which is infered from layers.'''
+        '''tags for this :class:`Container`, which is infered \
+from :attr:`self.layers`.'''
         runtimes = []
         analytical = 1
         is_inplace = False
-        for i,layer in enumerate(self.layers):
-            if hasattr(layer,'tags'):
-                runtimes.extend(layer.tags.get('runtimes',[]))
-                analytical = max(analytical,layer.tags.get('analytical',1))
-                if i==0:
-                    is_inplace = layer.tags.get('is_inplace',False)
-        if analytical==3 and self.otype[:5] == 'float':
+        for i, layer in enumerate(self.layers):
+            if hasattr(layer, 'tags'):
+                runtimes.extend(layer.tags.get('runtimes', []))
+                analytical = max(analytical, layer.tags.get('analytical', 1))
+                if i == 0:
+                    is_inplace = layer.tags.get('is_inplace', False)
+        if analytical == 3 and self.otype[:5] == 'float':
             analytical = 2
-        if analytical==2 and self.otype[:7] == 'complex':
+        if analytical == 2 and self.otype[:7] == 'complex':
             analytical = 3
         return {'runtimes': runtimes,
                 'analytical': analytical,
@@ -332,24 +380,30 @@ class Container(Layer):
 
     @property
     def dtype(self):
-        '''inner variable data shape, which is infered from layers.'''
-        if self.num_layers==0:
+        '''variable data shape, which is infered from layers.'''
+        if self.num_layers == 0:
             raise AttributeError('Can not infer dtype from empty network.')
-        return np.find_common_type([layer.dtype for layer in self.layers],()).name
+        return np.find_common_type([layer.dtype for layer in self.layers],
+                                   ()).name
 
     def check_connections(self):
-        '''Check whether connections of layers in this Container are valid.'''
+        '''
+        check whether connections among layers in this \
+:class:`Container` are valid.
+        '''
         pass
 
     def get_runtimes(self):
-        '''Show runtime variables used in this Container.'''
+        '''show runtime variables used in this :class:`Container`.'''
         rd = {}
         for layer in layers:
             for key in layer.tags['runtimes']:
-                value=layer.__getattribute__(key)
+                value = layer.__getattribute__(key)
                 if hasattr(rd, key) and (value is not rd[var]):
-                    raise Exception('runtime variables conflicts %s and %s not same'%(rd[var], value))
-                rd[var]=value
+                    raise Exception(
+                        'runtime variables conflicts %s \
+                                and %s not same' % (rd[var], value))
+                rd[var] = value
         return rd
 
     def set_runtime_vars(self, var_dict):
@@ -366,27 +420,29 @@ class Container(Layer):
         '''Dump values to an array.'''
         return np.concatenate([layer.get_variables() for layer in self.layers])
 
-    def set_variables(self,v):
+    def set_variables(self, v):
         '''
         Load data from an array.
-        
+
         Args:
             v (1darray): variables.
         '''
-        start=0
+        start = 0
         for layer in self.layers:
-            stop=start+layer.num_variables
+            stop = start + layer.num_variables
             layer.set_variables(np.asarray(v[start:stop]))
-            start=stop
+            start = stop
 
     @property
     def num_variables(self):
         '''int: number of variables.'''
         return np.sum([layer.num_variables for layer in self.layers])
 
+
 class Monitor(Function):
     '''
-    A special layer used to monitor a flow, it operate on but do not change the flow.
+    A special layer used to monitor a flow, it operate on but do not \
+change the flow.
     '''
     __metaclass__ = ABCMeta
 
@@ -418,6 +474,7 @@ class Monitor(Function):
     def backward(self, xy, dy, **kwargs):
         self.monitor_backward(xy, dy, **kwargs)
         return EMPTY_VAR, dy
+
 
 class AnalyticityError(Exception):
     '''Behavior conflict with the analytical type of a layer.'''
