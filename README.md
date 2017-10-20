@@ -35,3 +35,4 @@ Convolutional mnist test (need install tensorflow to provide mnist database)
 ```
 
 ## Documentation
+http://layers.readthedocs.io/en/latest/
