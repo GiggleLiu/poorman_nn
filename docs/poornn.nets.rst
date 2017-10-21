@@ -1,13 +1,13 @@
-functions
-===========
+nets
+========
 
 .. toctree::
 	:maxdepth: 2
 
 Module contents
------------------
+---------------
 
-.. automodule:: poornn.functions
+.. automodule:: poornn.nets
     :members:
     :special-members: __init__
     :show-inheritance:

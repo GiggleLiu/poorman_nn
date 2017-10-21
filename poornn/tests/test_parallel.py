@@ -2,9 +2,11 @@
 Tests for MPS and MPO
 '''
 from numpy import *
-from numpy.testing import dec,assert_,assert_raises,assert_almost_equal,assert_allclose
+from numpy.testing import dec, assert_, assert_raises,\
+    assert_almost_equal, assert_allclose
 from scipy import sparse as sps
-import pdb,time
+import pdb
+import time
 
 from ..checks import check_numdiff
 from ..utils import typed_randn
@@ -14,6 +16,7 @@ from .. import functions
 
 random.seed(2)
 
+
 def test_pa():
     num_batch = 2
     dim_in = 30
@@ -22,20 +25,21 @@ def test_pa():
     input_shape = (-1, dim_in)
     output_shape = (-1, -1, dim_in)
     pnet = ParallelNN(axis=1)
-    x=asfortranarray(typed_randn(dtype, [num_batch,dim_in]))
-    weight=asfortranarray(typed_randn(dtype, [dim_in, dim_in]))
-    bias=typed_randn(dtype, [dim_in])
+    x = asfortranarray(typed_randn(dtype, [num_batch, dim_in]))
+    weight = asfortranarray(typed_randn(dtype, [dim_in, dim_in]))
+    bias = typed_randn(dtype, [dim_in])
     ll = Linear(input_shape=input_shape, itype=dtype, weight=weight, bias=bias)
     pnet.layers.append(ll)
     pnet.add_layer(functions.Power, order=2)
-    pnet.add_layer(functions.Reshape, output_shape = ll.output_shape)
+    pnet.add_layer(functions.Reshape, output_shape=ll.output_shape)
     y = pnet.forward(x)
     ll = pnet.layers[0]
-    assert_allclose(y[:,0,:], x.dot(ll.weight.T)+ll.bias)
-    assert_allclose(y[:,1,:], x**2)
-    assert_allclose(y[:,2,:], x)
-    print("Testing numdiff for %s"%pnet)
+    assert_allclose(y[:, 0, :], x.dot(ll.weight.T) + ll.bias)
+    assert_allclose(y[:, 1, :], x**2)
+    assert_allclose(y[:, 2, :], x)
+    print("Testing numdiff for %s" % pnet)
     assert_(all(check_numdiff(pnet, num_check=100)))
+
 
 if __name__ == '__main__':
     test_pa()
