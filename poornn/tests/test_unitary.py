@@ -22,58 +22,62 @@ def test_unitary():
     xin_np=asfortranarray(typed_randn(dtype,[num_batch,dim_in]))
     #sv=Linear((num_batch, dim_in),dtype,weight=typed_randn(dtype,(dim_out,dim_in)),bias = typed_randn(dtype, (dim_out,)))
     sv=Linear((num_batch, dim_in),dtype,weight=(dim_out,dim_in), bias=0,is_unitary=True)
-    print( "Testing numdiff for %s"%sv)
-    net = nets.ANN(layers = [sv])
-    #net.add_layer(monitors.Print)
-    net.add_layer(functions.Sum, axis=1)
-    net.add_layer(functions.Abs2)
+    for tl in [functions.Real, functions.Imag]:
+        net = nets.ANN(layers = [sv])
+        net.add_layer(functions.Mean, axis=1)
+        net.add_layer(tl)
+        net.add_layer(functions.Abs2)
+        print( "Testing unitary train for %s"%net)
+        res = check_numdiff(net)
 
-    num_step = 100
-    lr = 1e-4
-    for i in xrange(num_step):
-        data_cache = {}
-        y = net.forward(xin_np, data_cache=data_cache)
-        dw, dx = net.backward((xin_np, y), data_cache = data_cache)
-        net.set_variables(net.get_variables()-dw.conj()*lr)
-        if i%10==0:
-            err = net.layers[0].check_unitary()
-            print('%d, loss = %.4f, unitary err = %s'%(i+1, y, err))
-    assert_almost_equal(y,0)
-    assert_almost_equal(err,0)
+        num_step = 300
+        lr = 1e-3
+        for i in range(num_step):
+            data_cache = {}
+            y = net.forward(xin_np, data_cache=data_cache)
+            dw, dx = net.backward((xin_np, y), data_cache = data_cache)
+            net.set_variables(net.get_variables()-dw.conj()*lr)
+            if i%10==0:
+                err = net.layers[0].check_unitary()
+                print('%d, loss = %.4f, unitary err = %s'%(i+1, y, err))
+        assert_almost_equal(y,0,decimal=3)
+        assert_almost_equal(err,0,decimal=3)
 
 def test_unitary_conv():
     random.seed(2)
     num_batch=1
-    nfi=1
+    nfi=3
     dim_out=10
     img_size=30
     dtype = 'complex128'
     xin_np=asfortranarray(typed_randn(dtype,[num_batch,nfi,img_size]))
-    sv=SPConv((num_batch, nfi, img_size),dtype,weight=typed_randn(dtype,(dim_out,nfi, img_size)), bias=0, is_unitary=True)
-    print( "Testing numdiff for %s"%sv)
-    net = nets.ANN(layers = [sv])
-    #net.add_layer(monitors.Print)
-    net.add_layer(functions.Sum, axis=1)
-    net.add_layer(functions.Sum, axis=1)
-    net.add_layer(functions.Abs2)
+    for tl in [functions.Real, functions.Imag]:
+        sv=SPConv((num_batch, nfi, img_size),dtype,weight=typed_randn(dtype,(dim_out,nfi, img_size)), bias=0, is_unitary=True)
+        net = nets.ANN(layers = [sv])
+        #net.add_layer(monitors.Print)
+        net.add_layer(functions.Mean, axis=1)
+        net.add_layer(functions.Mean, axis=1)
+        net.add_layer(tl)
+        net.add_layer(functions.Abs2)
+        print( "Testing unitary train for %s"%net)
+        res = check_numdiff(net)
 
-    num_step = 100
-    lr = 2e-6
-    for i in xrange(num_step):
-        data_cache = {}
-        y = net.forward(xin_np, data_cache=data_cache)
-        dw, dx = net.backward((xin_np, y), data_cache = data_cache)
-        net.set_variables(net.get_variables()-dw.conj()*lr)
-        if i%10==0:
-            err = net.layers[0].check_unitary()
-            print('%d, loss = %.4f, unitary err = %s'%(i+1, y, err))
-    assert_almost_equal(y,0)
-    assert_almost_equal(err,0)
+        num_step = 300
+        lr = 1e-2
+        for i in range(num_step):
+            data_cache = {}
+            y = net.forward(xin_np, data_cache=data_cache)
+            dw, dx = net.backward((xin_np, y), data_cache = data_cache)
+            net.set_variables(net.get_variables()-dw.conj()*lr)
+            if i%10==0:
+                err = net.layers[0].check_unitary()
+                print('%d, loss = %.4f, unitary err = %s'%(i+1, y, err))
+        assert_almost_equal(y,0,decimal=3)
+        assert_almost_equal(err,0,decimal=3)
 
-
-def test_all():
-    test_unitary_conv()
+def run_all():
     test_unitary()
+    test_unitary_conv()
 
 if __name__=='__main__':
-    test_all()
+    run_all()

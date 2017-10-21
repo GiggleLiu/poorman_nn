@@ -113,11 +113,11 @@ class Linear(LinearBase):
         if self.is_unitary and self.var_mask[0]:
             W = self.weight
             dG = var1.reshape(W.shape,order='F') - W
-            #dG = dG.conj()
-            dA = W.T.conj().dot(dG) - dG.T.conj().dot(W)
-            #dA=dA.conj()
+            dA = W.T.conj().dot(dG)
+            dA = dA - dA.T.conj()
             B = np.eye(dG.shape[1]) - dA/2
             Y = W.dot(B.T.conj()).dot(np.linalg.inv(B))
+
             self.weight[...] = Y
         elif self.var_mask[0]:
             weight_data[:] = var1

@@ -114,22 +114,32 @@ class SPConv(LinearBase):
             raise ValueError('non-unitary matrix error, error = %s!'%err)
         return err
 
-    def set_variables(self, variables):
+    def set_variables(self, variables, debug=False):
         nw=self.weight.size if self.var_mask[0] else 0
         var1, var2 = variables[:nw], variables[nw:]
         weight_data = self.weight.data if sps.issparse(self.weight) else self.weight.ravel(order='F')
         if self.is_unitary and self.var_mask[0]:
             W = self.weight.reshape(self.weight.shape[:2]+(-1,), order='F')
             dG = var1.reshape(W.shape,order='F') - W
-            # -dA = W.T.conj().dot(dG) - dG.T.conj().dot(W)
             dA = np.einsum('ijk,kjl->ijl',W.T.conj(),dG)
             dA = dA - dA.T.conj()
+
             B = np.eye(dG.shape[2])[:,None] - dA/2
             Binv = np.transpose(np.linalg.inv(np.transpose(B,axes=(1,0,2))),axes=(1,0,2))
-            #Y = W.dot(B.T.conj()).dot(np.linalg.inv(B))
             Y = np.einsum('ijk,kjl->ijl',W,B.T.conj())
             Y = np.einsum('ijk,kjl->ijl',Y,Binv)
-            self.weight[...] = Y
+
+            if debug:
+                dG2 = Y-self.weight
+                print('@',np.sum(abs(dG)))
+                print('#',np.sum(abs(dG2)))
+                norm1 = np.sum(dG.conj()*dG)
+                print(norm1.real)
+                norm2 = np.sum(dG2.conj()*dG2)
+                print(norm2.real)
+                print(np.sum(dG.conj()*dG2)/np.sqrt(norm1*norm2))
+            self.weight[...] = Y.reshape(self.weight.shape,order='F')
+
         elif self.var_mask[0]:
             weight_data[:] = var1
         if self.var_mask[1]:

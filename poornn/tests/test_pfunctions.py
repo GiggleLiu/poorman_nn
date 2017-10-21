@@ -36,12 +36,11 @@ def test_mobiusgeogaussian():
             print('Test numdiff for \n%s.'%func)
             assert_(all(check_numdiff(func, eta_w=1e-2 if func is func3 else None)))
 
-def test_all():
-    random.seed(2)
+def run_all():
     test_poly()
     test_mul()
     test_prelu()
     test_mobiusgeogaussian()
 
 if __name__=='__main__':
-    test_all()
+    run_all()
