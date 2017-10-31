@@ -179,3 +179,14 @@ napoleon_use_ivar = False
 napoleon_use_param = True
 napoleon_use_rtype = True
 napoleon_use_keyword = True
+
+import sys
+from mock import Mock as MagicMock
+
+class Mock(MagicMock):
+    @classmethod
+    def __getattr__(cls, name):
+            return MagicMock()
+
+MOCK_MODULES = ['poornn.lib.spconv']
+sys.modules.update((mod_name, Mock()) for mod_name in MOCK_MODULES)

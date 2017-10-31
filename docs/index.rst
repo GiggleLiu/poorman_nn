@@ -8,7 +8,7 @@ extensible.
 
 Our project repo is https://159.226.35.226/jgliu/PoorNN.git
 
-Here I lists its main features
+Here I list its main features
 
     * low abstraction
     * complex number support

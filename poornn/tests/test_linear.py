@@ -8,7 +8,7 @@ from numpy.testing import dec, assert_, assert_raises,\
     assert_almost_equal, assert_allclose
 from scipy import sparse as sps
 import pdb
-import time
+import time, pytest
 
 from ..linears import *
 from ..checks import check_numdiff
@@ -108,6 +108,7 @@ def test_linear_complex():
     assert_allclose(sv.get_variables(), zeros(0))
 
 
+@pytest.mark.skip
 def test_splinear():
     num_batch = 2
     dim_in = 30
