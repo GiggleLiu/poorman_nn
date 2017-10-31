@@ -187,6 +187,6 @@ class Mock(MagicMock):
     @classmethod
     def __getattr__(cls, name):
             return MagicMock()
-
-MOCK_MODULES = ['poornn.lib.spconv']
+MOCK_MODULES = ['poornn.lib', 'poornn.lib.linear', 'poornn.lib.spconv', 'poornn.lib.relu',
+        'poornn.lib.pooling', 'poornn.lib.convprod']
 sys.modules.update((mod_name, Mock()) for mod_name in MOCK_MODULES)
