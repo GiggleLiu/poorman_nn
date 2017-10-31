@@ -164,16 +164,16 @@ class SPConv(LinearBase):
         if self.is_unitary and self.var_mask[0]:
             W = self.weight.reshape(self.weight.shape[:2] + (-1,), order='F')
             dG = var1.reshape(W.shape, order='F') - W
-            # -dA = W.T.conj().dot(dG) - dG.T.conj().dot(W)
             dA = np.einsum('ijk,kjl->ijl', W.T.conj(), dG)
             dA = dA - dA.T.conj()
+
             B = np.eye(dG.shape[2])[:, None] - dA / 2
             Binv = np.transpose(np.linalg.inv(
                 np.transpose(B, axes=(1, 0, 2))), axes=(1, 0, 2))
-            # Y = W.dot(B.T.conj()).dot(np.linalg.inv(B))
             Y = np.einsum('ijk,kjl->ijl', W, B.T.conj())
             Y = np.einsum('ijk,kjl->ijl', Y, Binv)
-            self.weight[...] = Y
+
+            self.weight[...] = Y.reshape(self.weight.shape, order='F')
         elif self.var_mask[0]:
             weight_data[:] = var1
         if self.var_mask[1]:

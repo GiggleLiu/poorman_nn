@@ -25,7 +25,8 @@ __all__ = ['wrapfunc', 'Log2cosh', 'Logcosh', 'Sigmoid',
 def wrapfunc(func, dfunc, classname='GeneralFunc', attrs={},
              docstring="", tags={}, real_out=False):
     '''
-    wrap a function and its backward counterpart into a :class:`poornn.core.Function` layer.
+    wrap a function and its backward counterpart into \
+a :class:`poornn.core.Function` layer.
 
     Args:
         func (func): forward function, take input (x, attrs) as parameters.

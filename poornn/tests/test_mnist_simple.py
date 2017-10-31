@@ -49,7 +49,7 @@ def build_dnn():
         ann = ANN()  # do not specify layers.
         linear1 = Linear((-1, I1 * I2), dtype, W_fc1, b_fc1)
         ann.layers.append(linear1)
-        #ann.add_layer(functions.SoftMaxCrossEntropy, axis=1)
+        # ann.add_layer(functions.SoftMaxCrossEntropy, axis=1)
         ann.add_layer(functions.Normalize, axis=1)
         ann.add_layer(functions.SquareLoss, axis=1)
         ann.add_layer(functions.Sum, axis=1)
@@ -58,7 +58,7 @@ def build_dnn():
     # random num-diff check
     y_true = zeros(10, dtype='float32')
     y_true[3] = 1
-    assert(all(check_numdiff(ann, var_dict={'y_true': y_true},tol=1e-2)))
+    assert(all(check_numdiff(ann, var_dict={'y_true': y_true}, tol=1e-2)))
     return ann
 
 

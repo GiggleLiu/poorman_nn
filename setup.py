@@ -1,8 +1,8 @@
 #!/usr/bin/env python
-descr = """Python module for low abstraction neural network."""
-
 import os
 import sys
+
+descr = """Python module for low abstraction neural network."""
 
 DISTNAME = 'poornn'
 DESCRIPTION = descr
@@ -42,7 +42,8 @@ try:
     ))
 except:
     print('setuptools module not found.')
-    print("Install setuptools if you want to enable 'python setup.py develop'.")
+    print("Install setuptools if you want to enable \
+'python setup.py develop'.")
 
 
 def configuration(parent_package='', top_path=None, package_name=DISTNAME):
@@ -72,7 +73,7 @@ def get_version():
 
 
 def setup_package():
-# Call the setup function
+    # Call the setup function
     metadata = dict(
         name=DISTNAME,
         maintainer=MAINTAINER,
@@ -87,17 +88,17 @@ def setup_package():
             'numpy',
             'scipy',
             'jinja2',
-            #'mpi4py',   #recommended
-            #'mkl-service'
-            #'pygraphviz'
+            # 'mpi4py',   #recommended
+            # 'mkl-service'
+            # 'pygraphviz'
         ],
-        #test_suite="nose.collector",
+        # test_suite="nose.collector",
         **EXTRA_INFO
     )
 
-    if (len(sys.argv) >= 2
-            and ('--help' in sys.argv[1:] or sys.argv[1]
-                 in ('--help-commands', 'egg_info', '--version', 'clean'))):
+    if (len(sys.argv) >= 2 and
+            ('--help' in sys.argv[1:] or sys.argv[1]
+             in ('--help-commands', 'egg_info', '--version', 'clean'))):
 
         # For these actions, NumPy is not required.
         try:
@@ -110,6 +111,7 @@ def setup_package():
         metadata['configuration'] = configuration
         from numpy.distutils.core import setup
     setup(**metadata)
+
 
 if __name__ == "__main__":
     setup_package()

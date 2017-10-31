@@ -16,11 +16,11 @@ TAG_LIST = ['runtimes', 'is_inplace', 'analytical']
 '''
 List of tags:
 
-    * 'runtimes' (list<str>, default=[]): 
+    * 'runtimes' (list<str>, default=[]):
         runtime variables that should be supplied during each run.
-    * 'is_inplace' (bool, default=False): 
+    * 'is_inplace' (bool, default=False):
         True if the output is made by changing input inplace.
-    * 'analytical' (int): 
+    * 'analytical' (int):
         the analyticaity of a layer. A table of legal values,
 
         * 1, yes (default)
@@ -172,8 +172,8 @@ attributes that will be displayed in print and graphviz.
     def backward(self, xy, dy, mask=(1, 1)):
         '''
         back propagation to get :math:`\\frac{\partial J(w,x)}{\partial w}` \
-and :math:`\\frac{\partial J(w,x)}{\partial x}`, where :math:`J` and :math:`w` \
-are cost function and variables respectively.
+and :math:`\\frac{\partial J(w,x)}{\partial x}`, \
+where :math:`J` and :math:`w` are cost function and variables respectively.
 
         Args:
             xy (tuple<ndarray>, len=2): input and output array.
