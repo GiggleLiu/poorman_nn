@@ -17,7 +17,7 @@ __all__ = ['wrapfunc', 'Log2cosh', 'Logcosh', 'Sigmoid',
            'Pooling', 'DropOut',
            'Sin', 'Cos', 'ArcTan', 'Exp', 'Log', 'SoftPlus', 'Power',
            'SoftMax', 'CrossEntropy', 'SoftMaxCrossEntropy', 'SquareLoss',
-           'Reshape', 'Transpose', 'TypeCast',
+           'Reshape', 'Transpose', 'TypeCast', 'Reverse',
            'Filter', 'BatchNorm', 'Normalize',
            'Real', 'Imag', 'Conj', 'Abs', 'Abs2', 'Angle']
 
@@ -740,6 +740,24 @@ class Reshape(Function):
     def backward(self, xy, dy, **kwargs):
         x, y = xy
         return EMPTY_VAR, dy.reshape(self.input_shape, order='F')
+
+class Reverse(Function):
+    '''
+    Reverse data along specific axis.
+    '''
+    def __init__(self, input_shape, itype, axis, **kwargs):
+        if axis > len(input_shape) - 1:
+            raise ValueError('invalid axis')
+        self.axis = axis % len(input_shape)
+        super(Reverse, self).__init__(
+            input_shape, input_shape, itype, otype=itype)
+
+    def forward(self, x, **kwargs):
+        return x[(slice(None),)*self.axis+(slice(None,None,-1),)]
+
+    def backward(self, xy, dy, **kwargs):
+        x, y = xy
+        return EMPTY_VAR, dy[(slice(None),)*self.axis+(slice(None,None,-1),)]
 
 
 class TypeCast(Function):

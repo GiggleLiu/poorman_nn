@@ -131,7 +131,7 @@ class Linear(LinearBase):
         self.weight = np.linalg.qr(self.weight.T)[0].T
         self.is_unitary = True
 
-    def check_unitary(self, tol=1e-10):
+    def check_unitary(self, tol=1e-6):
         '''
         check weight is unitary or not, if not, raise an exception.
 

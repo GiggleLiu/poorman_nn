@@ -5,6 +5,7 @@ ABC of neural network.
 import numpy as np
 import pdb
 import numbers
+import uuid
 
 from .checks import check_shape_forward, check_shape_backward,\
     check_shape_match
@@ -21,6 +22,11 @@ class ANN(Container):
     '''
     Sequential Artificial Neural network.
     '''
+    _id = 0
+    def __init__(self, *args, **kwargs):
+        super(ANN, self).__init__(*args, **kwargs)
+        self.uuid = ANN._id
+        ANN._id += 1
 
     def __graphviz__(self, g, father=None):
         node = 'cluster-%s' % id(self)
@@ -45,6 +51,9 @@ dtype = %s</font><br align="l"/>>' % (
             return self.__layer_dict__[name]
         else:
             raise KeyError('Get invalid key %s' % name)
+
+    def __hash__(self):
+        return hash(self.__str__())
 
     @property
     def input_shape(self):
@@ -91,9 +100,9 @@ dtype = %s</font><br align="l"/>>' % (
 to call a subsequent :meth:`backward` method, \
 because backward need :data:`data_cache`.
 
-            :data:`'%d-ys'%id(self)` is used as the key to store \
+            :data:`self.uuid` is used as the key to store \
 run-time output of layers in this network.
-            :data:`data_cache['%d-ys'%id(self)]` is a list with contents \
+            :data:`data_cache[self.uuid]` is a list with contents \
 outputs in each layers generate in this forward run.
 
         Returns:
@@ -103,18 +112,18 @@ outputs in each layers generate in this forward run.
         for layer in self.layers:
             if do_shape_check:
                 x = check_shape_forward(layer.forward)(
-                    layer, x, data_cache=data_cache)
+                    layer, x, data_cache=data_cache, **kwargs)
             else:
-                x = layer.forward(x, data_cache=data_cache)
+                x = layer.forward(x, data_cache=data_cache, **kwargs)
             ys.append(x)
             if isinstance(x, list):
                 x = x[-1]
         if data_cache is not None:
-            data_cache['%d-ys' % id(self)] = ys
+            data_cache[self.uuid] = ys
         return x
 
-    def backward(self, xy, dy=np.array(1), data_cache=None,
-                 do_shape_check=False):
+    def backward(self, xy, dy=None, data_cache=None,
+                 do_shape_check=False, **kwargs):
         '''
         Compute gradients.
 
@@ -131,7 +140,9 @@ outputs in each layers generate in this forward run.
         dvs = []
         x_broken = False
         x, y = xy
-        key = '%d-ys' % id(self)
+        if dy is None:
+            dy = np.ones(self.output_shape, dtype=self.otype)
+        key = self.uuid
         if data_cache is None or key not in data_cache:
             raise TypeError('Can not find cached ys! get %s' % data_cache)
         else:
@@ -141,9 +152,9 @@ outputs in each layers generate in this forward run.
             layer = self.layers[-i]
             if do_shape_check:
                 dv, dy = check_shape_backward(layer.backward)(
-                    layer, [x, y], dy, data_cache=data_cache)
+                    layer, [x, y], dy, data_cache=data_cache, **kwargs)
             else:
-                dv, dy = layer.backward([x, y], dy, data_cache=data_cache)
+                dv, dy = layer.backward([x, y], dy, data_cache=data_cache, **kwargs)
             dvs.append(dv)
         return np.concatenate(dvs[::-1]), dy
 
@@ -273,9 +284,9 @@ and storge the outputs of layers parallel along this axis.
         ys = []
         for layer in self.layers:
             if do_shape_check:
-                y = check_shape_forward(layer.forward)(layer, x)
+                y = check_shape_forward(layer.forward)(layer, x, **kwargs)
             else:
-                y = layer.forward(x)
+                y = layer.forward(x, **kwargs)
             ys.append(y[(slice(None),) * self.axis + (None,)])
         y = np.concatenate(ys, axis=self.axis)
         return y
@@ -300,9 +311,9 @@ and storge the outputs of layers parallel along this axis.
             yi, dyi = y.take(i, axis=self.axis), dy.take(i, axis=self.axis)
             if do_shape_check:
                 dv, dxi = check_shape_backward(
-                    layer.backward)(layer, [x, yi], dyi)
+                    layer.backward)(layer, [x, yi], dyi, **kwargs)
             else:
-                dv, dxi = layer.backward([x, yi], dyi)
+                dv, dxi = layer.backward([x, yi], dyi, **kwargs)
             dvs.append(dv)
             dx += dxi
         return np.concatenate(dvs), dx
@@ -482,7 +493,7 @@ dtype = %s)' % (l.itype, l.otype, l.dtype))
         hy = (sxc * y).real
         sdy = dy * sx
 
-        dw0, dx0 = h.backward((absx, hy), sdy.real)
+        dw0, dx0 = h.backward((absx, hy), sdy.real, **kwargs)
         # sdy.imag can be non-zeros.
         return dw0, dx0 * sxc + hy / np.maximum(1e-15, absx)\
             * sxc * 1j * sdy.imag

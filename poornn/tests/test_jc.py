@@ -17,7 +17,6 @@ from ..derivatives import *
 
 random.seed(2)
 
-
 def test_jcsigmoid():
     itype = 'float32'
     nfi = 8

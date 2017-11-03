@@ -424,8 +424,17 @@ def test_fft():
             func = FFT(input_shape, itype, axis=axis)
             assert_(all(check_numdiff(func)))
 
+def test_reverse():
+    input_shape = [10,10]
+    itype = 'complex128'
+    x = typed_randn(itype, input_shape)
+    func = Reverse(input_shape, itype, axis=-1)
+    y = func(x)
+    assert_allclose(y[:,::-1], x)
+    assert_(all(check_numdiff(func)))
 
 def run_all():
+    test_reverse()
     test_fft()
     test_softmaxnorm()
     test_batchnorm()

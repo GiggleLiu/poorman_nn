@@ -142,7 +142,7 @@ class SPConv(LinearBase):
                 axes=(1, 0, 2)), order='F')
         self.is_unitary = True
 
-    def check_unitary(self, tol=1e-10):
+    def check_unitary(self, tol=1e-6):
         # check weight shape
         if self.weight.shape[2] < self.weight.shape[0]:
             raise ValueError('output shape greater than input shape error!')
@@ -153,6 +153,7 @@ class SPConv(LinearBase):
             weight = self.weight[:, i]
             err += abs(weight.dot(weight.T.conj()) -
                        np.eye(weight.shape[0])).mean()
+        err/=self.num_feature_in
         if self.is_unitary and err > tol:
             raise ValueError('non-unitary matrix error, error = %s!' % err)
         return err

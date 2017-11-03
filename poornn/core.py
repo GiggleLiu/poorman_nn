@@ -320,6 +320,8 @@ class Container(Layer):
         return s
 
     def __repr__(self, offset=0):
+        if self.num_layers == 0:
+            return '<%s|empty>'%self.__class__.__name__
         return '<%s|%s>: %s|%s -> %s|%s' % (self.__class__.__name__,
                                             dtype2token(
                                                 self.dtype), self.input_shape,
