@@ -85,12 +85,13 @@ Through running the above example, we notice the following facts:
 #. Layers take numpy array as inputs and generates array outputs (notice what :func:`typed_randn` also generates numpy array).
 #. Network :class:`ANN` is a subclass of :class:`Layer`, it realizes all the interfaces claimed in :class:`Layer`,
    it is a kind of simplest vertical :class:`Container`.
-   Here, :class:`Container` is a special kind of :class:`Layer`, it take other layers as its entity and has not independant functionality.
+   Here, :class:`Container` is a special kind of :class:`Layer`, it take other layers as its entity and has no independant functionality.
    Containers can be nested, chained, ... to realize complex networks.
 #. :data:`-1` is used as a placeholder in a shape, however, using more than 1 place holder in one shape tuple is not recommended, it raises error during reshaping.
 #. Anytime, a :class:`Layer` take :data:`input_shape` and :data:`itype` as first 2 parameters to initialize, even it is not needed!
-   However, you can ommit it by using :meth:`add_layer` method of :class:`ANN` and :class:`PrallelNN` network when you are trying to add a layer to existing network.
-   :meth:`add_layer` can infer input shape and data type from previous layers, appearantly it fails when there is no layers in a container.
+   However, you can ommit it by using :meth:`add_layer` method of :class:`ANN` or :class:`PrallelNN` network when you are trying to add a layer to existing network.
+   :meth:`add_layer` can infer input shape and type from previous layers.
+   Appearantly, it fails when there is no layers in a container.
    Then you should use :meth:`net.layers.append` to add a first layer, or give at least one layer when initialing a container.
 
 .. note::

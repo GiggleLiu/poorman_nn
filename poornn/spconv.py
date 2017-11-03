@@ -9,7 +9,6 @@ import time
 from scipy import sparse as sps
 
 from .lib.spconv import lib as fspconv
-from .lib.spsp import lib as fspsp
 from .utils import scan2csc, tuple_prod, spscan2csc,\
     masked_concatenate, dtype2token, typed_randn
 from .linears import LinearBase
@@ -277,6 +276,7 @@ class SPSP(SPConv):
 
     def __init__(self, input_shape, itype, cscmat, bias, strides=None,
                  var_mask=(1, 1)):
+        from .lib.spsp import lib as fspsp
         self.cscmat = cscmat
         self.bias = bias
         self.var_mask = var_mask

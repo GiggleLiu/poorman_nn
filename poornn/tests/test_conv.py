@@ -158,7 +158,7 @@ def test_conv1d_per():
     ts = random.random([num_batch, nfin, dim_x])
     ts = autograd.Variable(torch.Tensor(ts), requires_grad=True)
     # 2 features, kernel size 3x3
-    cv = Conv2d(nfin, nfout, kernel_size=(K1,), stride=(1,), padding=(0,))
+    cv = Conv1d(nfin, nfout, kernel_size=(K1,), stride=(1,), padding=(0,))
     weight = cv.weight.data.numpy()
     sv = SPConv((-1, nfin, dim_x), 'float32', float32(weight),
                 float32(cv.bias.data.numpy()), strides=(1,),

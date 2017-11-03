@@ -8,7 +8,6 @@ import scipy.sparse as sps
 import pdb
 
 from .core import Layer, EMPTY_VAR
-from .lib.spsp import lib as fspsp
 from .lib.linear import lib as flinear
 from .utils import masked_concatenate, dtype2token, typed_randn
 
@@ -205,6 +204,7 @@ class SPLinear(LinearBase):
 
     def __init__(self, input_shape, itype, weight, bias,
                  var_mask=(1, 1), **kwargs):
+        from .lib.spsp import lib as fspsp
         if input_shape[-1] != weight.shape[1]:
             raise ValueError('Shape Mismatch!')
         super(SPLinear, self).__init__(input_shape, itype=itype,
