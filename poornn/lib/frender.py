@@ -13,6 +13,9 @@ def render_f90(template_folder, template_file, var_dict, out_file):
 
 
 if __name__ == '__main__':
+    render_f90('templates', 'spconv_cc.template.f90', {'version_list': [
+               ''], 'dtype_list': ['complex*16', 'real*8', 'real*4']},
+               out_file='spconv_cc.f90')
     render_f90('templates', 'spsp.template.f90', {'dtype_list': [
                'complex*16', 'real*8', 'real*4'],
                'version_list': ['', '_conv']}, out_file='spsp.f90')

@@ -226,6 +226,40 @@ def test_conv1d_per():
     assert_allclose(cv.weight.grad.data.numpy() / wfactor, dweight, atol=2e-3)
     assert_(all(check_numdiff(sv, xin_np)))
 
+def test_conv2d_cc():
+    nfi = 3
+    nfo = 16
+    dtype = 'complex128'
+    ntest = 100
+    for with_batch in [False, True]:
+        batch_dim = (4,) if with_batch else ()
+        for dim in [1,2]:
+            figsize = (10,) if dim==1 else (10,10)
+            kernel_size = figsize
+
+            weight = asfortranarray(typed_randn(dtype, (nfo, nfi)+kernel_size))
+            bias = typed_randn(dtype, (nfo,))
+            sv = SPConv(batch_dim+(nfi,)+figsize, dtype, weight,
+                        bias, strides=None, boundary='P', w_contiguous=True)
+
+            print("Testing forward_cc for %s,\n D = %s, batch = %s" % (sv, dim, with_batch))
+            x0 = asfortranarray(typed_randn(dtype, sv.input_shape))
+            y0 = sv.forward(x0)
+
+            raveled_locs = array([0,2])
+            dx = typed_randn(dtype, batch_dim+(nfi,len(raveled_locs)))
+            x=x0.copy(order='F')
+            x.reshape(batch_dim+(nfi,-1),order='F')[...,raveled_locs]+=dx
+            t0=time.time()
+            for i in range(ntest):
+                y1 = sv.forward(x)
+            t1=time.time()
+            for i in range(ntest):
+                y2 = sv.forward_cc(raveled_locs, dx, y0.copy(order='F'))
+            t2=time.time()
+            print('ACC Ratio: %s'%((t2-t1)/(t1-t0)))
+            print((y2-y1).sum())
+            assert_allclose(y2,y1)
 
 def test_conv2d_complex():
     num_batch = 1
@@ -370,6 +404,7 @@ def run_all():
     test_conv2d()
     test_conv2d_per()
     test_conv1d_per()
+    test_conv2d_cc()
 
 
 if __name__ == '__main__':

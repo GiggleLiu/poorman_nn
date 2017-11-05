@@ -50,54 +50,6 @@ module lib
             dbias=sum(dy,1)
         endif
     end subroutine backward_z
-    subroutine forward_c(x, y, weight, bias, num_batch, nfi, nfo)
-        implicit none
-        integer,intent(in) :: num_batch, nfi, nfo
-        complex*8,intent(in) :: x(num_batch, nfi), weight(nfo, nfi), bias(nfo)
-        
-        complex*8,intent(out) :: y(num_batch, nfo)
-        complex*8,parameter :: one=cmplx(1.0,0.0)
-        integer :: i
-
-        do i=1,nfo
-            y(:,i)=bias(i)
-        enddo
-
-        call cgemm('N', 'T', num_batch, nfo, nfi, one, x, num_batch,&
-            weight, nfo, one, y, num_batch)
-    end subroutine forward_c
-
-    subroutine backward_c(dy,x, weight, dx, dweight,dbias,&
-            nfi,nfo, num_batch, do_xgrad, do_wgrad, do_bgrad)
-        implicit none
-        integer,intent(in) :: num_batch,nfi,nfo
-        logical,intent(in) :: do_xgrad, do_wgrad, do_bgrad
-        complex*8,intent(in) :: x(num_batch, nfi), dy(num_batch, nfo), weight(nfo, nfi)
-        
-        complex*8,intent(out) :: dweight(nfo, nfi), dbias(nfo), dx(num_batch, nfi)
-
-        complex*8,parameter :: one=cmplx(1.0,0.0)
-        complex*8,parameter :: zero=cmplx(0.0,0.0)
-
-        !f2py intent(out) dx, dweight, dbias
-
-        if(do_wgrad) then
-            !call cgemm('T', 'N', nfo, nfi, num_batch, one, dy, num_batch,&
-            !    conjg(x), num_batch, zero, dweight, nfo)
-            call cgemm('T', 'N', nfo, nfi, num_batch, one, dy, num_batch,&
-                x, num_batch, zero, dweight, nfo)
-        endif
-        if(do_xgrad) then
-            !call cgemm('N', 'N', num_batch, nfi, nfo, one, dy, num_batch,&
-            !    conjg(weight), nfo, zero, dx, num_batch)
-            call cgemm('N', 'N', num_batch, nfi, nfo, one, dy, num_batch,&
-                weight, nfo, zero, dx, num_batch)
-        endif
-        if(do_bgrad) then
-            !calculate dbias
-            dbias=sum(dy,1)
-        endif
-    end subroutine backward_c
     subroutine forward_d(x, y, weight, bias, num_batch, nfi, nfo)
         implicit none
         integer,intent(in) :: num_batch, nfi, nfo

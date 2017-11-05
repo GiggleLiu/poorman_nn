@@ -13,7 +13,8 @@ from .core import Container, Function
 from . import functions
 from .spconv import SPConv
 from .linears import Linear
-from .utils import _connect, dtype2token, dtype_r2c, dtype_c2r, fsign
+from .utils import _connect, dtype2token, dtype_r2c, dtype_c2r,\
+        fsign, y_from_update_res
 
 __all__ = ['ANN', 'ParallelNN', 'JointComplex', 'KeepSignFunc']
 
@@ -228,6 +229,17 @@ dtype = %s</font><br align="l"/>>' % (
         _connect(g, father, c, self.input_shape, self.itype, pos='mid')
         return c
 
+    def __update__(self, locs, dx, xy0, **kwargs):
+        x0, y0 = dxy0
+        ys = []
+        add_axis = (slice(None),) * self.axis + (None,)
+        for ilayer, layer in enumerate(self.layers):
+            res, info = layer.update(locs, dx, (x0,y0.take(ilayer,axis=self.axis)), **kwargs)
+            y = y_from_update_res(res, info)
+            ys.append(y[add_axis])
+        y = np.concatenate(ys, axis=self.axis)
+        return y, 0
+
     @property
     def itype(self):
         if self.num_layers == 0:
@@ -282,12 +294,13 @@ and storge the outputs of layers parallel along this axis.
             ndarray: output,
         '''
         ys = []
+        add_axis = (slice(None),) * self.axis + (None,)
         for layer in self.layers:
             if do_shape_check:
                 y = check_shape_forward(layer.forward)(layer, x, **kwargs)
             else:
                 y = layer.forward(x, **kwargs)
-            ys.append(y[(slice(None),) * self.axis + (None,)])
+            ys.append(y[add_axis])
         y = np.concatenate(ys, axis=self.axis)
         return y
 

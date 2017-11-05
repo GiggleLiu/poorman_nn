@@ -91,14 +91,32 @@ def test_linear():
 
 def test_linear_complex():
     num_batch = 1
-    dim_in = 30
-    dim_out = 400
-    xin_np = asfortranarray(typed_randn('complex128', [num_batch, dim_in]))
+    dim_in = 300
+    dim_out = 300
     weight = asfortranarray(typed_randn('complex128', [dim_out, dim_in]))
     bias = typed_randn('complex128', [dim_out])
     sv = Linear((num_batch, dim_in), 'complex128', weight, bias)
     print("Testing numdiff for %s" % sv)
     assert_(all(check_numdiff(sv, num_check=100)))
+
+    print('Testing forward_cc')
+    xin_np = asfortranarray(typed_randn('complex128', [num_batch, dim_in]))
+    y0 = sv.forward(xin_np)
+    dx = zeros_like(xin_np)
+    dx_ = [0.1,0.1]
+    locs = [1,3]
+    dx_, locs = array(dx_), array(locs)
+    dx[:,locs]=dx_
+    xnew = xin_np+dx
+    t0=time.time()
+    for i in range(100):
+        y1 = sv.forward(xnew)
+    t1=time.time()
+    for i in range(100):
+        y2 = sv.forward_cc(locs, dx_, y0)
+    t2=time.time()
+    print('ACC Ratio = %s'%((t2-t1)/(t1-t0)))
+    assert_allclose(y1,y2)
 
     print('Testing var_mask')
     sv.var_mask = (False, False)

@@ -7,7 +7,7 @@ from .lib import futils
 __all__ = ['take_slice', 'scan2csc', 'typed_random', 'typed_randn',
            'typed_uniform', 'tuple_prod',
            'masked_concatenate', 'dtype2token', 'dtype_c2r', 'dtype_r2c',
-           'complex_backward', 'fsign']
+           'complex_backward', 'fsign', 'y_from_update_res']
 
 
 def take_slice(arr, sls, axis):
@@ -67,9 +67,11 @@ def scan2csc(kernel_shape, img_in_shape, strides, boundary):
     csc_indptr = np.arange(1, dim_kernel * dim_out + 2,
                            dim_kernel, dtype='int32')
     csc_indices = []  # pointer to rows in x
+    offset_table = []
     for ind_out in range(dim_out):
         ijk_out = np.unravel_index(ind_out, img_out_shape, order='F')
         ijk_in0 = np.asarray(ijk_out) * strides
+        offset_table.append(ijk_in0)
         for ind_offset in range(tuple_prod(kernel_shape)):
             ijk_in = ijk_in0 + \
                 np.unravel_index(ind_offset, kernel_shape, order='F')
@@ -79,7 +81,7 @@ def scan2csc(kernel_shape, img_in_shape, strides, boundary):
             csc_indices.append(ind_in + 1)
 
     csc_indices = np.int32(csc_indices)
-    return csc_indptr, csc_indices, img_out_shape
+    return csc_indptr, csc_indices, img_out_shape, np.ascontiguousarray(offset_table).T
 
 
 def spscan2csc(cscmat, strides):
@@ -262,7 +264,7 @@ def _connect(g, start, end, arr_shape, dtype, pos='mid'):
         kwargs['lhead'] = end.name
         nodes = end.nodes()
         end = get_node(nodes)
-    g.add_edge(start, end, label='<<font point-size="10px">%s</font>i\
+    g.add_edge(start, end, label='<<font point-size="10px">%s</font>\
 <br align="center"/><font point-size="10px">%s</font>\
 <br align="center"/>>' % (arr_shape, dtype), **kwargs)
 
@@ -386,6 +388,20 @@ def fsign(x):
     return eval('futils.fsign_%s' % dtype2token(x.dtype.name)
                 )(x.ravel(order=order)).reshape(x.shape, order=order)
 
+def y_from_update_res(res, info, y0):
+    '''
+    Args:
+        res, info: result given by update function.
+        y0 (ndarray): old output.
+    '''
+    if info==0:
+        return res
+    elif info==1:
+        res = locs, dy
+        y0[locs] += dy
+        return y0
+    else:
+        raise Exception()
 
 if __name__ == '__main__':
     print(typed_uniform('complex128', (2, 2)))

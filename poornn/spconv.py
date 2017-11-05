@@ -9,6 +9,7 @@ import time
 from scipy import sparse as sps
 
 from .lib.spconv import lib as fspconv
+from .lib.spconv_cc import lib as fspconv_cc
 from .utils import scan2csc, tuple_prod, spscan2csc,\
     masked_concatenate, dtype2token, typed_randn
 from .linears import LinearBase
@@ -57,7 +58,7 @@ class SPConv(LinearBase):
     def __init__(self, input_shape, itype, weight, bias,
                  strides=None, boundary="P",
                  w_contiguous=True, var_mask=(1, 1),
-                 is_unitary=False, **kwargs):
+                 is_unitary=False, acc_version='v2', **kwargs):
         if isinstance(weight, tuple):
             weight = 0.1 * typed_randn(kwargs.get('dtype', itype), weight)
         super(SPConv, self).__init__(input_shape, itype=itype,
@@ -71,9 +72,10 @@ class SPConv(LinearBase):
         self.boundary = boundary
         self.w_contiguous = w_contiguous
         self.is_unitary = is_unitary
+        self.acc_version = acc_version
 
         kernel_shape = self.weight.shape[2:]
-        self.csc_indptr, self.csc_indices, self.img_out_shape = scan2csc(
+        self.csc_indptr, self.csc_indices, self.img_out_shape, self.offset_table = scan2csc(
             kernel_shape, input_shape[-img_nd:], strides, boundary)
         self.output_shape = input_shape[:-img_nd - 1] + \
             (self.num_feature_out,) + self.img_out_shape
@@ -81,31 +83,25 @@ class SPConv(LinearBase):
         # use the correct fortran subroutine.
         dtype_token = dtype2token(
             np.find_common_type((self.itype, self.dtype), ()))
+        batch_token = '' if len(self.input_shape) - len(strides) > 1 else '1'
 
         if not w_contiguous:
             self.weight_indices = np.asarray(np.tile(np.arange(tuple_prod(
                 kernel_shape), dtype='int32'), tuple_prod(img_out_shape)),
                 order='F') + 1  # pointer to filter data
-            func_f = eval('fspconv.forward_general%s' % dtype_token)
-            func_b = eval('fspconv.backward_general%s' % dtype_token)
-            func1_f = eval('fspconv.forward1_general%s' % dtype_token)
-            func1_b = eval('fspconv.backward1_general%s' % dtype_token)
+            func_f = eval('fspconv.forward%s_general%s' % (batch_token, dtype_token))
+            func_b = eval('fspconv.backward%s_general%s' % (batch_token, dtype_token))
             self._fforward = lambda *args, **kwargs: func_f(
                 *args, weight_indices=self.weight_indices, **kwargs)
             self._fbackward = lambda *args, **kwargs: func_b(
                 *args, weight_indices=self.weight_indices, **kwargs)
-            self._fforward1 = lambda *args, **kwargs: func1_f(
-                *args, weight_indices=self.weight_indices, **kwargs)
-            self._fbackward1 = lambda *args, **kwargs: func1_b(
-                *args, weight_indices=self.weight_indices, **kwargs)
         else:
-            self._fforward = eval('fspconv.forward_contiguous%s' % dtype_token)
-            self._fforward1 = eval(
-                'fspconv.forward1_contiguous%s' % dtype_token)
-            self._fbackward = eval(
-                'fspconv.backward_contiguous%s' % dtype_token)
-            self._fbackward1 = eval(
-                'fspconv.backward1_contiguous%s' % dtype_token)
+            self._fforward = eval('fspconv.forward%s_contiguous%s' % (batch_token, dtype_token))
+            self._fbackward = eval('fspconv.backward%s_contiguous%s' % (batch_token, dtype_token))
+
+            # cc operation
+            self._fforward_cc1 = eval('fspconv_cc.forward%s_%s%s' % (batch_token, 'v1', dtype_token))
+            self._fforward_cc2 = eval('fspconv_cc.forward%s_%s%s' % (batch_token, 'v2', dtype_token))
 
         # make it unitary
         self.is_unitary = is_unitary
@@ -187,25 +183,34 @@ class SPConv(LinearBase):
         Returns:
             ndarray, (num_batch, nfo, img_out_dims), output in 'F' order.
         '''
-        x_nd, img_nd = x.ndim, self.img_nd
-
         # flatten inputs/outputs
-        x = x.reshape(x.shape[:x_nd - img_nd] + (-1,), order='F')
+        x = x.reshape(x.shape[:-self.img_nd] + (-1,), order='F')
         _fltr_flatten = self.weight.reshape(
             self.weight.shape[:2] + (-1,), order='F')
 
-        if x_nd == img_nd + 1:  # single batch wise
-            y = self._fforward1(x, csc_indptr=self.csc_indptr,
+        y = self._fforward(x, csc_indptr=self.csc_indptr,
+                            csc_indices=self.csc_indices,
+                            fltr_data=_fltr_flatten,
+                            bias=self.bias,
+                            max_nnz_row=_fltr_flatten.shape[-1])
+        y = y.reshape(self.output_shape, order='F')
+        return y
+
+    def forward_cc(self, locs, dx, y0):
+        # flatten inputs/outputs
+        _fltr_flatten = self.weight.reshape(
+            self.weight.shape[:2] + (-1,), order='F')
+        y = y0.reshape(y0.shape[:-self.img_nd]+(-1,), order='F')
+
+        if self.acc_version=='v1':
+            self._fforward_cc1(locs, dx, y, csc_indptr=self.csc_indptr,
                                 csc_indices=self.csc_indices,
-                                fltr_data=_fltr_flatten,
-                                bias=self.bias,
-                                max_nnz_row=_fltr_flatten.shape[-1])
+                                fltr_data=_fltr_flatten)
+        elif self.acc_version=='v2':
+            self._fforward_cc2(locs, dx, y, _fltr_flatten, self.offset_table, img_shape = self.input_shape[-self.img_nd:],
+                    boundary=1 if self.boundary=='P' else 0, kernel_shape = self.weight.shape[-self.img_nd:])
         else:
-            y = self._fforward(x, csc_indptr=self.csc_indptr,
-                               csc_indices=self.csc_indices,
-                               fltr_data=_fltr_flatten,
-                               bias=self.bias,
-                               max_nnz_row=_fltr_flatten.shape[-1])
+            raise NotImplementedError()
         y = y.reshape(self.output_shape, order='F')
         return y
 
@@ -223,8 +228,7 @@ class SPConv(LinearBase):
             tuple(1darray, ndarray): dw, dx
         '''
         x, y = xy
-        x_nd, img_nd = x.ndim, self.img_nd
-        xpre = x.shape[:x_nd - img_nd]
+        xpre = x.shape[:-self.img_nd]
         ypre = xpre[:-1] + (self.num_feature_out,)
         do_xgrad = True
         mask = self.var_mask
@@ -235,24 +239,13 @@ class SPConv(LinearBase):
         _fltr_flatten = self.weight.reshape(
             self.weight.shape[:2] + (-1,), order='F')
 
-        if x_nd == img_nd + 1:  # single batch wise
-            dx, dweight, dbias =\
-                self._fbackward1(dy, x, self.csc_indptr,
-                                 self.csc_indices,
-                                 fltr_data=_fltr_flatten,
-                                 do_xgrad=do_xgrad,
-                                 do_wgrad=mask[0],
-                                 do_bgrad=mask[1],
-                                 max_nnz_row=_fltr_flatten.shape[-1])
-        else:
-            dx, dweight, dbias =\
-                self._fbackward(dy,
-                                x, self.csc_indptr, self.csc_indices,
-                                fltr_data=_fltr_flatten,
-                                do_xgrad=do_xgrad,
-                                do_wgrad=mask[0],
-                                do_bgrad=mask[1],
-                                max_nnz_row=_fltr_flatten.shape[-1])
+        dx, dweight, dbias = self._fbackward(dy,
+                            x, self.csc_indptr, self.csc_indices,
+                            fltr_data=_fltr_flatten,
+                            do_xgrad=do_xgrad,
+                            do_wgrad=mask[0],
+                            do_bgrad=mask[1],
+                            max_nnz_row=_fltr_flatten.shape[-1])
         return masked_concatenate([dweight.ravel(order='F'), dbias], mask),\
             dx.reshape(self.input_shape, order='F')
 
@@ -293,7 +286,6 @@ class SPSP(SPConv):
                 cscmat.shape[1], tuple_prod(input_shape[1:])))
 
         # self.csc_indptr, self.csc_indices,
-        # self.csc_data = scan2csc_sp(input_shape[1:], strides)
         img_in_shape = input_shape[2:]
         self.csc_indptr, self.csc_indices, self.img_out_shape = spscan2csc(
             kernel_shape, input_shape[-img_nd:], strides, boundary)
@@ -381,7 +373,7 @@ class SPConvProd(LinearBase):
 
         kernel_shape = self.weight.shape[2:]
         img_in_shape = input_shape[-img_nd:]
-        self.csc_indptr, self.csc_indices, self.img_out_shape = scan2csc(
+        self.csc_indptr, self.csc_indices, self.img_out_shape, offset_table = scan2csc(
             kernel_shape, img_in_shape, strides=strides, boundary=boundary)
         output_shape = input_shape[:-img_nd] + self.img_out_shape
 

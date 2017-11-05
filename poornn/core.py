@@ -7,12 +7,12 @@ from abc import ABCMeta, abstractmethod
 from collections import namedtuple
 import pdb
 
-from .utils import _connect, dtype2token, dtype_c2r
+from .utils import _connect, dtype2token, dtype_c2r, get_tag
 
 __all__ = ['Layer', 'Function', 'ParamFunction', 'Monitor', 'EXP_OVERFLOW',
            'EMPTY_VAR', 'AnalyticityError', 'DEFAULT_TAGS', 'TAG_LIST']
 
-TAG_LIST = ['runtimes', 'is_inplace', 'analytical']
+TAG_LIST = ['runtimes', 'is_inplace', 'analytical', 'one2one']
 '''
 List of tags:
 
@@ -27,6 +27,9 @@ List of tags:
         * 2, yes for float, no for complex, complex output for real output.
         * 3, yes for float, no for complex, complex output for complex input.
         * 4, no
+    * 'one2one' (bool):
+        True if this layer performs a one-to-one mapping,
+        neither inducing entanglement between data, nor chaning the order.
 '''
 
 EXP_OVERFLOW = 12
@@ -41,6 +44,7 @@ DEFAULT_TAGS = {
     'runtimes': [],
     'is_inplace': False,
     'analytical': 1,
+    'one2one': False,
 }
 '''
 A layer without tags attributes will take this set of tags.
@@ -139,6 +143,30 @@ attributes that will be displayed in print and graphviz.
         node = g.get_node(node_token)
         _connect(g, father, node, self.input_shape, self.itype)
         return node
+
+    def update(self, locs, dx, xy0, **kwargs):
+        '''
+        update forward run using existing run.
+
+        Args:
+            locs (2darray): different positions in input.
+            dx (ndarray): difference amount of value in input.
+            xy0 (tuple): x0 and y0 in previous run.
+
+        Return:
+            tuple|ndarray, int: data and information,
+                * information == 0, data is entangled, terminating (or swich to forward), data is ndarray.
+                * information == 1, not entangled, can go one update run, data is tuple.
+        '''
+        x0, y0 = xy0
+        if hasattr(self,'__update__'):
+            return self.__update__(locs, dx, xy0, **kwargs)
+        else:
+            if get_tag(self, 'one2one'):
+                y = self.forward(x0[locs]+dx, **kwargs)
+                return (locs, y-y0[locs]), 1
+            else:
+                raise NotImplementedError('Layer %s do not support history based update.'%self.__class__.__name__)
 
     def set_runtime_vars(self, var_dict={}):
         '''

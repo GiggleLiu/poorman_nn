@@ -166,7 +166,7 @@ texinfo_documents = [
      'Miscellaneous'),
 ]
 
-
+# configuration on napoleon
 napoleon_google_docstring = True
 napoleon_numpy_docstring = False
 napoleon_include_init_with_doc = False
@@ -180,13 +180,21 @@ napoleon_use_param = True
 napoleon_use_rtype = True
 napoleon_use_keyword = True
 
-import sys
-from mock import Mock as MagicMock
+# mock your binary lib interface (in order to deploy your API on Read The Docs server correctly).
+# mock is integrated into unittest since python3.3
+# mock API link: https://docs.python.org/3/library/unittest.mock.html
+if sys.version_info[0] >= 3.3:
+    from unittest.mock import MagicMock
+else:
+    from mock import Mock as MagicMock
 
 class Mock(MagicMock):
     @classmethod
     def __getattr__(cls, name):
-            return MagicMock()
+        return MagicMock()
+
+# module names are same as how you include these binary packages at '../' (i.e. in your path).
+# you can use try and "warning" strategy to detect those missing packages (without inplace compilation).
 MOCK_MODULES = ['poornn.lib', 'poornn.lib.linear', 'poornn.lib.spconv', 'poornn.lib.relu',
         'poornn.lib.pooling', 'poornn.lib.convprod']
 sys.modules.update((mod_name, Mock()) for mod_name in MOCK_MODULES)

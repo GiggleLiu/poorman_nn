@@ -111,8 +111,12 @@ class Linear(LinearBase):
             self.check_unitary()
 
     def forward(self, x, **kwargs):
-        y = self._fforward(np.atleast_2d(x), self.weight, self.bias)
-        return y.reshape(self.output_shape, order='F')
+        res = self._fforward(np.atleast_2d(x), self.weight, self.bias)
+        return res.reshape(self.output_shape, order='F')
+
+    def forward_cc(self, locs, dx, y0, **kwargs):
+        res = self._fforward(np.atleast_2d(dx), self.weight[:,locs], y0)
+        return res.reshape(self.output_shape, order='F')
 
     def backward(self, xy, dy, **kwargs):
         mask = self.var_mask

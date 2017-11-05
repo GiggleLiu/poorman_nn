@@ -64,6 +64,12 @@ any input data type if True.
             raise ValueError('Encountered duplicate field name: %r' % name)
         seen_names.add(name)
 
+    # set default `one2one` tags True
+    if tags is None:
+        tags = {'one2one':True}
+    elif 'one2one' not in tags:
+        tags['one2one'] = True
+
     def __init__(self, input_shape, itype, **kwargs):
         for fieldname in field_names:
             if fieldname in kwargs:
@@ -105,8 +111,8 @@ class Log2cosh(Function):
     '''
 
     def __init__(self, input_shape, itype, **kwargs):
-        super(Log2cosh, self).__init__(
-            input_shape, input_shape, itype, **kwargs)
+        super(Log2cosh, self).__init__(input_shape, input_shape, itype,
+                tags={'one2one':True}, **kwargs)
 
     @classmethod
     def forward(self, x, **kwargs):
@@ -135,8 +141,8 @@ class Logcosh(Function):
     '''
 
     def __init__(self, input_shape, itype, **kwargs):
-        super(Logcosh, self).__init__(
-            input_shape, input_shape, itype, **kwargs)
+        super(Logcosh, self).__init__(input_shape, input_shape, itype,
+                tags={'one2one':True}, **kwargs)
 
     @classmethod
     def forward(self, x, **kwargs):
@@ -165,7 +171,8 @@ class Sigmoid(Function):
     '''
 
     def __init__(self, input_shape, itype, **kwargs):
-        super(Sigmoid, self).__init__(input_shape, input_shape, itype)
+        super(Sigmoid, self).__init__(input_shape, input_shape, itype,
+                tags={'one2one':True})
 
     @classmethod
     def forward(self, x, **kwargs):
@@ -338,7 +345,7 @@ class ReLU(Function):
     __display_attrs__ = ['leak']
 
     def __init__(self, input_shape, itype, leak=0.0, is_inplace=False,
-                 mode=None, **kwargs):
+                 mode=None, tags={'one2one':True}, **kwargs):
         if leak > 1 or leak < 0:
             raise ValueError('leak parameter should be 0-1!')
         self.leak = leak
@@ -397,7 +404,7 @@ stored in 'F' order.
         if mode not in self.mode_list:
             raise ValueError('mode %s not allowed!' % mode)
         img_in_shape = input_shape[-len(kernel_shape):]
-        self.csc_indptr, self.csc_indices, self.img_out_shape = scan2csc(
+        self.csc_indptr, self.csc_indices, self.img_out_shape, _ = scan2csc(
             kernel_shape, img_in_shape, strides=kernel_shape, boundary='O')
         output_shape = input_shape[: -len(kernel_shape)] + self.img_out_shape
         super(Pooling, self).__init__(input_shape, output_shape, itype)
@@ -475,7 +482,7 @@ img_out_dims), stored in 'F' order.
         self.strides = strides
 
         img_in_shape = input_shape[-img_nd:]
-        self.csc_indptr, self.csc_indices, self.img_out_shape = scan2csc(
+        self.csc_indptr, self.csc_indices, self.img_out_shape, _ = scan2csc(
             self.powers.shape, img_in_shape, strides=strides,
             boundary=boundary)
         output_shape = input_shape[: -img_nd] + self.img_out_shape
@@ -551,7 +558,8 @@ class DropOut(Function):
         self.mask = None
         super(DropOut, self).__init__(input_shape, input_shape, itype,
                                       tags=dict(runtimes=['seed'],
-                                                is_inplace=is_inplace))
+                                                is_inplace=is_inplace,
+                                                one2one=True))
 
     def set_runtime_vars(self, var_dict):
         '''Set the runtime variable seed, used to generate a random mask.'''
@@ -709,7 +717,8 @@ requres runtime variable 'y_true'.
         self.y_true = None
         super(SquareLoss, self).__init__(input_shape, input_shape,
                                          itype, tags=dict(runtimes=['y_true'],
-                                                          analytical=2))
+                                                          analytical=2,
+                                                          one2one=True,))
 
     def forward(self, x, **kwargs):
         if self.y_true is None:
@@ -733,9 +742,13 @@ class Reshape(Function):
     Note:
         output_shape is a mandatory parameter now.
     '''
-
     def forward(self, x, **kwargs):
         return x.reshape(self.output_shape, order='F')
+
+    def _cc_tunnel(self, locs, dx, y0, **kwargs):
+        '''not tested'''
+        return np.unravel_index(np.ravel_multi_index(locs,\
+            self.input_shape, order='F'),self.output_shape, order='F')
 
     def backward(self, xy, dy, **kwargs):
         x, y = xy
@@ -749,11 +762,16 @@ class Reverse(Function):
         if axis > len(input_shape) - 1:
             raise ValueError('invalid axis')
         self.axis = axis % len(input_shape)
-        super(Reverse, self).__init__(
-            input_shape, input_shape, itype, otype=itype)
+        super(Reverse, self).__init__(input_shape, input_shape, itype,
+                otype=itype)
 
     def forward(self, x, **kwargs):
         return x[(slice(None),)*self.axis+(slice(None,None,-1),)]
+
+    def _cc_tunnel(self, locs, dx, y0, **kwargs):
+        '''not tested'''
+        locs[self.axis,:] = self.input_shape[self.axis]-locs[self.axis,:]
+        return locs, dx
 
     def backward(self, xy, dy, **kwargs):
         x, y = xy
@@ -769,8 +787,8 @@ class TypeCast(Function):
     '''
 
     def __init__(self, input_shape, itype, otype, **kwargs):
-        super(TypeCast, self).__init__(
-            input_shape, input_shape, itype, otype=otype)
+        super(TypeCast, self).__init__(input_shape, input_shape, itype,
+                otype=otype, tags={'one2one':True})
 
     def forward(self, x, **kwargs):
         return np.asarray(x, dtype=self.otype, order='F')
