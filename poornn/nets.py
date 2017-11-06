@@ -274,12 +274,14 @@ dtype = %s</font><br align="l"/>>' % (
         if len(layers) < 2:
             return
         input_shape = layers[0].input_shape
+        output_shape = layers[0].output_shape
         for la in layers[1:]:
             input_shape = check_shape_match(input_shape, la.input_shape)
             output_shape = check_shape_match(output_shape, la.output_shape)
         for la in layers:
-            la.input_shape = input_shape
-            la.output_shape = output_shape
+            if not isinstance(la, Container):
+                la.input_shape = input_shape
+                la.output_shape = output_shape
 
     def forward(self, x, do_shape_check=False, **kwargs):
         '''

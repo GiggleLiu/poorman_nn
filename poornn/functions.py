@@ -13,7 +13,7 @@ from .utils import scan2csc, tuple_prod, dtype2token,\
 
 __all__ = ['wrapfunc', 'Log2cosh', 'Logcosh', 'Sigmoid',
            'Cosh', 'Sinh', 'Tan', 'Tanh',
-           'Sum', 'Mul', 'Mod', 'Mean', 'FFT', 'ReLU', 'ConvProd',
+           'Sum', 'Mul', 'Mod', 'Mean', 'FFT', 'ReLU', 'ConvProd', 'Prod',
            'Pooling', 'DropOut',
            'Sin', 'Cos', 'ArcTan', 'Exp', 'Log', 'SoftPlus', 'Power',
            'SoftMax', 'CrossEntropy', 'SoftMaxCrossEntropy', 'SquareLoss',
@@ -257,6 +257,38 @@ class Mean(Function):
                        axis=self.axis) / x.shape[self.axis]
         return EMPTY_VAR, dx
 
+class Prod(Function):
+    '''
+    Product layer.
+
+    Args:
+        axis (int): product over this axis.
+
+    Attributes:
+        axis (int): product over this axis.
+    '''
+    __display_attrs__ = ['axis']
+
+    def __init__(self, input_shape, itype, axis, **kwargs):
+        if axis > len(input_shape) - 1:
+            raise ValueError('invalid axis')
+        self.axis = axis % len(input_shape)
+        output_shape = input_shape[:self.axis] + input_shape[self.axis + 1:]
+        super(Prod, self).__init__(input_shape, output_shape, itype)
+
+    def forward(self, x, **kwargs):
+        return np.prod(x,axis=self.axis)
+
+    def backward(self, xy, dy, **kwargs):
+        x, y = xy
+        if np.ndim(dy) == 0:
+            dyy_ = np.asarray(dy*y, order='F')[np.newaxis]
+        else:
+            dyy_ = np.asarray(dy*y, order='F')[
+                (slice(None),) * self.axis + (np.newaxis,)]
+        dx = dyy_/x
+        return EMPTY_VAR, dx
+
 
 class FFT(Function):
     '''
@@ -446,7 +478,6 @@ stored in 'F' order.
                              mode=self.mode_list.index(self.mode)
                              ).reshape(self.input_shape, order='F')
         return EMPTY_VAR, dx
-
 
 class ConvProd(Function):
     '''

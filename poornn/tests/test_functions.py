@@ -243,7 +243,6 @@ def test_dropout():
 
 
 def test_summean():
-    random.seed(2)
     func = Sum(input_shape=(-1, 2), itype='float32', axis=1)
     func2 = Mean(input_shape=(-1, 2), itype='float32', axis=1)
     print('Test forward for %s, %s.' % (func, func2))
@@ -261,6 +260,10 @@ def test_summean():
     assert_(all(check_numdiff(func, x)))
     assert_(all(check_numdiff(func2, x)))
 
+def test_prod():
+    func = Prod(input_shape=(-1, 2), itype='float32', axis=1)
+    print('Testing numdiff for %s'%func)
+    assert_(all(check_numdiff(func)))
 
 def test_filter():
     random.seed(2)
@@ -434,6 +437,7 @@ def test_reverse():
     assert_(all(check_numdiff(func)))
 
 def run_all():
+    test_prod()
     test_reverse()
     test_fft()
     test_softmaxnorm()
